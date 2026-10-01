@@ -15,7 +15,7 @@ import {ScrollTrigger} from '@/components/rhio/gsap-motion';
 import {SectionHead} from './features';
 import {Thumb} from './mocks';
 
-const STEPS:[string,string,string,string][]=[['Find','Browse published agents in Discover.','','bg-sky'],['Run','Pick a skill and describe the task.','5 CR sample','bg-iris'],['Pay','The creator’s price is debited in credits.','Creator price','bg-coral'],['Earn','The creator is credited in the ledger.','0% fee · beta','bg-lime']];
+const STEPS:[string,string,string,string][]=[['Find','Browse published agents in Discover.','','bg-sky'],['Run','Pick a skill and describe the task.','5 CR sample','bg-iris'],['Pay','The creator’s price is debited in credits.','Creator price','bg-coral'],['Earn','The creator is credited in the ledger.','','bg-lime']];
 
 export function Flow({onNavigate}:{onNavigate:(v:'agents'|'roadmap')=>void}){
  const list=useRef<HTMLOListElement>(null);const [lit,setLit]=useState(1);
@@ -25,7 +25,7 @@ export function Flow({onNavigate}:{onNavigate:(v:'agents'|'roadmap')=>void}){
   return()=>sts.forEach(t=>t.kill());},[]);
  return <section className="bg-surface px-4 py-[clamp(80px,10vw,140px)]">
   <SectionHead center eyebrow="Pay per run" tone="amber" lead="Every run pays" rest="the creator who built the agent." sub="Credits move from the person running the task to the creator, minus the platform fee. Failed runs are refunded automatically."/>
-  <div className="mx-auto mt-12 grid max-w-[1180px] gap-5 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,.7fr)]">
+  <div className="mx-auto mt-12 grid max-w-[860px] gap-6">
    <Reveal className="relative pt-14 pr-[clamp(0px,8vw,110px)] max-sm:pt-8">
     <div className="absolute top-0 right-0 flex h-[calc(100%-28px)] w-[86%] items-end justify-end rounded-2xl border bg-t-amber p-4"><span className="max-w-44 text-[11px] leading-snug text-muted-foreground max-sm:hidden">Credits pay for runs. USDG top-ups and earnings claims run on Robinhood Chain.</span></div>
     <Card className="tone-dark relative gap-0 rounded-2xl rounded-tl-none border-white/10 px-7 py-5 max-sm:px-5">
@@ -36,16 +36,8 @@ export function Flow({onNavigate}:{onNavigate:(v:'agents'|'roadmap')=>void}){
      </li>)}</ol>
     </Card>
    </Reveal>
-   <Reveal delay={120}>
-    <Card className="h-full gap-5 rounded-2xl p-6 shadow-none">
-     <div className="flex items-center justify-between"><Eyebrow tone="lime">Creator share</Eyebrow><span className="font-mono text-[10px] tracking-[.08em] text-muted-foreground uppercase">Beta</span></div>
-     <div className="font-display text-[clamp(72px,8vw,112px)] leading-[.9] font-medium tracking-[-.06em]">100%<span className="ml-2 text-base font-normal tracking-normal text-muted-foreground">of the price</span></div>
-     <div className="grid gap-3">
-      {[['Creator','100%',100,'bg-lime'],['Platform fee','0%',1.5,'bg-muted-foreground']].map(([l,v,w,c])=><div key={l as string} className="grid gap-1.5"><div className="flex justify-between font-mono text-[10.5px] tracking-[.08em] uppercase"><span className="text-muted-foreground">{l}</span><b>{v}</b></div><div className="h-2 overflow-hidden rounded-lg bg-secondary"><div className={cn('h-full rounded-lg',c as string)} style={{width:`${w}%`}}/></div></div>)}
-     </div>
-     <p className="text-sm text-muted-foreground">A 10% platform fee is planned after beta. The current rate is shown in your account.</p>
-     <div className="mt-auto flex flex-wrap gap-2"><CutButton size="sm" onClick={()=>onNavigate('agents')}>Set a price</CutButton><CutButton size="sm" variant="outline" onClick={()=>onNavigate('roadmap')}>Roadmap</CutButton></div>
-    </Card>
+   <Reveal delay={120} className="flex flex-wrap justify-center gap-2">
+    <CutButton size="sm" onClick={()=>onNavigate('agents')}>Set a price</CutButton><CutButton size="sm" variant="outline" onClick={()=>onNavigate('roadmap')}>Roadmap</CutButton>
    </Reveal>
   </div>
  </section>;
