@@ -1,0 +1,74 @@
+RHIO AGENT STUDIO — INTEGRATION GUIDE
+
+What this file is
+A short technical note for operators who host RHIO themselves. The full guides are in the
+repository (START-HERE-ID.md, DEPLOY-ID.md, COOLIFY-ID.md) and in the Docs on the site.
+
+Current product state
+Live: character studio (25 procedural characters, three.js), agent builder, eight skills,
+workspace storage per account, task history, export / import, share links, schedules, the
+pay-per-run marketplace in preview credits, and wallet-only sign-in (Sign-In with Ethereum
+on Robinhood Chain).
+Built and off until an operator configures it: live AI on a server-side provider, credit
+top-ups in USDG, earnings claims, holder tiers and holder rewards.
+Not live: the RHIO token is not deployed. Rewards pay nothing. Preview credits have no
+monetary value. Without an AI provider every skill returns a labelled workflow sample that
+does not browse, summarise or execute anything.
+
+AI providers (server-side secrets only, never in the browser)
+The server uses the first one that is configured, and only when AI_ENABLED=true:
+1. ANTHROPIC_API_KEY                       Claude (official SDK), web search for research
+2. OPENAI_API_KEY + OPENAI_MODEL           OpenAI Responses API, web search for research
+3. AI_BASE_URL + AI_API_KEY + AI_MODEL     any OpenAI-compatible Chat Completions API
+4. AI_GATEWAY_URL + AI_GATEWAY_KEY         your own gateway (contract below)
+Every live run is debited in credits and counted against per-account and studio-wide daily
+limits that are enforced in the database. A failed run returns its credits. Set a spending
+limit at the provider as well: a timeout does not guarantee that the provider stopped.
+
+Gateway contract
+The server sends POST JSON over HTTPS:
+{
+  "version": 1,
+  "taskId": "UUID",
+  "agent": {"name":"...","personality":"...","tone":"Friendly",
+            "language":"English","skills":["research"]},
+  "skill": "research",
+  "prompt": "User task",
+  "maxOutputTokens": 1800,
+  "allowExternalActions": false
+}
+Headers: Authorization: Bearer <AI_GATEWAY_KEY>, Idempotency-Key: <taskId>
+Expected response: {"output":"Plain text result, including source URLs when used"}
+The request times out after 45 seconds. Redirects are rejected and plain http is refused.
+Output must be nonempty text; at most 40,000 characters are kept. HTML is never rendered.
+
+The gateway must implement the selected skill itself: research retrieves sources, document
+reads the supplied text, write drafts content. It must respect the personality, tone,
+language and output limit, treat pasted documents as untrusted content, and take no
+external actions. Do not present a generic text model as a web-research service.
+When someone else's published agent is run, its instructions must not be revealed in the
+output; the server also withholds an answer that copies them.
+
+Storage and access
+Agents, runs and credit balances live in a D1 (SQLite) database, scoped to the signed-in
+account. API writes require a matching Origin. IDs are random UUIDs. Archiving an agent is
+reversible. Share links carry the agent's configuration in the URL fragment, so never put
+secrets in instructions.
+
+Credits
+New accounts start with free credits (STARTING_CREDITS, default 25). A workflow sample
+costs 5; a live run is priced by skill. The balance can never go below zero: the debit and
+the run are written in one transaction, and reusing a request ID returns the existing
+result without a second debit. Granted and bought credits can never be withdrawn.
+
+Chain
+Robinhood Chain (mainnet 4663, testnet 46630). Addresses come from the server
+environment and are published at /api/chain; nothing is hard-coded in the client. The
+server holds no key that can transfer funds. Token balances are always read by the server
+from the chain, never taken from the browser.
+
+Characters
+Characters are built at runtime from primitives by the RHIO engine (three.js). The first
+generation GLB models in /models are kept for provenance and are no longer loaded.
+RobotExpressive (in /models): Tomas Laulhe / Quaternius, CC0 1.0, modified by Don McCurdy,
+from the three.js examples repository.

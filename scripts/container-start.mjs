@@ -1,0 +1,234 @@
+// Container entrypoint (Docker / Coolify). Runs the built Worker on workerd through `wrangler dev --local`,
+// with D1 stored as SQLite under RHIO_DATA_DIR (a persistent volume). Steps:
+//   1. refuse unsafe settings (missing secret, dev-only auth flags, http origin in production)
+//   2. write the Worker's variables to dist/server/.dev.vars from an allow-list of environment variables
+//      (nothing else from the container environment reaches the Worker)
+//   3. apply drizzle/*.sql migrations that have not run yet (tracked in the d1_migrations table)
+//   4. start the server on 0.0.0.0:PORT and forward stop signals
+//   5. every minute: call the scheduler (scheduled agent runs, holder recorder); every day: back up the database
+import {spawn,spawnSync} from 'node:child_process';
+import http from 'node:http';
+import {mkdirSync,readFileSync,readdirSync,rmSync,statSync,writeFileSync} from 'node:fs';
+import {randomBytes} from 'node:crypto';
+import {createRequire} from 'node:module';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+
+const root=fileURLToPath(new URL('../',import.meta.url));process.chdir(root);
+const E=process.env;const DATA=(E.RHIO_DATA_DIR||'/data').split(path.sep).join('/');const PORT=String(E.PORT||8787);
+const devFlags=E.RHIO_ALLOW_DEV_FLAGS==='true';
+const fail=m=>{console.error(`[rhio] ${m}`);process.exit(1);};
+const log=m=>console.log(`[rhio] ${m}`);
+
+// 1. safety checks
+const origin=(E.APP_ORIGIN||'').replace(/[/]+$/,'');
+if(!/^https?:\/\/[^/\s]+$/.test(origin))fail('Set APP_ORIGIN to the public URL of the site, for example https://rhio.studio (no path).');
+if(origin.startsWith('http:')&&!devFlags)fail('APP_ORIGIN must use https on a public server. Set RHIO_ALLOW_DEV_FLAGS=true only for a local test.');
+if((E.BETTER_AUTH_SECRET||'').length<32||/\s/.test(E.BETTER_AUTH_SECRET||''))fail('Set BETTER_AUTH_SECRET to 32+ random characters: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'base64url\'))"');
+for(const k of ['AUTH_TRUST_SITES_HEADERS'])
+ if(E[k]==='true'&&!devFlags)fail(`${k}=true lets anyone sign in as anyone on a public server. Remove it (RHIO_ALLOW_DEV_FLAGS=true is for local tests only).`);
+if(E.CLAIMS_ADMIN_TOKEN&&E.CLAIMS_ADMIN_TOKEN.length<32)fail('CLAIMS_ADMIN_TOKEN must be 32+ characters (or leave it empty).');
+// numbers that scale money: a typo here mis-prices every top-up, claim or reward, so they are checked before anything starts
+const DECIMALS=/^(?:\d|[12]\d|3[0-6])$/;
+for(const k of ['PAY_TOKEN_DECIMALS','REWARD_TOKEN_DECIMALS'])if(E[k]&&!DECIMALS.test(E[k]))fail(`${k} must be a whole number from 0 to 36 (USDG: 6, NVDA: 18).`);
+if(E.CREDITS_PER_TOKEN&&!/^[1-9]\d{0,6}$/.test(E.CREDITS_PER_TOKEN))fail('CREDITS_PER_TOKEN must be a whole number of credits per token, at least 1 (default 100).');
+for(const k of ['REWARD_PERIOD_HOURS','REWARD_PRICE_MAX_AGE_HOURS'])if(E[k]&&!/^[1-9]\d{0,3}$/.test(E[k]))fail(`${k} must be a whole number of hours, at least 1.`);
+for(const k of ['TOPUP_MIN_CONFIRMATIONS','CLAIM_MIN_CREDITS','TIER_BASE_CREDITS','REWARD_START_BLOCK','PLATFORM_FEE_BPS','SKILL_TRIAL_LIMIT','SCHEDULE_RUN_COST','SCHEDULE_MAX','SCHEDULE_DAILY_RUNS','AI_DAILY_FREE_RUNS','AI_DAILY_SEARCH_RUNS'])
+ if(E[k]&&!/^\d{1,12}$/.test(E[k]))fail(`${k} must be a whole number.`);
+// an entry with a typo would silently stop being excluded and start earning holder rewards
+if(E.REWARD_EXCLUDE)for(const a of E.REWARD_EXCLUDE.split(',').map(x=>x.trim()).filter(Boolean))if(!/^0x[0-9a-fA-F]{40}$/.test(a))fail(`REWARD_EXCLUDE: "${a.slice(0,50)}" is not a 0x address (40 hex characters). Fix or remove it.`);
+// Robinhood Chain mainnet moves real money: only the official USDG, a treasury, and settled (not soft) top-ups.
+const USDG_MAINNET='0x5fc5360d0400a0fd4f2af552add042d716f1d168';
+const NVDA_MAINNET='0xd0601ce157db5bdc3162bbac2a2c8af5320d9eec';
+// Chainlink "Robinhood NVDA / USD" (RHNVDA / USD, 8 decimals) from Chainlink's feed directory for Robinhood mainnet
+const NVDA_FEED_MAINNET='0x379ec4f7c378f34a1b47e4f3cbebcbac3e8e9f15';
+for(const k of ['PAY_TOKEN_ADDRESS','TOPUP_TREASURY','CLAIMS_CONTRACT','RHIO_TOKEN_ADDRESS','REWARD_TOKEN_ADDRESS','REWARD_CONTRACT','REWARD_PRICE_FEED'])
+ if(E[k]&&!/^0x[0-9a-fA-F]{40}$/.test(E[k]))fail(`${k} must be a 0x address (40 hex characters) or empty.`);
+if(E.CHAIN_NETWORK==='mainnet'){
+ if(devFlags)fail('RHIO_ALLOW_DEV_FLAGS=true is for local tests only and is refused on mainnet.');
+ if(E.CHAIN_ID&&E.CHAIN_ID!=='4663')fail('CHAIN_ID does not match Robinhood Chain mainnet (4663). Remove CHAIN_ID.');
+ for(const k of ['CHAIN_RPC_URL','CHAIN_LOGS_RPC_URL'])if(E[k]&&!/^https:\/\/\S+$/.test(E[k]))fail(`${k} must be an https URL on mainnet.`);
+ if(E.PAY_TOKEN_ADDRESS?.toLowerCase()===USDG_MAINNET&&E.PAY_TOKEN_DECIMALS&&E.PAY_TOKEN_DECIMALS!=='6')fail('USDG has 6 decimals: set PAY_TOKEN_DECIMALS=6. Another value mis-prices every top-up.');
+ {const want={[NVDA_MAINNET]:'18',[USDG_MAINNET]:'6'}[(E.REWARD_TOKEN_ADDRESS||'').toLowerCase()];
+  if(want&&E.REWARD_TOKEN_DECIMALS&&E.REWARD_TOKEN_DECIMALS!==want)fail(`REWARD_TOKEN_DECIMALS must be ${want} for this reward token. Another value mis-prices every reward.`);}
+ if(E.PAY_TOKEN_ADDRESS&&E.PAY_TOKEN_ADDRESS.toLowerCase()!==USDG_MAINNET&&E.RHIO_ALLOW_CUSTOM_PAY_TOKEN!=='true')
+  fail(`On mainnet PAY_TOKEN_ADDRESS must be the official USDG (${USDG_MAINNET}, docs.robinhood.com/chain/contracts).`);
+ if(E.PAY_TOKEN_ADDRESS&&!E.TOPUP_TREASURY)fail('Mainnet top-ups need TOPUP_TREASURY (your multisig address).');
+ if(E.TOPUP_FINALITY==='soft')fail('TOPUP_FINALITY=soft is for tests only. Use safe (default) or finalized on mainnet.');
+ if(E.CLAIMS_ENABLED==='true'&&!E.CLAIMS_CONTRACT)fail('CLAIMS_ENABLED=true needs CLAIMS_CONTRACT.');
+ if(E.REWARDS_ENABLED==='true'&&!(E.RHIO_TOKEN_ADDRESS&&E.REWARD_TOKEN_ADDRESS&&E.REWARD_CONTRACT))fail('REWARDS_ENABLED=true needs RHIO_TOKEN_ADDRESS, REWARD_TOKEN_ADDRESS and REWARD_CONTRACT.');
+ if(E.REWARD_TOKEN_ADDRESS&&![NVDA_MAINNET,USDG_MAINNET].includes(E.REWARD_TOKEN_ADDRESS.toLowerCase())&&E.RHIO_ALLOW_CUSTOM_REWARD_TOKEN!=='true')
+  fail(`On mainnet REWARD_TOKEN_ADDRESS must be the official NVDA Stock Token (${NVDA_MAINNET}) or USDG.`);
+ if(E.REWARD_CONTRACT&&E.CLAIMS_CONTRACT&&E.REWARD_CONTRACT.toLowerCase()===E.CLAIMS_CONTRACT.toLowerCase())fail('REWARD_CONTRACT must be a separate RhioClaims instance, not CLAIMS_CONTRACT.');
+ if(E.REWARD_TOKEN_ADDRESS?.toLowerCase()===NVDA_MAINNET){
+  if(E.REWARD_PRICE_FEED&&E.REWARD_PRICE_FEED.toLowerCase()!==NVDA_FEED_MAINNET&&E.RHIO_ALLOW_CUSTOM_PRICE_FEED!=='true')
+   fail(`REWARD_PRICE_FEED must be the official Chainlink NVDA / USD feed on Robinhood Chain (${NVDA_FEED_MAINNET}).`);
+  if(E.REWARDS_ENABLED==='true'&&!E.REWARD_PRICE_FEED)log(`warning: no REWARD_PRICE_FEED; the NVDA price must be set by hand. The live Chainlink feed is ${NVDA_FEED_MAINNET}.`);
+ }
+ // the public RPC keeps only recent state (about 10 minutes: measured 1 Oct 2026, older than 6,000 to 9,000 blocks is gone): monthly tier snapshots and the RHIO deploy-block
+ // search read older blocks and fail there
+ if(!E.CHAIN_RPC_URL)log('warning: no CHAIN_RPC_URL; using the public mainnet RPC, which is rate-limited and keeps no old state. Tier snapshots need an archive RPC (Alchemy).');
+ log(`MAINNET: top-ups ${E.PAY_TOKEN_ADDRESS?'ON (real USDG)':'off'}, claims ${E.CLAIMS_ENABLED==='true'?'ON':'off'}, tiers ${E.RHIO_TOKEN_ADDRESS?'ON':'off'}, holder rewards ${E.REWARDS_ENABLED==='true'?'ON':'off'}`);
+}
+
+// 2. Worker variables: allow-list only
+const KEYS=['APP_ORIGIN','BETTER_AUTH_SECRET','AUTH_TRUST_SITES_HEADERS',
+ 'AI_ENABLED','ANTHROPIC_API_KEY','ANTHROPIC_MODEL','ANTHROPIC_EFFORT','ANTHROPIC_MAX_TOKENS','ANTHROPIC_BASE_URL','LIVE_RUN_COST','LIVE_DAILY_PER_USER','AI_DAILY_RUNS','AI_DAILY_FREE_RUNS','AI_DAILY_SEARCH_RUNS','AI_SEARCH_FREE_CREDITS','OPENAI_API_KEY','OPENAI_MODEL','AI_GATEWAY_URL','AI_GATEWAY_KEY','AI_BASE_URL','AI_API_KEY','AI_MODEL','AI_REASONING_EFFORT','AI_WEB_SEARCH','AI_MAX_TOKENS','AI_MODEL_FREE','STARTING_CREDITS','LIVE_SKILL_COSTS','FREE_REFILL_CREDITS','FREE_REFILL_HOURS','LIMIT_WINDOW_HOURS','FREE_HEAVY_PER_WINDOW','PAID_HEAVY_PER_WINDOW','HEAVY_SKILLS','REWARD_ROOT_POSTER_KEY','PLATFORM_FEE_BPS','SKILL_TRIAL_LIMIT',
+ 'SCHEDULES_ENABLED','SCHEDULE_RUN_COST','SCHEDULE_MAX','SCHEDULE_DAILY_RUNS','SCHEDULER_TOKEN',
+ 'CHAIN_NETWORK','CHAIN_ID','CHAIN_RPC_URL','CHAIN_LOGS_RPC_URL','PAY_TOKEN_ADDRESS','PAY_TOKEN_SYMBOL','PAY_TOKEN_DECIMALS','TOPUP_TREASURY','CREDITS_PER_TOKEN',
+ 'TOPUP_MIN_CONFIRMATIONS','TOPUP_FINALITY','CLAIMS_ENABLED','CLAIMS_CONTRACT','CLAIM_MIN_CREDITS','CLAIMS_ADMIN_TOKEN','RHIO_TOKEN_ADDRESS','TIER_BASE_CREDITS',
+ 'REWARDS_ENABLED','REWARD_TOKEN_ADDRESS','REWARD_TOKEN_SYMBOL','REWARD_TOKEN_DECIMALS','REWARD_CONTRACT','REWARD_RHIO_PER_UNIT','REWARD_USD_PER_UNIT_HOUR','REWARD_PRICE_FEED','REWARD_PRICE_MAX_AGE_HOURS',
+ 'REWARD_START_BLOCK','REWARD_EXCLUDE','REWARD_PERIOD_HOURS','REWARD_AUTO'];
+// earlier reward rules (weekly, then % of circulating) were replaced by the fixed rate (client, 30 Sep 2026): say so
+for(const old of ['REWARD_MIN_HOLD','REWARD_MIN_HOLD_DAYS','REWARD_PERIOD_DAYS','REWARD_MIN_HOLD_PCT','REWARD_MIN_HOLD_HOURS','REWARD_DRIP_HOURS','REWARD_SPLIT'])
+ if(E[old])log(`warning: ${old} is no longer used; remove it. The rule is REWARD_RHIO_PER_UNIT (default 3000000) RHIO = REWARD_USD_PER_UNIT_HOUR (default 0.01) USD per hour.`);
+if(E.REWARD_RHIO_PER_UNIT&&!/^[1-9]\d{0,14}$/.test(E.REWARD_RHIO_PER_UNIT))fail('REWARD_RHIO_PER_UNIT must be a whole number of RHIO, for example 3000000.');
+if(E.REWARD_USD_PER_UNIT_HOUR&&!(/^\d{1,12}(\.\d{1,8})?$/.test(E.REWARD_USD_PER_UNIT_HOUR)&&Number(E.REWARD_USD_PER_UNIT_HOUR)>0))fail('REWARD_USD_PER_UNIT_HOUR must be a USD amount with at most 8 decimals, for example 0.01.');
+// Claude needs a Console API key (sk-ant-api...). A subscription token (Claude Pro/Max, sk-ant-oat...) is for the
+// subscriber's own use in Claude apps, not for serving other people from a server: refuse it instead of failing later.
+if(E.ANTHROPIC_API_KEY&&/^sk-ant-oat/.test(E.ANTHROPIC_API_KEY))fail('ANTHROPIC_API_KEY is a Claude subscription token (sk-ant-oat...). Create an API key at console.anthropic.com (Settings → API keys) and set a spend limit there.');
+if(E.ANTHROPIC_API_KEY&&!/^sk-ant-api/.test(E.ANTHROPIC_API_KEY))log('warning: ANTHROPIC_API_KEY does not look like a Console API key (sk-ant-api...).');
+const SKILLS=['research','write','document','summarize','translate','brainstorm','code','planner'];
+if(E.LIVE_SKILL_COSTS&&E.LIVE_SKILL_COSTS!=='flat'&&!E.LIVE_SKILL_COSTS.split(',').every(p=>{const [k,v,...rest]=p.split('=').map(x=>x.trim());return !rest.length&&SKILLS.includes(k)&&/^\d{1,3}$/.test(v||'');}))fail('LIVE_SKILL_COSTS must look like research=12,document=6 (skills: research, write, document, summarize, translate, brainstorm, code, planner) or be flat.');
+if(E.HEAVY_SKILLS&&!E.HEAVY_SKILLS.split(',').every(k=>SKILLS.includes(k.trim())))fail('HEAVY_SKILLS must be a comma-separated list of skills: '+SKILLS.join(', ')+'.');
+if(E.REWARD_ROOT_POSTER_KEY&&!/^0x[0-9a-fA-F]{64}$/.test(E.REWARD_ROOT_POSTER_KEY))fail('REWARD_ROOT_POSTER_KEY must be 0x followed by 64 hex characters (a dedicated key that only posts reward roots).');
+if(E.AI_WEB_SEARCH&&E.AI_WEB_SEARCH!=='google')fail('AI_WEB_SEARCH must be google (Gemini Grounding with Google Search for the research skill) or empty.');
+if(E.AI_SEARCH_FREE_CREDITS&&!['true','false'].includes(E.AI_SEARCH_FREE_CREDITS))fail('AI_SEARCH_FREE_CREDITS must be true or false (false: only runs paid with bought credits use web search).');
+if(E.AI_WEB_SEARCH==='google'&&!(E.AI_BASE_URL||'').startsWith('https://generativelanguage.googleapis.com/'))fail('AI_WEB_SEARCH=google needs AI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai');
+if(E.AI_REASONING_EFFORT&&!['none','minimal','low','medium','high'].includes(E.AI_REASONING_EFFORT))fail('AI_REASONING_EFFORT must be none, minimal, low, medium or high (Gemini Flash-Lite: minimal to high).');
+if(E.ANTHROPIC_EFFORT&&!['low','medium','high','xhigh','max'].includes(E.ANTHROPIC_EFFORT))fail('ANTHROPIC_EFFORT must be low, medium, high, xhigh or max.');
+for(const k of ['LIVE_RUN_COST','LIVE_DAILY_PER_USER','AI_DAILY_RUNS','ANTHROPIC_MAX_TOKENS','AI_MAX_TOKENS','STARTING_CREDITS','FREE_REFILL_CREDITS','FREE_REFILL_HOURS','LIMIT_WINDOW_HOURS','FREE_HEAVY_PER_WINDOW','PAID_HEAVY_PER_WINDOW'])if(E[k]&&!/^\d{1,7}$/.test(E[k]))fail(`${k} must be a whole number.`);
+// the scheduler token only has to be shared between this process and the Worker: a fresh one per start is enough
+if(!E.SCHEDULER_TOKEN||E.SCHEDULER_TOKEN.length<32)E.SCHEDULER_TOKEN=randomBytes(32).toString('base64url');
+const vars={...Object.fromEntries(KEYS.filter(k=>E[k]!==undefined&&E[k]!=='').map(k=>[k,E[k]])),APP_ORIGIN:origin};
+writeFileSync('dist/server/.dev.vars',Object.entries(vars).map(([k,v])=>`${k}=${JSON.stringify(String(v))}`).join('\n')+'\n',{mode:0o600});
+log(`worker variables: ${Object.keys(vars).filter(k=>k!=='SCHEDULER_TOKEN').join(', ')} (+ scheduler token)`);
+
+// preview deployments (preview.<domain> or RHIO_NOINDEX=true) ask search engines to stay away
+const noindex=E.RHIO_NOINDEX?E.RHIO_NOINDEX==='true':new URL(origin).hostname.startsWith('preview.');
+writeFileSync('dist/client/robots.txt',noindex?'User-agent: *\nDisallow: /\n':'User-agent: *\nAllow: /\n');
+const headers=readFileSync('dist/client/_headers','utf8').replace(/\n# rhio-noindex[\s\S]*$/,'');
+writeFileSync('dist/client/_headers',noindex?`${headers.trimEnd()}\n# rhio-noindex\n/*\n  X-Robots-Tag: noindex, nofollow\n`:headers);
+log(noindex?'preview mode: robots.txt disallows crawling, X-Robots-Tag noindex':'indexing allowed');
+
+// runtime config next to the build output so its relative paths (main, assets) still resolve
+const cfg=JSON.parse(readFileSync('dist/server/wrangler.json','utf8'));
+cfg.d1_databases=(cfg.d1_databases||[]).map(d=>({...d,migrations_dir:'../../drizzle'}));
+const INTERNAL=Number(PORT)+1; // workerd listens here; the front proxy below owns PORT
+cfg.dev={...(cfg.dev||{}),ip:'127.0.0.1',port:INTERNAL,local_protocol:'http',enable_containers:false};
+const CONFIG='dist/server/wrangler.container.json';writeFileSync(CONFIG,JSON.stringify(cfg));
+mkdirSync(DATA,{recursive:true});
+
+const wrangler=createRequire(import.meta.url).resolve('wrangler/bin/wrangler.js');
+// X_LOCAL_EXPLORER=false: the dev runtime ships a data explorer (/cdn-cgi/explorer, raw SQL on the database) that is on
+// by default and guarded only by a Host check. It is never wanted on a server (the front proxy also refuses /cdn-cgi/).
+const env={...E,CI:'1',WRANGLER_SEND_METRICS:'false',CLOUDFLARE_CF_FETCH_ENABLED:'false',WRANGLER_WRITE_LOGS:'false',X_LOCAL_EXPLORER:'false'};
+
+// 3. migrations
+log(`applying migrations to ${DATA}`);
+const mig=spawnSync(process.execPath,[wrangler,'d1','migrations','apply','DB','--local','--config',CONFIG,'--persist-to',DATA],{stdio:'inherit',env});
+if(mig.status!==0)fail('migrations failed; the server was not started.');
+
+// 4. serve. request.url is rewritten to the public origin so origin checks match behind the proxy.
+const pub=new URL(origin);
+const args=[wrangler,'dev','--config',CONFIG,'--local','--persist-to',DATA,'--ip','127.0.0.1','--port',String(INTERNAL),'--inspector-port','0',
+ '--local-upstream',pub.host,'--upstream-protocol',pub.protocol.replace(':',''),'--show-interactive-dev-session=false','--live-reload=false'];
+log(`starting on 0.0.0.0:${PORT} for ${origin}`);
+const child=spawn(process.execPath,args,{stdio:'inherit',env});
+
+// 5. front proxy. The local runtime stalls the NEXT request on a keep-alive connection when a handler answers
+// without reading the request body (e.g. a 401/404/405 to a POST). Reverse proxies (Coolify's Traefik) reuse
+// connections, so one such request could hang or 503 other users. Every request is therefore forwarded to the
+// runtime on its own short-lived connection; clients keep normal keep-alive with this proxy.
+// Other hostnames pointed at this container (www., an old preview domain) go to the public origin: wallet sign-in
+// is bound to that one domain, so the app cannot work anywhere else. Health checks, IPs and container names pass through.
+const foreign=h=>{const n=String(h||'').toLowerCase().replace(/:\d+$/,'');return n.includes('.')&&n!==pub.hostname&&!/^[\d.]+$/.test(n)&&!n.startsWith('[')&&!n.endsWith('.localhost');};
+// The runtime behind this proxy is developer tooling, so the proxy is the security boundary:
+// - /cdn-cgi/* (the runtime's own endpoints: data explorer, scheduled triggers) is never forwarded;
+// - the Host the runtime sees is always the public one, so its "local request" shortcuts cannot be reached from another
+//   container or the host by sending Host: localhost;
+// - headers a client must not choose are replaced: the runtime's internal mf-* headers, Cloudflare's cf-* headers (there
+//   is no Cloudflare in front unless RHIO_TRUST_CF_HEADERS=true) and platform identity headers. The client address is the
+//   one the nearest reverse proxy appended (last X-Forwarded-For entry), which is what the sign-in rate limit keys on;
+// - a request body is cut off at 1 MB (every API body is JSON under 18,000 characters).
+const MAX_BODY=1_000_000;
+const trustCf=E.RHIO_TRUST_CF_HEADERS==='true';
+const looksLikeIp=s=>/^[0-9a-fA-F:.]{3,45}$/.test(s);
+const clientIp=req=>{
+ const cf=String(req.headers['cf-connecting-ip']||'').trim();if(trustCf&&looksLikeIp(cf))return cf;
+ const hops=String(req.headers['x-forwarded-for']||'').split(',').map(s=>s.trim()).filter(Boolean);const last=hops[hops.length-1]||'';
+ return looksLikeIp(last)?last:String(req.socket.remoteAddress||'').replace(/^::ffff:/,'')||'0.0.0.0';
+};
+/** Path as the runtime will read it (absolute-form targets, dot segments, encoded and repeated slashes resolved), or null. */
+const runtimePath=raw=>{
+ let s=String(raw||'/');const abs=s.match(/^[a-z][a-z0-9+.-]*:\/\/[^/?#]*(.*)$/i);if(abs)s=abs[1]||'/';
+ if(!s.startsWith('/'))s='/'+s;
+ try{return decodeURIComponent(new URL('http://x'+s.replace(/^[/\\]+/,'/')).pathname).replace(/\\/g,'/').replace(/\/{2,}/g,'/').toLowerCase();}catch{return null;}
+};
+const reply=(res,status,error,extra={})=>{res.writeHead(status,{'content-type':'application/json','cache-control':'no-store',...extra});res.end(JSON.stringify({error}));};
+const front=http.createServer((req,res)=>{
+ // origin-form only: an absolute-form target ("GET http://other/…") must not choose the upstream's idea of the host
+ const abs=String(req.url||'/').match(/^[a-z][a-z0-9+.-]*:\/\/[^/?#]*(.*)$/i);const target=abs?(abs[1]||'/'):String(req.url||'/');
+ if(!target.startsWith('/'))return reply(res,400,'Invalid request.');
+ if(foreign(req.headers.host)){res.writeHead(308,{location:pub.origin+target,'cache-control':'no-store'});res.end();return;}
+ const p=runtimePath(target);
+ if(p===null)return reply(res,400,'Invalid request.');
+ if(p==='/cdn-cgi'||p.startsWith('/cdn-cgi/'))return reply(res,404,'Not found.');
+ if(Number(req.headers['content-length']||0)>MAX_BODY)return reply(res,413,'Request too large.',{connection:'close'});
+ const ip=clientIp(req);const headers={};
+ for(const [k,v] of Object.entries(req.headers)){const n=k.toLowerCase();
+  if(n.startsWith('mf-')||n.startsWith('cf-')||n.startsWith('oai-authenticated-user')||n==='upgrade'||n==='x-forwarded-host'||n==='forwarded')continue;
+  headers[k]=v;}
+ Object.assign(headers,{host:pub.host,connection:'close','cf-connecting-ip':ip,'x-real-ip':ip,'x-forwarded-for':ip,'x-forwarded-proto':pub.protocol.replace(':','')});
+ let cut=false;
+ const up=http.request({host:'127.0.0.1',port:INTERNAL,method:req.method,path:target,headers,agent:false},r=>{
+  if(cut){r.resume();return;}
+  const h={...r.headers};delete h.connection;delete h['keep-alive'];
+  if(noindex)h['x-robots-tag']='noindex, nofollow';
+  res.writeHead(r.statusCode||502,h);r.pipe(res);
+ });
+ up.setTimeout(120000,()=>up.destroy(new Error('upstream timeout')));
+ up.on('error',()=>{if(cut)return;if(!res.headersSent){res.writeHead(502,{'content-type':'application/json'});res.end(JSON.stringify({error:'The server is starting. Try again in a moment.'}));}else res.destroy();});
+ // bodies without a Content-Length (chunked) are counted as they arrive
+ let size=0;
+ req.on('data',chunk=>{size+=chunk.length;if(size<=MAX_BODY||cut)return;cut=true;req.unpipe(up);up.destroy();
+  // answer, discard what is still arriving for two seconds so the client can read the answer, then hang up
+  if(!res.headersSent)reply(res,413,'Request too large.');
+  setTimeout(()=>req.destroy(),2000).unref();});
+ req.pipe(up);
+});
+front.keepAliveTimeout=65000;front.headersTimeout=66000;
+front.listen(Number(PORT),'0.0.0.0',()=>log(`front proxy on 0.0.0.0:${PORT} → runtime 127.0.0.1:${INTERNAL}`));
+// 6. scheduler heartbeat: due schedules run, the holder recorder keeps up (both are no-ops when nothing is set up)
+let ticking=false,lastNote='';
+const tick=async()=>{if(ticking)return;ticking=true;
+ try{const r=await fetch(`http://127.0.0.1:${INTERNAL}/api/schedules/tick`,{method:'POST',headers:{Authorization:`Bearer ${E.SCHEDULER_TOKEN}`},signal:AbortSignal.timeout(240000)});
+  const d=await r.json().catch(()=>({}));if(!r.ok)log(`scheduler: HTTP ${r.status} ${d.error||''}`);else if(d.schedules?.ran||d.schedules?.paused)log(`scheduler: ran ${d.schedules.ran}, paused ${d.schedules.paused}`);
+  // holder rewards, the recorder and top-up settlement report problems here; each distinct message is logged once
+  const note=[['rewards',d.rewards?.error||d.rewards?.posterError||d.rewards?.skipped||(d.rewards?.stalled&&`period ${d.rewards.stalled} is stalled: ${d.rewards.why||''}`)],['recorder',d.holders?.error],['top-ups',d.topups?.error]].filter(x=>x[1]).map(x=>`${x[0]}: ${String(x[1]).slice(0,300)}`).join(' | ');
+  if(note!==lastNote){lastNote=note;if(note)log(`scheduler: ${note}`);else log('scheduler: back to normal');}}
+ catch{/* runtime still starting */}finally{ticking=false;}};
+// idle only when nothing needs it: no schedules, no holder rewards and no top-ups to settle
+const ticker=E.SCHEDULES_ENABLED==='false'&&E.REWARDS_ENABLED!=='true'&&!(E.PAY_TOKEN_ADDRESS&&E.TOPUP_TREASURY)?null:setInterval(tick,60000);
+
+// 7. daily database backup: a consistent copy (SQLite VACUUM INTO) under DATA/backups, the last RHIO_BACKUP_DAYS kept
+const keep=/^\d{1,3}$/.test(E.RHIO_BACKUP_DAYS||'')?Number(E.RHIO_BACKUP_DAYS):7;
+function backup(){
+ try{
+  const dir=path.join(DATA,'v3','d1');const files=[];
+  const walk=d=>{for(const f of readdirSync(d,{withFileTypes:true})){const p=path.join(d,f.name);if(f.isDirectory())walk(p);else if(f.name.endsWith('.sqlite')&&f.name!=='metadata.sqlite')files.push(p);}};
+  walk(dir);if(!files.length)return;
+  const db=files.sort((a,b)=>statSync(b).size-statSync(a).size)[0];
+  const out=path.join(DATA,'backups');mkdirSync(out,{recursive:true});
+  const target=path.join(out,`rhio-${new Date().toISOString().slice(0,10)}.sqlite`);rmSync(target,{force:true});
+  const {DatabaseSync}=createRequire(import.meta.url)('node:sqlite');const con=new DatabaseSync(db);
+  try{con.exec(`VACUUM INTO '${target.replace(/'/g,"''")}'`);}finally{con.close();}
+  const old=readdirSync(out).filter(f=>/^rhio-\d{4}-\d{2}-\d{2}\.sqlite$/.test(f)).sort().reverse().slice(keep);
+  for(const f of old)rmSync(path.join(out,f),{force:true});
+  log(`backup written: ${target}`);
+ }catch(e){log(`backup skipped: ${e.message}`);}
+}
+const backups=keep>0?[setTimeout(backup,5*60e3),setInterval(backup,24*3600e3)]:[];
+
+for(const sig of ['SIGTERM','SIGINT'])process.on(sig,()=>{if(ticker)clearInterval(ticker);backups.forEach(t=>clearTimeout(t));front.close();child.kill(sig);});
+child.on('exit',code=>process.exit(code??0));

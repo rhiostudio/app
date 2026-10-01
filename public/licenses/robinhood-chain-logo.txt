@@ -1,0 +1,12 @@
+Robinhood Chain logo (public/brands/robinhood-chain-*.svg)
+
+Source: official Robinhood Chain brand kit, unmodified files
+  https://cdn.robinhood.com/robinhood_chain/brand_assets/robinhood-chain-brand-assets-v1.zip
+  (Robinhood Chain Logo/Robinhood_Chain_Logo_White.svg and Robinhood_Chain_Logo_Black.svg)
+Guidelines: https://docs.robinhood.com/chain/brand-guidelines
+
+The marks belong to Robinhood. Use is subject to the Robinhood Chain brand guidelines and Terms of Service:
+only the Robinhood Chain logo (never the Robinhood master logo), refer to the network as "Robinhood Chain",
+no recoloring, cropping or combining with other imagery, approved pairings only (white on black, black on white,
+black on #ccff00), clear space of at least the width of the "R", no use in NFTs or AI-generated imagery, and no
+implication of partnership or endorsement.

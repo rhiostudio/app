@@ -1,0 +1,10 @@
+{
+  "workerName": "rhio-studio",
+  "domain": "rhio.studio",
+  "origin": "https://rhio.studio",
+  "d1DatabaseName": "rhio-studio-db",
+  "d1DatabaseId": "PASTE-THE-DATABASE-ID-FROM-wrangler-d1-create",
+  "aiEnabled": false,
+  "openaiModel": "gpt-6-luna",
+  "platformFeeBps": 0
+}
