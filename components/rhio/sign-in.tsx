@@ -95,5 +95,5 @@ export function SignIn({onWalletDone}:{onWalletDone:()=>void}){
 function WalletLogo({src,fallback,plain}:{src?:string;fallback?:string;plain?:boolean}){
  const [url,setUrl]=useState(src);useEffect(()=>setUrl(src),[src]);
  if(!url)return <span className="grid size-8 place-items-center rounded-lg bg-secondary text-muted-foreground [&_svg]:size-4"><I id="wallet"/></span>;
- return <img src={url} alt="" width={32} height={32} loading="lazy" decoding="async" className={cn('size-8 rounded-lg object-contain',plain&&'bg-white p-1')} onError={()=>setUrl(u=>u!==fallback&&fallback?fallback:undefined)}/>;
+ return <img src={url} alt="" width={32} height={32} decoding="async" className={cn('size-8 rounded-lg object-contain',plain&&'bg-white p-1')} onError={()=>setUrl(u=>u!==fallback&&fallback?fallback:undefined)}/>;
 }
