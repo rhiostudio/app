@@ -8,6 +8,7 @@ import {starter,skillCatalog,isOpenSkill,triesLeft,MAX_SKILLS,type Trials,type A
 import {characters,getCharacter,loopMotions,powers,type CharacterId,type Motion} from '@/lib/characters';
 import {CONTENT} from '@/lib/rhio3d/content';
 import {filterItems,type SearchMode} from '@/lib/search';
+import {SIGNIN_EVENT,requireAuth,setAuthenticated} from '@/lib/auth-gate';
 import Avatar,{playMotion,castPower} from './avatar';
 /** How the character works while a task runs: research scans first, writing-type skills type, the rest think. */
 const WORK_MOTION:Record<string,string>={research:'Think',brainstorm:'Think',planner:'Think'};
@@ -118,17 +119,22 @@ export default function Studio(){
  useEffect(()=>{const q=query.trim();if(view!=='discover'||q.length<2)return;const t=setTimeout(async()=>{try{const d=await api('/api/market?q='+encodeURIComponent(q));setMarket(m=>{const seen=new Set((m||[]).map(a=>a.id));return [...(m||[]),...(d.agents as MarketAgent[]).filter(a=>!seen.has(a.id))];});}catch{}},300);return()=>clearTimeout(t);},[query,view]);
  function change<K extends keyof Agent>(key:K,value:Agent[K]){setDraft(d=>({...d,[key]:value}));}
  function chooseCharacter(id:CharacterId){const c=getCharacter(id);setDraft(d=>{const renamed=!d.name.trim()||d.name==='My '+getCharacter(d.skin).name;return {...d,skin:id,appearance:{...c.look},look:undefined,...(renamed?{name:'My '+c.name}:{})};});playMotion('Wave');}
- async function save(){if(!auth){setSignin(true);return null;}const parsed=(await agentSchema()).safeParse(draft);if(!parsed.success){toast.error(await agentIssue(parsed.error));return null;}setBusy(true);const wasArchived=!!agents.find(a=>a.id===draft.id)?.archived;try{const saved=await api('/api/agents',{method:'POST',body:JSON.stringify(parsed.data)});setDraft(saved);await refresh();toast.success(wasArchived?`Saved and restored “${saved.name}”`:`Saved “${saved.name}”`);playMotion('Salute');return saved as Agent;}catch(e:any){toast.error(e.message);if(e.status===401){setAuth(false);setSignin(true);}return null;}finally{setBusy(false)}}
+ // Account gate (lib/auth-gate.ts): this component owns the session state and the sign-in panel. Every action that
+ // saves, runs, publishes, shares or imports starts with requireAuth(); api() applies the same gate to every write.
+ useEffect(()=>{setAuthenticated(auth);},[auth]);
+ useEffect(()=>{const open=(e:Event)=>{if((e as CustomEvent<{expired?:boolean}>).detail?.expired)setAuth(false);setSignin(true);};
+  window.addEventListener(SIGNIN_EVENT,open);return()=>window.removeEventListener(SIGNIN_EVENT,open);},[]);
+ async function save(){if(!requireAuth())return null;const parsed=(await agentSchema()).safeParse(draft);if(!parsed.success){toast.error(await agentIssue(parsed.error));return null;}setBusy(true);const wasArchived=!!agents.find(a=>a.id===draft.id)?.archived;try{const saved=await api('/api/agents',{method:'POST',body:JSON.stringify(parsed.data)});setDraft(saved);await refresh();toast.success(wasArchived?`Saved and restored “${saved.name}”`:`Saved “${saved.name}”`);playMotion('Salute');return saved as Agent;}catch(e:any){toast.error(e.message);if(e.status===401){setAuth(false);setSignin(true);}return null;}finally{setBusy(false)}}
  /** Saves first when the agent is new, archived, or changed since the last save, so runs use what is on screen. */
  async function ensureCurrent(){const prev=draft.id?agents.find(a=>a.id===draft.id):undefined;const s=prev&&!prev.archived&&sameConfig(prev,draft)?draft:await save();return s?.id||null;}
  function fresh(skin:Agent['skin']='atlas'){const c=getCharacter(skin);setDraft({...starter,name:'My '+c.name,skin,skills:[...starter.skills]});setTab('look');navigate('studio');}
  function edit(a:Agent){setDraft({...a});setTab('look');navigate('studio');}
  function applyTemplate(t:typeof TEMPLATES[number]){setDraft({...starter,name:t.name,skin:t.skin as Agent['skin'],skills:(t.skills.filter(isOpenSkill).length?t.skills.filter(isOpenSkill):['summarize']) as Agent['skills'],personality:t.personality});setTab('persona');navigate('studio');toast.success(`Template applied: ${t.name}`);}
- async function archive(a:Agent){try{await api('/api/agents',{method:'PATCH',body:JSON.stringify({id:a.id,archived:!a.archived})});await refresh();toast.success(a.archived?'Agent restored':'Agent archived. Restore it from Archived.');}catch(e:any){toast.error(e.message)}}
+ async function archive(a:Agent){if(!requireAuth())return;try{await api('/api/agents',{method:'PATCH',body:JSON.stringify({id:a.id,archived:!a.archived})});await refresh();toast.success(a.archived?'Agent restored':'Agent archived. Restore it from Archived.');}catch(e:any){toast.error(e.message)}}
  async function loadMarket(){try{const d=await api('/api/market?q=');setMarket(d.agents);}catch(e:any){toast.error(e.message);}}
- async function publish(a:Agent,published:boolean){const raw=priceDraft[a.id!]??String(a.price??0);const price=Number(raw);if(published&&(!Number.isInteger(price)||price<0||price>500)){toast.error('Price must be a whole number from 0 to 500 credits.');return;}setBusy(true);try{await api('/api/agents',{method:'PATCH',body:JSON.stringify({id:a.id,published,price})});await refresh();if(market)loadMarket();toast.success(published?`${a.name} is live in Discover at ${price} credits per run`:`${a.name} removed from Discover`);}catch(e:any){toast.error(e.message);}finally{setBusy(false);}}
- async function exportAgent(a:Agent=draft){const checked=(await agentSchema()).safeParse(a);if(!checked.success){toast.error('Complete the name, instructions, and skills first.');return;}const file=`rhio-${(a.name||'agent').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'agent'}.json`;const {id:_id,...config}=checked.data;download(file,JSON.stringify(config,null,2));toast.success(`Exported ${file}`,{description:'Import it on any RHIO account from My agents → Import.'});}
- async function importText(txt:string){if(!auth){setSignin(true);return;}
+ async function publish(a:Agent,published:boolean){if(!requireAuth())return;const raw=priceDraft[a.id!]??String(a.price??0);const price=Number(raw);if(published&&(!Number.isInteger(price)||price<0||price>500)){toast.error('Price must be a whole number from 0 to 500 credits.');return;}setBusy(true);try{await api('/api/agents',{method:'PATCH',body:JSON.stringify({id:a.id,published,price})});await refresh();if(market)loadMarket();toast.success(published?`${a.name} is live in Discover at ${price} credits per run`:`${a.name} removed from Discover`);}catch(e:any){toast.error(e.message);}finally{setBusy(false);}}
+ async function exportAgent(a:Agent=draft){if(!requireAuth())return;const checked=(await agentSchema()).safeParse(a);if(!checked.success){toast.error('Complete the name, instructions, and skills first.');return;}const file=`rhio-${(a.name||'agent').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'agent'}.json`;const {id:_id,...config}=checked.data;download(file,JSON.stringify(config,null,2));toast.success(`Exported ${file}`,{description:'Import it on any RHIO account from My agents → Import.'});}
+ async function importText(txt:string){if(!requireAuth())return;
   let list:unknown[];try{const o=JSON.parse(txt);list=Array.isArray(o)?o:[o];}catch{toast.error('That is not valid agent JSON.');return;}
   const sc=await agentSchema();let n=0,bad=0;
   for(const x of list){const p=sc.safeParse(x&&typeof x==='object'?{...x,id:undefined}:x);if(!p.success){bad++;continue;}
@@ -179,8 +185,11 @@ export default function Studio(){
    <AppShell view={view} navigate={(v,doc)=>navigate(v,doc)} onSearch={()=>setPalette(true)} theme={theme} setTheme={setTheme} auth={auth} label={email} balance={balance} counts={{agents:activeAgents.length,published:publishedCount,runs:runs.length}} onAccount={()=>setSettings(true)} onSignIn={()=>setSignin(true)} onNew={()=>fresh()} collapsed={view==='studio'||view==='docs'||view==='paper'}>
    <Suspense fallback={<Loading/>}>
    <div key={view} className={cn('max-[820px]:pb-[calc(92px+env(safe-area-inset-bottom))]',view==='studio'&&'min-[821px]:flex min-[821px]:h-[calc(100svh-74px)] min-[821px]:flex-col')}>
-   {(needsAuth||loadError)&&<div className={cn('mx-auto grid max-w-[1240px] gap-2 px-[clamp(16px,2.4vw,32px)] pt-4',view==='studio'&&'max-w-none shrink-0 px-2 pt-2 pb-2')}>
-    {needsAuth&&<Alert className="flex flex-wrap items-center gap-3 rounded-xl"><I id="user"/><AlertDescription className="flex-1 text-sm"><span><b className="text-foreground">Connect a wallet</b> (Robinhood Wallet or any EVM wallet) to save agents, publish them and run tasks. Everything else works without an account.</span></AlertDescription><Button size="sm" onClick={()=>setSignin(true)}>Connect wallet</Button></Alert>}
+   {/* signed out: on desktop the top bar carries the hint and the Connect button (components/app/shell.tsx) and the
+       Studio shows a small chip under the agent name, so no row is taken from the page. Phones keep one slim line
+       on the list pages; the Studio stage is too short there for a banner. */}
+   {((needsAuth&&view!=='studio')||loadError)&&<div className={cn('mx-auto grid max-w-[1240px] gap-2 px-[clamp(16px,2.4vw,32px)] pt-4',view==='studio'&&'max-w-none shrink-0 px-2 pt-2 pb-2',!loadError&&'min-[821px]:hidden')}>
+    {needsAuth&&view!=='studio'&&<Alert className="flex items-center gap-3 rounded-xl py-2.5 min-[821px]:hidden"><I id="user"/><AlertDescription className="flex-1 text-[13px]"><span><b className="text-foreground">Connect a wallet</b> to save, publish and run agents.</span></AlertDescription><Button size="sm" onClick={()=>setSignin(true)}>Connect</Button></Alert>}
     {loadError&&<Alert variant="destructive" className="flex items-center gap-3 rounded-xl"><AlertDescription className="flex-1">{loadError}</AlertDescription><Button size="sm" variant="outline" onClick={refresh}>Retry</Button></Alert>}
    </div>}
 
@@ -191,7 +200,8 @@ export default function Studio(){
      <div className="pointer-events-none absolute inset-x-4 top-4 flex items-start justify-between gap-3 [&>*]:pointer-events-auto">
       <div className="grid gap-1.5"><h1 className="font-display text-[clamp(22px,2.4vw,30px)] leading-none font-medium tracking-[-.03em]">{draft.name||'Untitled agent'}</h1>
        <div className="flex items-center gap-2 text-[13px] text-muted-foreground"><span className="size-2 rounded-sm bg-lime"/><span>{character.name} · {character.role} · {sig?.name}</span>
-        <TooltipProvider delayDuration={100}><Tooltip><TooltipTrigger asChild><button className="grid size-5 place-items-center rounded-md text-muted-foreground hover:text-foreground" aria-label="Stage tips"><svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></button></TooltipTrigger><TooltipContent side="bottom">Drag to turn · scroll to zoom · keys 1–6 fire powers</TooltipContent></Tooltip></TooltipProvider></div></div>
+        <TooltipProvider delayDuration={100}><Tooltip><TooltipTrigger asChild><button className="grid size-5 place-items-center rounded-md text-muted-foreground hover:text-foreground" aria-label="Stage tips"><svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></button></TooltipTrigger><TooltipContent side="bottom">Drag to turn · scroll to zoom · keys 1–6 fire powers</TooltipContent></Tooltip></TooltipProvider></div>
+       {!auth&&!loading&&<button onClick={()=>setSignin(true)} className="flex w-fit items-center gap-1.5 rounded-md border bg-background/85 px-2 py-1 text-[12px] whitespace-nowrap max-[820px]:hidden text-muted-foreground backdrop-blur-sm transition-colors hover:border-foreground/30 hover:text-foreground [&_svg]:size-3.5"><I id="wallet"/><span>Not saved · <b className="font-medium text-foreground">connect wallet</b></span></button>}</div>
       <StageControls paused={paused} onPause={()=>setPaused(v=>!v)} speed={speed} onSpeed={setSpeed}/>
      </div>
      {scan&&<Card className="absolute top-24 right-4 w-60 gap-2 border-lime/50 bg-background/90 p-3.5 text-[13px] backdrop-blur-md max-[820px]:top-auto max-[820px]:bottom-44">
@@ -236,7 +246,7 @@ export default function Studio(){
      </Tabs>
      <div className="flex items-center gap-2 border-t bg-surface p-3">
       <Button className="h-10 flex-1 rounded-lg shadow-[inset_0_-3px_0_rgb(0_0_0/.12)]" disabled={busy} onClick={save}><I id="save"/>{busy?'Saving…':'Save agent'}</Button>
-      <Button variant="outline" size="icon" className="size-10" onClick={async()=>{const p=(await agentSchema()).safeParse(draft);if(!p.success){toast.error('Complete your agent before sharing.');return;}setShare(true);}} aria-label="Share or export"><I id="share"/></Button>
+      <Button variant="outline" size="icon" className="size-10" onClick={async()=>{if(!requireAuth())return;const p=(await agentSchema()).safeParse(draft);if(!p.success){toast.error('Complete your agent before sharing.');return;}setShare(true);}} aria-label="Share or export"><I id="share"/></Button>
       <Button variant="outline" className="h-10" onClick={()=>fresh(draft.skin)}>New</Button>
      </div>
     </aside>
@@ -252,7 +262,7 @@ export default function Studio(){
    {view==='rewards'&&<RewardsPage wallet={wallet||undefined} auth={auth} onSignIn={()=>setSignin(true)} onPaper={()=>navigate('paper','token')}/>}
 
    {view==='agents'&&<DashPage>
-    <PageHeader icon="users" tone="sky" title="My agents" text="Saved to your account. Publish one to Discover with a price, or export a config to move it elsewhere." actions={<><Button variant="outline" onClick={()=>setImportOpen(true)}><I id="download"/>Import</Button><Button onClick={()=>fresh()}><I id="plus"/>New agent</Button></>}/>
+    <PageHeader icon="users" tone="sky" title="My agents" text="Saved to your account. Publish one to Discover with a price, or export a config to move it elsewhere." actions={<><Button variant="outline" onClick={()=>requireAuth()&&setImportOpen(true)}><I id="download"/>Import</Button><Button onClick={()=>fresh()}><I id="plus"/>New agent</Button></>}/>
     <KpiRow>
      <Kpi label="Agents" value={activeAgents.length} hint={`${archivedCount} archived`} tone="sky" icon="users"/>
      <Kpi label="Live in Discover" value={publishedCount} hint="Published with a price" tone="mint" icon="store"/>
@@ -276,7 +286,7 @@ export default function Studio(){
     </div>
     {visibleMarket===null?<TileSkeletons/>:visibleMarket.length===0?<EmptyState title={query?'No matches':'No published agents yet'} text={query?(mode==='title'?'No agent names match. Try Search everything.':'Nothing matches your search.'):'Publish one of your agents from My agents and it shows up here for everyone.'} chars={['cole','nova','rook']} action={!query?<Button variant="outline" onClick={()=>navigate('agents')}>Go to My agents</Button>:undefined}/>:
     <Grid>{visibleMarket.map((a,k)=><AgentTile key={a.id} a={a} idx={k+2} creator={a.mine?'Your agent':a.creator} price={a.price} status={a.mine?'mine':'live'}
-     footer={<><span className="text-xs text-muted-foreground">{a.uses} run{a.uses===1?'':'s'} · {a.tone}</span><Button size="sm" className="ml-auto" onClick={()=>{if(!auth){setSignin(true);return;}setMarketAgent(a);}}>Run a task<I id="arrow"/></Button></>}/>)}</Grid>}
+     footer={<><span className="text-xs text-muted-foreground">{a.uses} run{a.uses===1?'':'s'} · {a.tone}</span><Button size="sm" className="ml-auto" onClick={()=>{if(!requireAuth())return;setMarketAgent(a);}}>Run a task<I id="arrow"/></Button></>}/>)}</Grid>}
     <div className="mt-2 flex items-end justify-between gap-3"><div className="grid gap-1"><h2 className="font-display text-xl font-medium tracking-[-.02em]">Starter templates</h2><p className="text-sm text-muted-foreground">Editable starting points. Published agents run as-is; their instructions are not shown.</p></div></div>
     <div className="stagger grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{TEMPLATES.map((t,k)=><button key={t.name} onClick={()=>applyTemplate(t)} className={cn('lift group grid gap-3 rounded-xl border p-4 text-left',['bg-t-iris','bg-t-mint','bg-t-amber','bg-t-coral'][k%4])}>
      <div className="flex items-center gap-3"><Thumb id={t.skin as CharacterId} className="size-11 rounded-md bg-background object-[50%_18%]"/><div className="grid"><b className="text-[15px] font-semibold">{t.name}</b><span className="font-mono text-[10px] tracking-[.06em] text-muted-foreground uppercase">{getCharacter(t.skin).name} · {t.skills.length} skills</span></div></div>
@@ -474,7 +484,7 @@ function RunPanel({target,ready,liveCost,skillCosts,liveToday,balance,trials,aut
  const runnable=target.skills.filter(isOpenSkill) as typeof target.skills;const [skillPick,setSkill]=useState(runnable[0]);const skill=runnable.includes(skillPick)?skillPick:runnable[0];const [mode,setMode]=useState<'sample'|'live'>('sample');const [task,setTask]=useState('');const [running,setRunning]=useState(false);const [result,setResult]=useState<Run|null>(null);
  const cost=(mode==='sample'?5:skillCosts[skill]??liveCost)+(target.mine?0:target.price);const short=balance!==null&&cost>balance;const left=skill?triesLeft(trials,skill):null;const out=auth&&left===0;
  const timer=useRef(0);
- async function run(){if(running)return;if(!auth){onSignIn();return;}if(task.trim().length<3){toast.error('Enter a task with at least 3 characters.');return;}setRunning(true);setResult(null);startWork(skill);
+ async function run(){if(running)return;if(!requireAuth())return;if(task.trim().length<3){toast.error('Enter a task with at least 3 characters.');return;}setRunning(true);setResult(null);startWork(skill);
   try{const id=await ensureSaved();if(!id){setRunning(false);return;}const data=await api('/api/runs',{method:'POST',body:JSON.stringify({id:crypto.randomUUID(),agentId:id,prompt:task,skill,mode,...(target.mine?{}:{expectedPrice:target.price})})});setResult(data);playMotion(Math.random()<0.5?'Cheer':'Victory');onDone();}
   catch(e:any){toast.error(e.message);playMotion('Shrug');onDone();}finally{setRunning(false);clearTimeout(timer.current);}}
  return <>

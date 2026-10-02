@@ -74,7 +74,10 @@ export function AppShell({view,navigate,onSearch,theme,setTheme,auth,label,balan
     <div className="ml-auto flex items-center gap-1.5">
      <Button variant="ghost" size="icon" className="rounded-md" onClick={onSearch} aria-label="Search"><I id="search"/></Button>
      <Button variant="ghost" size="icon" className="rounded-md" onClick={()=>navigate('home')} aria-label="Back to the site"><I id="home"/></Button>
-     {view!=='studio'&&<Button size="sm" onClick={onNew} className="gap-1.5"><I id="plus"/>New agent</Button>}
+     {view!=='studio'&&<Button size="sm" variant={auth?'default':'outline'} onClick={onNew} className="gap-1.5"><I id="plus"/>New agent</Button>}
+     {/* signed out: the hint and the sign-in button live here instead of a banner across every page */}
+     {!auth&&<><span className="ml-1 text-[12.5px] text-muted-foreground max-[1180px]:hidden">Browsing without an account</span>
+      <Button size="sm" onClick={onSignIn} className="gap-1.5"><I id="wallet"/>Connect wallet</Button></>}
     </div>
    </header>
    <div className={cn('min-w-0 flex-1 min-[821px]:[--top:48px]',view==='studio'?'':'')} data-view="">{children}</div>

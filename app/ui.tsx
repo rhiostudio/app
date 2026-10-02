@@ -8,8 +8,17 @@ import {Empty as EmptyRoot,EmptyContent,EmptyDescription,EmptyHeader,EmptyTitle}
 import {Label} from '@/components/ui/label';
 import {cn} from '@/lib/utils';
 import {splitSearchWidget} from '@/lib/grounding';
+import {openSignIn,requireAuth} from '@/lib/auth-gate';
 
-export async function api(path:string,options:RequestInit={}):Promise<any>{const response=await fetch(path,{...options,headers:{'Content-Type':'application/json',...options.headers}});const data=await response.json().catch(()=>({})) as any;if(!response.ok)throw Object.assign(new Error(data.error||'Something went wrong.'),{status:response.status});return data;}
+/** API client. Every write (anything but GET) goes through the account gate (lib/auth-gate.ts): signed out, the
+    request is not sent and the sign-in panel opens; a 401 on a write (expired session) opens it too. Reads are never
+    blocked here: signed-out pages load public data, and a 401 on the first workspace read is the normal answer. */
+export async function api(path:string,options:RequestInit={}):Promise<any>{
+ const write=(options.method||'GET').toUpperCase()!=='GET'&&!path.startsWith('/api/auth/');
+ if(write&&!requireAuth())throw Object.assign(new Error('Connect a wallet to continue.'),{status:401,signIn:true});
+ const response=await fetch(path,{...options,headers:{'Content-Type':'application/json',...options.headers}});const data=await response.json().catch(()=>({})) as any;
+ if(!response.ok){if(write&&response.status===401)openSignIn(true);throw Object.assign(new Error(data.error||'Something went wrong.'),{status:response.status});}
+ return data;}
 /** Saves text as a file. The link is attached while it is clicked and the blob kept for a minute: Safari and older
     Firefox ignore detached links or lose a blob that is revoked too early. */
 export function download(name:string,text:string,type='application/json'){const url=URL.createObjectURL(new Blob([text],{type}));const a=document.createElement('a');a.href=url;a.download=name;a.rel='noopener';a.style.display='none';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);}
@@ -30,10 +39,12 @@ export function Options({label,value,options,onChange}:{label?:string;value:stri
    {options.map(([v,l])=><ToggleGroupItem key={v} value={v} className="h-8 flex-none rounded-lg border bg-card px-3 text-[13px] font-medium data-[state=on]:border-lime data-[state=on]:bg-lime data-[state=on]:text-ink">{l}</ToggleGroupItem>)}
   </ToggleGroup></div>;
 }
+/* The selected swatch is marked INSIDE its own box (a dark line, then a gap in the page colour): a ring drawn outside
+   the box was cut off by the collapsible panel around it, and so was the hover zoom. */
 export function Swatches({label,value,colors,onChange}:{label:string;value:string;colors:readonly string[];onChange:(v:string)=>void}){
  const v=(value||'').toLowerCase();
  return <div className="grid gap-2"><FieldLabel>{label}</FieldLabel><div className="flex flex-wrap items-center gap-1.5">
-  {colors.map(c=><button type="button" key={c} style={{background:c}} aria-label={c} aria-pressed={c.toLowerCase()===v} onClick={()=>onChange(c)} className="size-7 rounded-lg border border-foreground/15 transition-transform hover:scale-110 aria-pressed:ring-2 aria-pressed:ring-foreground aria-pressed:ring-offset-2 aria-pressed:ring-offset-background"/>)}
+  {colors.map(c=><button type="button" key={c} style={{background:c}} aria-label={c} aria-pressed={c.toLowerCase()===v} onClick={()=>onChange(c)} className="size-7 rounded-lg border border-foreground/15 transition-[box-shadow,border-color] hover:border-foreground/50 aria-pressed:border-transparent aria-pressed:shadow-[inset_0_0_0_2px_var(--text),inset_0_0_0_4px_var(--bg)]"/>)}
   <label title="Custom color" className="relative grid size-7 cursor-pointer place-items-center overflow-hidden rounded-lg border border-dashed text-sm text-muted-foreground">+<input type="color" value={/^#[0-9a-f]{6}$/i.test(value)?value:'#c8ff24'} onChange={e=>onChange(e.target.value)} aria-label="Custom color" className="absolute inset-0 cursor-pointer opacity-0"/></label>
  </div></div>;
 }
