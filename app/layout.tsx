@@ -2,6 +2,18 @@ import type { Metadata, Viewport } from "next";
 import { env } from "cloudflare:workers";
 import "./globals.css";
 import Studio from "./studio";
+import { TokenProvider, type RhioToken } from "@/components/rhio/token-context";
+import { chainConfig, rewardConfig } from "@/lib/chain";
+
+// The RHIO contract address shown on the site comes from the server environment (RHIO_TOKEN_ADDRESS), read on every
+// request, so adding the token needs no code change. Mainnet only: a test token must never be shown as the contract.
+function rhioToken(): { token: RhioToken | null; test: boolean } {
+  try {
+    const c = chainConfig();
+    if (c.network !== "mainnet") return { token: null, test: true };
+    return { token: c.rhio ? { address: c.rhio, explorer: `${c.explorer}/token/${c.rhio}`, rewardsLive: rewardConfig(c).live } : null, test: false };
+  } catch { return { token: null, test: false }; }
+}
 
 // The public origin is only known at runtime (APP_ORIGIN). Without metadataBase the share image was emitted as
 // http://localhost:3000/og.png, so link previews on X, Telegram and WhatsApp had no picture.
@@ -34,8 +46,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       </head>
       <body>
         {/* one app shell for every route: it reads the pathname (lib/routes.ts); pages only mark the routes */}
-        <Studio />
-        {children}
+        <TokenProvider {...rhioToken()}>
+          <Studio />
+          {children}
+        </TokenProvider>
       </body>
     </html>
   );

@@ -13,6 +13,7 @@ import {Progress} from '@/components/ui/progress';
 import {api,I} from '@/app/ui';
 import {cn} from '@/lib/utils';
 import {ToneIcon} from '@/components/rhio/navbar';
+import {useRhioToken} from '@/components/rhio/token-context';
 import {discoverWallets,type WalletInfo} from '@/lib/auth-client';
 import {claimOnchain,confirmTopup,explorerAddr,explorerTx,fetchChain,linkWallet,payTopup,type ChainInfo} from '@/lib/chain-client';
 import {DashPage,EmptyState,Kpi,KpiRow,PageHeader,StatusBadge} from './parts';
@@ -44,7 +45,7 @@ function useProvider(){
 export function WalletPage({auth,onSignIn,onChanged}:{auth:boolean;onSignIn:()=>void;onChanged:()=>void}){
  const [cfg,setCfg]=useState<ChainInfo|null>(null);const [wallets,setWallets]=useState<string[]>([]);const [claims,setClaims]=useState<Claims|null>(null);
  const [tier,setTier]=useState<TierState|null>(null);const [topups,setTopups]=useState<{tx_hash:string;from_address:string;amount:string;credits:number;created:string}[]>([]);const [pendingTopups,setPendingTopups]=useState<{tx_hash:string;created:string}[]>([]);
- const [busy,setBusy]=useState('');const {list,current,setPick}=useProvider();
+ const [busy,setBusy]=useState('');const {list,current,setPick}=useProvider();const token=useRhioToken();
  const load=useCallback(async()=>{
   const c=await fetchChain().catch(()=>null);setCfg(c);if(!auth)return;
   const [w,cl,t,tp]=await Promise.allSettled([api('/api/wallet'),api('/api/claims'),api('/api/tier'),api('/api/topups')]);
@@ -60,6 +61,8 @@ export function WalletPage({auth,onSignIn,onChanged}:{auth:boolean;onSignIn:()=>
   <EmptyState title="Connect a wallet first" text="Sign in with Robinhood Wallet or any EVM wallet. Signing is free and never asks for your recovery phrase." action={<Button onClick={onSignIn}><I id="wallet"/>Sign in</Button>}/></DashPage>;
 
  const tierInfo=cfg?.tiers.find(t=>t.id===(tier?.tier||'free'));
+ // does the token exist on this server: the layout's answer until /api/chain has loaded, then the API's
+ const tiersOn=cfg?cfg.tiersLive:!!token;
  return <DashPage>
   <PageHeader icon="wallet" tone="sky" title="Wallet & chain" text="Top up credits in USDG, claim your creator earnings and check your holder tier. Every transaction is signed in your own wallet."
    actions={cfg&&<><StatusBadge kind={cfg.network==='mainnet'?'live':'pending'}>{cfg.name}</StatusBadge><Button variant="outline" asChild><a href={cfg.explorer} target="_blank" rel="noreferrer"><I id="globe"/>Explorer</a></Button></>}/>
@@ -71,7 +74,7 @@ export function WalletPage({auth,onSignIn,onChanged}:{auth:boolean;onSignIn:()=>
    <Kpi label="Linked wallets" value={wallets.length} hint={wallets[0]?short(wallets[0]):'None yet'} tone="sky" icon="wallet"/>
    <Kpi label="Top-ups" value={cfg?.topupEnabled?'On':'Off'} hint={cfg?.token?`1 ${cfg.token.symbol} = ${cfg.creditsPerToken} credits`:'Not switched on'} tone="lime" icon="coins"/>
    <Kpi label="Claimable" value={claims?.claimable??0} hint={claims?.enabled?'Earned credits':'Claims not switched on'} tone="iris" icon="store"/>
-   <Kpi label="Holder tier" value={tierInfo?.name??'Free'} hint={cfg?.tiersLive?'From your RHIO balance':'Starts with the token'} tone="coral" icon="hype"/>
+   <Kpi label="Holder tier" value={tierInfo?.name??'Free'} hint={tiersOn?'From your RHIO balance':'Starts with the token'} tone="coral" icon="hype"/>
   </KpiRow>
 
   <div className="grid items-start gap-4 lg:grid-cols-2">
@@ -94,14 +97,14 @@ export function WalletPage({auth,onSignIn,onChanged}:{auth:boolean;onSignIn:()=>
    <ClaimsCard cfg={cfg} claims={claims} provider={current} busy={busy} run={run}/>
 
    {/* tiers */}
-   <Card title="Holder tier" icon="hype" tone="coral" badge={<StatusBadge kind={cfg?.tiersLive?'live':'archived'}>{cfg?.tiersLive?'Live':'Starts with the token'}</StatusBadge>}>
+   <Card title="Holder tier" icon="hype" tone="coral" badge={<StatusBadge kind={tiersOn?'live':'archived'}>{tiersOn?'Live':'Starts with the token'}</StatusBadge>}>
     {cfg?.tiersLive&&tier?.live?<>
      <div className="grid gap-2 rounded-lg border bg-t-coral p-3"><div className="flex items-baseline justify-between"><b className="font-display text-2xl font-medium">{tierInfo?.name}</b><span className="font-mono text-[12px] text-muted-foreground">{whole(tier.balance||'0')} RHIO</span></div>
       {tier.next&&<><Progress value={Math.min(100,Number(BigInt(tier.balance||'0')/10n**18n)*100/Number(tier.next.min))}/><span className="text-xs text-muted-foreground">{Number(tier.next.min).toLocaleString('en-US')} RHIO for {tier.next.name}</span></>}</div>
      <Button disabled={!!busy||!tier.allotment||tier.allotment.claimed||tier.allotment.credits===0} onClick={()=>run('allot',async()=>{const r=await api('/api/tier',{method:'POST'});toast.success(`${r.credits} credits added for ${r.period}`);})}>
       <I id="coins"/>{tier.allotment?.claimed?`Claimed ${tier.allotment.claimedCredits} credits for ${tier.period}`:tier.allotment?.credits?`Claim ${tier.allotment.credits} credits for ${tier.period}`:'No monthly credits on Free'}</Button>
      <p className="text-xs text-muted-foreground">Balances are read at the month's snapshot block, fixed by the first claim of the month. Tokens moved afterwards count next month.</p>
-    </>:<Off>Tiers read the RHIO balance of your linked wallets. There is no RHIO token yet, so everyone is on Free for now.</Off>}
+    </>:<Off>Tiers read the RHIO balance of your linked wallets. {tiersOn?'Your RHIO balance has not been read yet. If this stays, reload the page.':'There is no RHIO token yet, so everyone is on Free for now.'}</Off>}
     {cfg&&<Table><TableHeader><TableRow><TableHead>Tier</TableHead><TableHead>Hold</TableHead><TableHead>Fee</TableHead><TableHead className="text-right">Credits / mo</TableHead></TableRow></TableHeader>
      <TableBody>{cfg.tiers.map(t=><TableRow key={t.id} className={cn(t.id===(tier?.tier||'free')&&'bg-t-coral')}><TableCell className="font-medium">{t.name}</TableCell><TableCell className="font-mono text-[12px]">{Number(t.min).toLocaleString('en-US')}+</TableCell><TableCell className="font-mono text-[12px]">×{(t.feePermille/1000).toFixed(1)}</TableCell><TableCell className="text-right font-mono text-[12px]">{t.credits}</TableCell></TableRow>)}</TableBody></Table>}
     <p className="text-xs text-muted-foreground">Draft thresholds. The fee multiplier applies to the platform fee on your sales.</p>
@@ -143,9 +146,9 @@ function ClaimsCard({cfg,claims,provider,busy,run}:{cfg:ChainInfo|null;claims:Cl
  const paidOut=(a:string)=>{const p=claims?.proofs.find(x=>x.address.toLowerCase()===a.toLowerCase());return !!p&&p.claimedOnchain!==null&&BigInt(p.claimedOnchain??'0')>=BigInt(p.cumulative);};
  const n=credits===''?(claims?.claimable??0):Number(credits)||0;const payout=claims?n/(claims.creditsPerToken||100):0;
  const why=!claims?'':claims.claimable===0?(claims.claimed>0?'Everything you earned is queued for the next payout.':'Credits you earn when others run your published agents show up here.'):claims.claimable<claims.min?`You can claim from ${claims.min} earned credits; ${claims.claimable} so far.`:n<claims.min?`The minimum is ${claims.min} credits.`:n>claims.claimable?`You can claim up to ${claims.claimable} credits.`:'';
- return <Card title="Claim earnings" icon="store" tone="iris" badge={<StatusBadge kind={claims?.enabled?'live':'archived'}>{claims?.enabled?'On':'Off'}</StatusBadge>}>
+ return <Card title="Claim earnings" icon="store" tone="iris" badge={<StatusBadge kind={claims?.enabled?'live':'archived'}>{claims?.enabled?'On':'Maintenance'}</StatusBadge>}>
   <div className="grid grid-cols-3 overflow-hidden rounded-lg border text-center">{([['Earned',claims?.earned??0],['Queued',claims?.claimed??0],['Claimable',claims?.claimable??0]] as const).map(([l,v],k)=><div key={l} className={cn('grid gap-0.5 p-3',k&&'border-l',k===2&&'bg-t-iris')}><span className="font-mono text-[10px] tracking-[.08em] text-muted-foreground uppercase">{l}</span><b className="font-display text-xl font-medium tabular-nums">{v}</b></div>)}</div>
-  {!claims?.enabled?<Off>Claims are not switched on for this server yet. Only credits you earn from other people running your agents can be claimed, never starting or bought credits.</Off>
+  {!claims?.enabled?<Off>Claiming is under maintenance and not available right now. Credits you earn from other people running your agents keep adding up in your balance, and you can spend them in the studio.</Off>
   :!claims.wallets.length?<Off>Link the wallet that should receive your {sym} first.</Off>
   :<>
    <div className="grid gap-2 sm:grid-cols-2"><label className="grid gap-1.5"><span className="text-[12.5px] font-medium text-muted-foreground">Credits to claim (min {claims.min})</span><div className="flex gap-2"><Input inputMode="numeric" aria-label="Credits to claim" value={credits} onChange={e=>setCredits(e.target.value.replace(/\D/g,''))} placeholder={`All: ${claims.claimable}`} className="h-10 tabular-nums"/><Button type="button" variant="outline" className="h-10" disabled={!claims.claimable} onClick={()=>setCredits(String(claims.claimable))}>Max</Button></div></label>

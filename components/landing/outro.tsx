@@ -11,11 +11,23 @@ import {BracketLink,CutButton,DashedRule,Eyebrow,Marquee,Reveal} from '@/compone
 import {Logo} from '@/components/rhio/navbar';
 import {Headline} from './features';
 import {SiteFooter} from '@/components/rhio/site-footer';
+import {useTokenStage,type TokenStage} from '@/components/rhio/token-context';
 
 import type {View} from '@/lib/routes';
 type Go=(v:View,doc?:string)=>void;
 
+/* What the reward band says for each state the server reports: [note under the card, status sentence]. */
+const REWARD_STATE:Record<TokenStage,[string,string]>={
+ test:['Testnet build. Nothing here pays real NVDA.','This is a testnet build: no real NVDA is paid here.'],
+ none:['Open. First payout after the RHIO token launches.','The RHIO token has not launched, so no period has paid out yet.'],
+ token:['Token live. First payout once the reward vault is switched on.','The RHIO token is live, but the reward vault is not switched on, so no period has paid out yet.'],
+ rewards:['Live. Claim on the Rewards page.','Rewards are switched on: every paid period is listed on the Rewards page.'],
+};
+
 export function TokenBand({onNavigate}:{onNavigate:Go}){
+ const stage=useTokenStage();const [note,status]=REWARD_STATE[stage];
+ // before the token exists: what has not happened. Afterwards only what the design never needs stays true.
+ const [sticker,crossed]=stage==='none'?['Not yet',['token sale','airdrop','staking']]:['Not needed',['staking','lock-up']];
  return <section className="px-2 pt-[clamp(60px,8vw,110px)] max-[820px]:px-0">
   <div className="rounded-xl border bg-surface px-4 pt-[clamp(64px,8vw,110px)] pb-[clamp(56px,7vw,96px)] text-center max-[820px]:rounded-none">
    <div className="grid justify-items-center gap-6">
@@ -29,20 +41,20 @@ export function TokenBand({onNavigate}:{onNavigate:Go}){
        <span className="font-mono text-[10px] tracking-[.08em] text-muted-foreground uppercase">Stock Token · holder reward</span>
        <CutButton size="sm" variant="lime" className="mt-1" onClick={()=>onNavigate('paper')}>How it works <I id="arrow"/></CutButton>
       </Card>
-      <div className="rounded-2xl border border-dashed bg-card px-4 py-3 font-mono text-[10px] tracking-[.06em] uppercase">Open. First payout after the RHIO token launches.</div>
+      <div className="rounded-2xl border border-dashed bg-card px-4 py-3 font-mono text-[10px] tracking-[.06em] uppercase">{note}</div>
      </div>
      <div className="mt-12 -ml-7 w-[170px] rotate-[8deg] rounded-xl bg-sky px-4 pt-4 pb-5 text-center text-[#062233] shadow-[0_30px_60px_-36px_rgb(0_0_0/.4)] transition-transform duration-700 ease-smooth hover:rotate-[2deg] max-sm:mt-[-24px] max-sm:ml-36">
-      <span className="font-mono text-[10px] font-bold tracking-[.1em] uppercase">Not yet</span>
-      <ul className="mt-3 grid gap-0.5 font-mono text-[11px] uppercase line-through">{['token sale','airdrop','staking'].map(x=><li key={x}>{x}</li>)}</ul>
+      <span className="font-mono text-[10px] font-bold tracking-[.1em] uppercase">{sticker}</span>
+      <ul className="mt-3 grid gap-0.5 font-mono text-[11px] uppercase line-through">{crossed.map(x=><li key={x}>{x}</li>)}</ul>
      </div>
     </Reveal>
    </div>
   </div>
   <div className="mx-auto grid max-w-[1180px] items-start gap-8 px-4 pt-16 pb-6 md:grid-cols-[240px_1fr]">
-   <Eyebrow tone="amber">What it would add</Eyebrow>
+   <Eyebrow tone="amber">{stage==='none'?'What it would add':'What it adds'}</Eyebrow>
    <Reveal className="grid max-w-[640px] gap-6">
     <p className="text-[clamp(20px,2vw,27px)] leading-snug font-medium tracking-[-.02em]">Creators already earn credits when others run their agents. Holding RHIO adds fee discounts and NVDA rewards: every 3,000,000 RHIO held earns $0.01 of tokenized NVDA per hour on Robinhood Chain.</p>
-    <p className="text-sm text-muted-foreground">The RHIO token has not launched, so no period has paid out yet. Stock Tokens are debt securities, not shares, and are not available to US persons or in restricted countries; holders confirm eligibility before claiming. Nothing here is financial advice.</p>
+    <p className="text-sm text-muted-foreground">{status} Stock Tokens are debt securities, not shares, and are not available to US persons or in restricted countries; holders confirm eligibility before claiming. Nothing here is financial advice.</p>
     <div className="flex flex-wrap gap-2"><CutButton onClick={()=>onNavigate('paper')}>Tokenomics</CutButton><CutButton variant="outline" onClick={()=>onNavigate('roadmap')}>Roadmap</CutButton></div>
    </Reveal>
   </div>

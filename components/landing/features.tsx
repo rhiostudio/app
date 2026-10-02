@@ -13,6 +13,7 @@ import {I,SKILL_ICON} from '@/app/ui';
 import {cn} from '@/lib/utils';
 import {BracketLink,CountUp,CutButton,DashedRule,Eyebrow,Reveal,TINT_BG,type Tone} from '@/components/rhio/motion';
 import {OutfitMock,PersonaMock,PublishMock,RosterMock,SkillsMock} from './mocks';
+import {TOKEN_LINE,useTokenStage} from '@/components/rhio/token-context';
 
 /** Twenty-style heading: light serif lead-in + medium sans finish. */
 export function Headline({lead,rest,className,as:Tag='h2'}:{lead:ReactNode;rest:ReactNode;className?:string;as?:'h2'|'h3'}){
@@ -77,10 +78,11 @@ export function FeatureRows({onNavigate,onPick}:{onNavigate:(v:'studio')=>void;o
 }
 
 export function FolderCards({onNavigate}:{onNavigate:(v:'studio'|'discover'|'docs')=>void}){
+ const stage=useTokenStage();
  const cards:{tab:string;tone:Tone;title:string;text:string;foot:[string,string];go:'studio'|'discover'|'docs';art:ReactNode}[]=[
   {tab:'Share',tone:'iris',title:'Share as a link or embed',text:'Send the whole agent as one link, or drop a live preview into any page with an iframe.',foot:['Link','Embed'],go:'studio',art:<div className="grid min-w-0 gap-2"><div className="flex min-w-0 items-center gap-2 rounded-lg border bg-background p-2 text-xs"><span className="min-w-0 truncate font-mono text-muted-foreground">rhio…/#agent=eyJuYW1lIjoi…</span><span className="ml-auto shrink-0 rounded-md bg-lime px-2 py-1 font-semibold text-ink">Copy</span></div><div className="truncate rounded-lg border bg-background p-2 font-mono text-[11px] text-muted-foreground">&lt;iframe src=&quot;…?view=embed&quot; /&gt;</div></div>},
   {tab:'Discover',tone:'coral',title:'Run what others built',text:'Browse published agents and pay per run in credits. The creator keeps the price minus the fee.',foot:['Marketplace','Pay per run'],go:'discover',art:<div className="flex flex-wrap gap-1.5">{['Research companion','Content co-pilot','Knowledge keeper','Builder buddy'].map(t=><span key={t} className="rounded-lg border bg-background px-3 py-1.5 text-xs font-medium">{t}</span>)}</div>},
-  {tab:'Docs',tone:'mint',title:'Honest about what is live',text:'Every page says what works today, what is switched on per server and what is only planned. The RHIO token and holder rewards are not live.',foot:['Docs','Roadmap'],go:'docs',art:<div className="grid gap-1.5">{[['Skills and publishing','Live'],['Wallet sign-in','Live'],['USDG top-ups','Per server'],['Token and rewards','Planned']].map(([a,b])=><div key={a} className="flex items-center justify-between rounded-lg border bg-background px-3 py-2 text-xs"><span>{a}</span><b className={cn('font-mono text-[10px] uppercase',b==='Live'?'text-[#15845a] dark:text-mint':'text-muted-foreground')}>{b}</b></div>)}</div>},
+  {tab:'Docs',tone:'mint',title:'Honest about what is live',text:`Every page says what works today, what is switched on per server and what is only planned. ${TOKEN_LINE[stage]}`,foot:['Docs','Roadmap'],go:'docs',art:<div className="grid gap-1.5">{[['Skills and publishing','Live'],['Wallet sign-in','Live'],['USDG top-ups','Per server'],['Token and rewards',{test:'Testnet',none:'Planned',token:'Token live',rewards:'Live'}[stage]]].map(([a,b])=><div key={a} className="flex items-center justify-between rounded-lg border bg-background px-3 py-2 text-xs"><span>{a}</span><b className={cn('font-mono text-[10px] uppercase',/live/i.test(b)?'text-[#15845a] dark:text-mint':'text-muted-foreground')}>{b}</b></div>)}</div>},
  ];
  const stats:[number,string][]=[[characters.length,'Characters'],[20,'Motions'],[powers.length,'Powers'],[skillCatalog.filter(s=>!s.planned&&!s.locked).length,'Open skills']];
  return <section className="px-4 py-[clamp(80px,10vw,140px)]">

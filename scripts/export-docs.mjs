@@ -35,8 +35,8 @@ const STATUS = [
   'NVDA holder rewards: $0.01 of NVDA per hour per 3,000,000 RHIO, live Chainlink price, reward vault, rewards dashboard',
  ]],
  ['Not live', 'no', [
-  'RHIO token (not deployed): tiers stay Free and rewards pay nothing',
-  'NVDA reward vault (RhioClaims): deployed on mainnet and source-verified, owned by the multisig, empty and not audited, so it pays nothing',
+  'RHIO token: live only once its contract address is shown in the CA box on the home page; until then tiers stay Free and rewards pay nothing',
+  'NVDA reward vault (RhioClaims): deployed on mainnet and source-verified, owned by the multisig, not audited and with no claims open, so it pays nothing',
   'RhioClaims for USDG earnings claims (written and tested locally, not audited, not deployed)',
   'Legal review of NVDA Stock Token payouts',
   'Platform fee (10%) after the beta',

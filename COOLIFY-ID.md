@@ -129,6 +129,20 @@ container. Kalau perlu memicunya sendiri (Coolify → Terminal), perintahnya:
   3. `REWARDS_ENABLED=true`.
   - Sebelum klaim pertama, tiap holder mengisi negara domisili dan pernyataan kelayakan. US dan negara yang dibatasi ditolak.
 
+## 4b-3. Menambah CA token RHIO
+Cukup lewat env, tanpa mengubah kode. Di Coolify isi `RHIO_TOKEN_ADDRESS` dengan alamat kontrak di Robinhood Chain
+mainnet (salin dari explorer supaya huruf besar-kecilnya benar), lalu **Redeploy**. Setelah itu:
+- kotak **CA** di halaman depan menampilkan alamatnya, dengan tautan ke explorer dan tombol Copy;
+- teks status di halaman depan dan menu berganti dari "not live" ke "The RHIO token is live";
+- holder tier aktif: diskon fee dan jatah kredit bulanan (`TIER_BASE_CREDITS`) dibaca dari saldo RHIO wallet yang ditautkan.
+
+Alamat hanya tampil kalau `CHAIN_NETWORK=mainnet`. Situs testnet menulis "Testnet build" dan tidak menampilkan alamat.
+Kalau kotak CA masih "Not deployed yet" setelah redeploy, alamatnya salah ketik: `GET /api/chain` harus menampilkan
+`rhioToken` berisi alamat itu.
+
+Reward NVDA tidak ikut menyala: `REWARDS_ENABLED` tetap `false` sampai syarat di 4b-2 terpenuhi. Whitepaper (bagian
+token, masih "draft") dan roadmap (Phase 3) adalah teks, bukan env: ubah di `lib/rhio3d/src/content.js` saat token diluncurkan.
+
 ## 4c. Tes end-to-end setelah deploy
 ```bash
 BASE=https://preview.rhio.studio npm run smoke

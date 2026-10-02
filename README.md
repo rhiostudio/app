@@ -12,7 +12,7 @@ RHIO is an independent project. It is not affiliated with, endorsed by or partne
   per account, history, export / import, schedules, the credit marketplace, wallet sign-in.
 - **Built, off until configured:** live AI on a server-side provider, USDG credit top-ups, earnings claims,
   holder tiers, holder rewards.
-- **Not live:** the RHIO token is not deployed and rewards pay nothing. The contracts in `contracts/` are drafts
+- **Not live until its address is set:** the RHIO token. The site shows the contract address (the CA box on the home page) only when the server has one for Robinhood Chain mainnet; until then holder tiers stay Free and rewards pay nothing. The contracts in `contracts/` are drafts
   and have not been audited independently. Credits have no monetary value.
 
 Without an AI provider every skill returns a clearly labelled workflow sample.

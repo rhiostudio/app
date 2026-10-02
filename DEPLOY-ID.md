@@ -236,7 +236,7 @@ Alamat hanya boleh disalin dari explorer resmi: testnet explorer.testnet.chain.r
 | CLAIMS_ENABLED | true untuk membuka antrean klaim |
 | CLAIMS_CONTRACT | alamat RhioClaims yang sudah di-deploy (contracts/RhioClaims.sol, owner = multisig) |
 | CLAIMS_ADMIN_TOKEN | token acak 32+ karakter untuk /api/claims/epoch (secret) |
-| RHIO_TOKEN_ADDRESS | alamat token RHIO (belum ada; tanpa ini tier tetap Free) |
+| RHIO_TOKEN_ADDRESS | alamat token RHIO di mainnet. Kosong = kotak CA di halaman depan menulis "Not deployed yet" dan tier tetap Free. Diisi = kotak CA dan teks status di situs menampilkan alamatnya dan holder tier aktif, tanpa mengubah kode (lihat COOLIFY-ID.md bagian 4b-3) |
 
 Isi lewat `npx wrangler secret put NAMA --config dist/server/wrangler.deploy.json` (atau Variables di dashboard Worker).
 

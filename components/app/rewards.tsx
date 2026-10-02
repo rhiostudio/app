@@ -13,6 +13,7 @@ import {Table,TableBody,TableCell,TableHead,TableHeader,TableRow} from '@/compon
 import {api,I} from '@/app/ui';
 import {cn} from '@/lib/utils';
 import {ToneIcon} from '@/components/rhio/navbar';
+import {useRhioToken} from '@/components/rhio/token-context';
 import {discoverWallets,type WalletInfo} from '@/lib/auth-client';
 import {claimOnchain,fetchChain,type ChainInfo} from '@/lib/chain-client';
 import {DashPage,Kpi,KpiRow,PageHeader,StatusBadge} from './parts';
@@ -49,7 +50,10 @@ export function RewardsPage({wallet,auth,onSignIn,onPaper}:{wallet?:string;auth:
  const load=useCallback(async()=>{try{const [d,c]=await Promise.all([api('/api/rewards') as Promise<Overview>,fetchChain().catch(()=>null)]);setData(d);setCfg(c);setError('');}catch(e:any){setError(e.message||'Could not load rewards.');}},[]);
  useEffect(()=>{load();},[load,auth]);
  useEffect(()=>discoverWallets(setWallets),[]);
- const live=!!data?.live;const sym=data?.token?.symbol||'NVDA';const dec=data?.token?.decimals??18;
+ const sym=data?.token?.symbol||'NVDA';const dec=data?.token?.decimals??18;
+ // token and program state as this server knows them: the layout's answer until /api/rewards has loaded (no flash of
+ // "not paying" on a live program), then the API's (a testnet token counts there)
+ const token=useRhioToken();const hasToken=data?!!data.rhio:!!token;const live=data?data.live:!!token?.rewardsLive;
 
  async function claim(c:{address:string;cumulative:string;proof:string[]}){
   if(busy||!cfg||!data?.contract)return;const w=wallets[0];if(!w){toast.error('Open this page in a browser with a wallet to claim.');return;}
@@ -58,14 +62,14 @@ export function RewardsPage({wallet,auth,onSignIn,onPaper}:{wallet?:string;auth:
 
  return <DashPage>
   <PageHeader icon="coins" tone="lime" title="Holder rewards" text={`Hold RHIO in your wallet: ${ruleText(data,sym)}, counted by the second. Paid in ${sym} at the current price, and you claim it yourself from an on-chain vault.`}
-   actions={<><StatusBadge kind={live?'live':'pending'}>{live?'Live':'Open · first payout after token launch'}</StatusBadge><Button variant="outline" onClick={onPaper}><I id="doc"/>How it works</Button></>}/>
+   actions={<><StatusBadge kind={live?'live':'pending'}>{live?'Live':hasToken?'Open · not paying yet':'Open · first payout after token launch'}</StatusBadge><Button variant="outline" onClick={onPaper}><I id="doc"/>How it works</Button></>}/>
 
   {!live&&<div className="flex flex-wrap items-start gap-3 rounded-xl border bg-t-amber p-4 text-[13.5px]">
    <ToneIcon icon="shield" tone="amber" className="size-8"/>
-   <div className="grid flex-1 gap-1"><b className="font-semibold">NVDA rewards are open. The first payout comes after the RHIO token launches.</b><span className="text-muted-foreground">Rewards are paid in NVDA Stock Tokens on Robinhood Chain. They start once the RHIO token and the reward vault are live, so there is nothing to claim yet. NVDA Stock Tokens track the share price but are debt securities, not shares. They may not go to US persons or to restricted and sanctioned countries, so each holder confirms their eligibility before claiming.</span></div>
+   <div className="grid flex-1 gap-1"><b className="font-semibold">{hasToken?'NVDA rewards are open, but not paying yet. The first payout comes once the reward vault is switched on.':'NVDA rewards are open. The first payout comes after the RHIO token launches.'}</b><span className="text-muted-foreground">Rewards are paid in NVDA Stock Tokens on Robinhood Chain. They start once {hasToken?'the reward vault is':'the RHIO token and the reward vault are'} live, so there is nothing to claim yet. NVDA Stock Tokens track the share price but are debt securities, not shares. They may not go to US persons or to restricted and sanctioned countries, so each holder confirms their eligibility before claiming.</span></div>
   </div>}
 
-  <Pipeline data={data}/>
+  <Pipeline data={data} live={live} hasToken={hasToken}/>
 
   {live&&data&&<>
    <KpiRow>
@@ -114,13 +118,13 @@ function Rules({data,sym}:{data:Overview|null;sym:string}){
 }
 
 /** The four parts of the program and whether each is running. */
-function Pipeline({data}:{data:Overview|null}){
- const live=!!data?.live;const rec=data?.recorder;
+function Pipeline({data,live,hasToken}:{data:Overview|null;live:boolean;hasToken:boolean}){
+ const rec=data?.recorder;
  const parts:[string,string,string,'lime'|'iris'|'coral'|'sky',ReactNode][]=[
-  ['users','Holder recorder','Reads every RHIO transfer: each wallet\'s balance at every second.','sky',rec?`${rec.holders} holders · block ${rec.lastBlock.toLocaleString('en-US')}`:data?.rhio?'Waiting for first sync':'Waiting for the RHIO token'],
+  ['users','Holder recorder','Reads every RHIO transfer: each wallet\'s balance at every second.','sky',rec?`${rec.holders} holders · block ${rec.lastBlock.toLocaleString('en-US')}`:hasToken?'Waiting for first sync':'Waiting for the RHIO token'],
   ['layers','Reward calculator',`Units × $${data?.usdPerUnitHour||'0.01'} × hours held, settled every hour at the current price.`,'iris',`${perText(data)} RHIO = 1 unit · hourly`],
   ['shield','Reward vault','Holds the NVDA and pays claims against a public merkle root. Never owes more than it holds.','coral',data?.contract?<a className="underline underline-offset-2" href={`${data.explorer}/address/${data.contract}`} target="_blank" rel="noreferrer">{short(data.contract)}</a>:'RhioClaims · awaiting audit'],
-  ['coins','RHIO dashboard','Your units, accrued reward, history and the claim button, on this page.','lime',live?'Live':'Open · waiting for token'],
+  ['coins','RHIO dashboard','Your units, accrued reward, history and the claim button, on this page.','lime',live?'Live':hasToken?'Not switched on yet':'Open · waiting for token'],
  ];
  return <section className="grid overflow-hidden rounded-xl border bg-card sm:grid-cols-2 xl:grid-cols-4">
   {parts.map(([ic,t,p,tone,state],k)=><div key={t} className={cn('grid content-start gap-2.5 p-4',k>0&&'border-t sm:border-t-0',k%2===1&&'sm:border-l',k>=2&&'sm:border-t xl:border-t-0',k>0&&'xl:border-l')}>

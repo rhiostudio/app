@@ -1,13 +1,16 @@
 'use client';
 /* Holdings & allocation: the signed-in user's RHIO position and what it unlocks. Reads /api/chain (tier table)
    and /api/tier (balance across linked wallets, share of supply, monthly allotment). Until the RHIO token exists
-   everything is shown as a clearly labelled preview with zero values: nothing here is live without the token. */
+   everything is shown as a clearly labelled preview with zero values: nothing here is live without the token.
+   Once it exists, a visitor whose wallets are not read (signed out, still loading, chain unreachable) is told that,
+   never that the token is not live. */
 import {useEffect,useState} from 'react';
 import {formatUnits} from 'viem';
 import {Button} from '@/components/ui/button';
 import {api,I} from '@/app/ui';
 import {cn} from '@/lib/utils';
 import {ToneIcon} from '@/components/rhio/navbar';
+import {useRhioToken} from '@/components/rhio/token-context';
 import {StatusBadge} from './parts';
 
 type TierRow={id:string;name:string;min:string;feePermille:number;credits:number;slots:number};
@@ -26,6 +29,8 @@ export function HoldingsCard({auth,onWallet,compact}:{auth:boolean;onWallet:()=>
   if(auth)api('/api/tier').then(t=>alive&&setTier(t)).catch(e=>alive&&setErr(e.message||'Could not read your holdings.'));
   return()=>{alive=false};},[auth]);
  const live=!!(chain?.tiersLive&&tier?.live);
+ // does the token exist on this server: the layout's answer until /api/chain has loaded, then the API's (a testnet token counts there)
+ const token=useRhioToken();const tokenLive=chain?chain.tiersLive:!!token;
  const tiers=chain?.tiers||[];const max=Math.max(1,...tiers.map(t=>Number(t.min)))*3;
  const bal=whole(tier?.balance);const cur=tiers.find(t=>t.id===(tier?.tier||'free'))||tiers[0];
  const next=tier?.next?tiers.find(t=>t.id===tier.next!.id):tiers[1];
@@ -36,7 +41,7 @@ export function HoldingsCard({auth,onWallet,compact}:{auth:boolean;onWallet:()=>
  const perUnit=BigInt(chain?.rewards?.rhioPerUnit||'3000000');const rate=Number(chain?.rewards?.usdPerUnitHour||'0.01');
  const units=tier?.balance?BigInt(tier.balance)/(perUnit*10n**18n):0n;const rsym=chain?.rewards?.token?.symbol||'NVDA';
  const tiles:{label:string;value:string;hint:string;icon:string;tone:'lime'|'iris'|'coral'|'sky'}[]=[
-  {label:'Monthly credits',value:live&&cur?`${cur.credits} CR`:'—',hint:!live?'Starts with the token':tier?.allotment?.claimed?`Claimed for ${tier.period}`:cur?.credits?`Claimable for ${tier?.period}`:'None on Free',icon:'coins',tone:'lime'},
+  {label:'Monthly credits',value:live&&cur?`${cur.credits} CR`:'—',hint:!tokenLive?'Starts with the token':!live?'From your RHIO balance':tier?.allotment?.claimed?`Claimed for ${tier.period}`:cur?.credits?`Claimable for ${tier?.period}`:'None on Free',icon:'coins',tone:'lime'},
   {label:'Platform fee',value:live&&cur?(cur.feePermille<1000?`−${Math.round((1000-cur.feePermille)/10)}%`:'Standard'):'—',hint:live?'On your sales':'Holder discount',icon:'store',tone:'iris'},
   {label:'Share of supply',value:live&&share!=null?pct(share):'—',hint:live?`${fmt(bal)} of ${fmt(whole(tier?.supply))} RHIO`:'Of all RHIO',icon:'users',tone:'sky'},
   {label:`${rsym} reward`,value:live?`$${fmt(Number(units)*rate,2)}/h`:'—',hint:live?(units>0n?`${units} × ${fmt(Number(perUnit))} RHIO`:`Hold ${fmt(Number(perUnit))} RHIO to earn`):`$${rate} per ${fmt(Number(perUnit))} RHIO per hour`,icon:'hype',tone:'coral'},
@@ -44,7 +49,7 @@ export function HoldingsCard({auth,onWallet,compact}:{auth:boolean;onWallet:()=>
  return <section className="grid gap-4 overflow-hidden rounded-xl border bg-card p-5">
   <div className="flex flex-wrap items-start justify-between gap-3">
    <div className="flex items-center gap-3"><ToneIcon icon="hype" tone="lime"/><div className="grid"><b className="text-[15px] font-semibold">Holdings &amp; allocation</b><span className="text-xs text-muted-foreground">RHIO across your linked wallets on {chain?.name||'Robinhood Chain'}</span></div></div>
-   <StatusBadge kind={live?'live':'archived'}>{live?'Live':'Token not live'}</StatusBadge>
+   <StatusBadge kind={live?'live':tokenLive?'pending':'archived'}>{live?'Live':!tokenLive?'Token not live':!auth?'Connect a wallet':err?'Balance not read':'Reading wallets'}</StatusBadge>
   </div>
 
   <div className={cn('grid gap-5',!compact&&'lg:grid-cols-[minmax(0,.9fr)_minmax(0,1.1fr)]')}>
@@ -62,7 +67,7 @@ export function HoldingsCard({auth,onWallet,compact}:{auth:boolean;onWallet:()=>
      </div>
      <div className="relative h-4 font-mono text-[9.5px] text-muted-foreground uppercase">{tiers.slice(1).map(t=><span key={t.id} className="absolute -translate-x-1/2 whitespace-nowrap" style={{left:`${pos(Number(t.min),max)}%`}}>{t.name}</span>)}</div>
     </div>
-    <p className="text-[12.5px] text-muted-foreground">{!auth?'Connect a wallet to see your position.':err?err:!live?'Tiers start when the RHIO token exists. Link the wallets you will hold it in now, and they are counted automatically.':next?`${fmt(toNext)} RHIO more for ${next.name}.`:'Top tier reached.'}</p>
+    <p className="text-[12.5px] text-muted-foreground">{!auth?'Connect a wallet to see your position.':err?err:!tokenLive?'Tiers start when the RHIO token exists. Link the wallets you will hold it in now, and they are counted automatically.':!live?'Reading the RHIO balance of your linked wallets.':next?`${fmt(toNext)} RHIO more for ${next.name}.`:'Top tier reached.'}</p>
    </div>
    {/* allocation tiles */}
    <div className="grid grid-cols-2 gap-2.5">

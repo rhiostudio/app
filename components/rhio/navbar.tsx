@@ -16,6 +16,7 @@ import {FaXTwitter} from 'react-icons/fa6';
 import {SOCIAL} from '@/lib/site';
 import {I} from '@/app/ui';
 import {CutButton,TINT_BG,type Tone} from './motion';
+import {TOKEN_LINE,useTokenStage} from './token-context';
 import {Thumb} from '@/components/landing/mocks';
 
 /* The mobile "More" drawer (vaul) loads the first time it opens. */
@@ -79,7 +80,7 @@ function Featured({tone,kicker,title,text,cta,onClick,children}:{tone:Tone;kicke
 const panel='absolute right-0 left-auto top-full mt-2 w-[min(780px,calc(100vw-24px))] rounded-2xl border bg-popover p-3 shadow-[0_30px_60px_-30px_rgb(0_0_0/.35)] md:w-[min(780px,calc(100vw-24px))]';
 
 export function Navbar(p:Props){
- const [sheet,setSheet]=useState(false);
+ const [sheet,setSheet]=useState(false);const stage=useTokenStage();
  const trig='h-9 rounded-lg bg-transparent px-2.5 text-[14px] font-medium text-foreground/80 transition-colors duration-300 hover:bg-secondary hover:text-foreground data-[state=open]:bg-secondary data-[state=open]:text-foreground';
  const go=(l:NavLink)=>p.navigate(l.id,l.doc);
  return <>
@@ -107,7 +108,7 @@ export function Navbar(p:Props){
       <NavigationMenuItem className="static"><NavigationMenuTrigger className={trig}>Resources</NavigationMenuTrigger>
        <NavigationMenuContent className={panel}><div className="grid grid-cols-[1fr_1fr_280px] gap-2">
         <div className="col-span-2 grid content-start gap-1"><span className="px-3 pt-2 pb-1 font-mono text-[10px] font-semibold tracking-[.1em] text-muted-foreground uppercase">Learn</span><div className="stagger grid grid-cols-2 gap-1">{RESOURCES.map(l=><MegaLink key={l.title} l={l} active={p.view===l.id&&!l.doc} onGo={()=>go(l)}/>)}</div></div>
-        <Featured tone="sky" kicker="Honest by default" title="What is live, what is planned" text="Credits, skills and publishing are live. Chain top-ups and claims run only where the operator switched them on. The token and NVDA rewards are not live." cta="Read the overview" onClick={()=>p.navigate('docs','overview')}/>
+        <Featured tone="sky" kicker="Honest by default" title="What is live, what is planned" text={`Credits, skills and publishing are live. Chain top-ups and claims run only where the operator switched them on. ${TOKEN_LINE[stage]}`} cta="Read the overview" onClick={()=>p.navigate('docs','overview')}/>
        </div></NavigationMenuContent></NavigationMenuItem>
       <NavigationMenuItem><NavigationMenuLink asChild data-active={p.view==='discover'}><button onClick={()=>p.navigate('discover')} className={cn(trig,'inline-flex items-center data-[active=true]:bg-secondary')}>Discover</button></NavigationMenuLink></NavigationMenuItem>
      </NavigationMenuList>
