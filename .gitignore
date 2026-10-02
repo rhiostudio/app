@@ -115,9 +115,7 @@ CLAUDE*.md
 .codex*
 .gpt*
 .chatgpt/
-# .openai/hosting.json is build configuration (the D1 binding name; vite.config.ts and the build plugin read it). No secret.
-.openai/*
-!.openai/hosting.json
+.openai/
 .agents/
 AGENTS.md
 AGENT.md
