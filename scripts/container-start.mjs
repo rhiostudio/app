@@ -81,8 +81,8 @@ const KEYS=['APP_ORIGIN','BETTER_AUTH_SECRET','AUTH_TRUST_SITES_HEADERS',
  'REWARD_START_BLOCK','REWARD_EXCLUDE','REWARD_PERIOD_HOURS','REWARD_AUTO'];
 // earlier reward rules (weekly, then % of circulating) were replaced by the fixed rate (client, 30 Sep 2026): say so
 for(const old of ['REWARD_MIN_HOLD','REWARD_MIN_HOLD_DAYS','REWARD_PERIOD_DAYS','REWARD_MIN_HOLD_PCT','REWARD_MIN_HOLD_HOURS','REWARD_DRIP_HOURS','REWARD_SPLIT'])
- if(E[old])log(`warning: ${old} is no longer used; remove it. The rule is REWARD_RHIO_PER_UNIT (default 3000000) RHIO = REWARD_USD_PER_UNIT_HOUR (default 0.01) USD per hour.`);
-if(E.REWARD_RHIO_PER_UNIT&&!/^[1-9]\d{0,14}$/.test(E.REWARD_RHIO_PER_UNIT))fail('REWARD_RHIO_PER_UNIT must be a whole number of RHIO, for example 3000000.');
+ if(E[old])log(`warning: ${old} is no longer used; remove it. The rule is REWARD_RHIO_PER_UNIT (default 1500000) RHIO = REWARD_USD_PER_UNIT_HOUR (default 0.01) USD per hour.`);
+if(E.REWARD_RHIO_PER_UNIT&&!/^[1-9]\d{0,14}$/.test(E.REWARD_RHIO_PER_UNIT))fail('REWARD_RHIO_PER_UNIT must be a whole number of RHIO, for example 1500000.');
 if(E.REWARD_USD_PER_UNIT_HOUR&&!(/^\d{1,12}(\.\d{1,8})?$/.test(E.REWARD_USD_PER_UNIT_HOUR)&&Number(E.REWARD_USD_PER_UNIT_HOUR)>0))fail('REWARD_USD_PER_UNIT_HOUR must be a USD amount with at most 8 decimals, for example 0.01.');
 // Claude needs a Console API key (sk-ant-api...). A subscription token (Claude Pro/Max, sk-ant-oat...) is for the
 // subscriber's own use in Claude apps, not for serving other people from a server: refuse it instead of failing later.

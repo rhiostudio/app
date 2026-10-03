@@ -61,9 +61,9 @@ const byId=(list:DocSection[],id:string)=>list.find(s=>s.id===id);
 export const DOC_GROUPS:Group[]=[
  {title:'Getting started',kind:'docs',items:[{id:'overview',title:'What is RHIO',icon:'book',tone:'lime'},{id:'start',title:'Getting started',icon:'play',tone:'iris'}]},
  {title:'Build an agent',kind:'docs',items:[{id:'characters',title:'Characters & outfits',icon:'users',tone:'coral'},{id:'motions',title:'Motions & powers',icon:'levitate',tone:'sky'},{id:'skills',title:'Agent skills',icon:'layers',tone:'amber',badge:['8 open','live']}]},
- {title:'Workspace',kind:'docs',items:[{id:'credits',title:'Credits, prices & earnings',icon:'coins',tone:'amber',badge:['Beta','beta']},{id:'save',title:'Saving, export & share',icon:'share',tone:'mint'},{id:'rewards',title:'Holder rewards (NVDA)',icon:'coins',tone:'lime',badge:['Draft','draft']}]},
+ {title:'Workspace',kind:'docs',items:[{id:'credits',title:'Credits, prices & earnings',icon:'coins',tone:'amber',badge:['Beta','beta']},{id:'save',title:'Saving, export & share',icon:'share',tone:'mint'},{id:'rewards',title:'Holder rewards (NVDA)',icon:'coins',tone:'lime',badge:['Live','live']}]},
  {title:'Trust',kind:'docs',items:[{id:'privacy',title:'Privacy & safety',icon:'shield',tone:'iris'},{id:'faq',title:'FAQ',icon:'bulb',tone:'sky'}]},
- {title:'Whitepaper',kind:'paper',items:C.paper.sections.map((s:DocSection,i:number)=>({id:s.id,title:s.title,icon:s.id==='token'?'coins':s.id==='risks'?'shield':'doc',tone:(['lime','iris','coral','sky','amber','mint'] as Tone[])[i%6],...(s.id==='token'?{badge:['Draft','draft'] as [string,string]}:{})}))},
+ {title:'Whitepaper',kind:'paper',items:C.paper.sections.map((s:DocSection,i:number)=>({id:s.id,title:s.title,icon:s.id==='token'?'coins':s.id==='risks'?'shield':'doc',tone:(['lime','iris','coral','sky','amber','mint'] as Tone[])[i%6],...(s.id==='token'?{badge:['Live','live'] as [string,string]}:{})}))},
 ];
 const BADGE:Record<string,string>={live:'bg-t-mint text-[#15845a] dark:text-mint',beta:'bg-t-amber text-[#9a6500] dark:text-amber',draft:'bg-t-coral text-coral'};
 

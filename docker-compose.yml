@@ -97,7 +97,7 @@ services:
       REWARD_CONTRACT: ${REWARD_CONTRACT:-}
       # fixed rate: every REWARD_RHIO_PER_UNIT RHIO held earns REWARD_USD_PER_UNIT_HOUR USD of the reward token per hour,
       # priced live by the Chainlink feed; hourly periods, built and published automatically (REWARDS-NVDA.md)
-      REWARD_RHIO_PER_UNIT: ${REWARD_RHIO_PER_UNIT:-3000000}
+      REWARD_RHIO_PER_UNIT: ${REWARD_RHIO_PER_UNIT:-1500000}
       REWARD_USD_PER_UNIT_HOUR: ${REWARD_USD_PER_UNIT_HOUR:-0.01}
       REWARD_PRICE_FEED: ${REWARD_PRICE_FEED:-}
       REWARD_PRICE_MAX_AGE_HOURS: ${REWARD_PRICE_MAX_AGE_HOURS:-72}

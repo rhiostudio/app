@@ -10,10 +10,12 @@ RHIO is an independent project. It is not affiliated with, endorsed by or partne
 
 - **Live:** character studio (25 procedural characters, three.js), agent builder, eight skills, workspace storage
   per account, history, export / import, schedules, the credit marketplace, wallet sign-in.
-- **Built, off until configured:** live AI on a server-side provider, USDG credit top-ups, earnings claims,
-  holder tiers, holder rewards.
-- **Not live until its address is set:** the RHIO token. The site shows the contract address (the CA box on the home page) only when the server has one for Robinhood Chain mainnet; until then holder tiers stay Free and rewards pay nothing. The contracts in `contracts/` are drafts
-  and have not been audited independently. Credits have no monetary value.
+- **Live on rhio.studio (Robinhood Chain mainnet):** the RHIO token (since 2 October 2026; the contract address is the
+  one in the CA box on the home page), live AI on a server-side provider, USDG credit top-ups, holder tiers, and holder
+  rewards in NVDA Stock Tokens ($0.01 per hour per 1,500,000 RHIO held, settled and claimable every hour).
+  Every one of these is a server setting: another deployment has them off until its operator configures them.
+- **Built, not switched on:** earnings claims in USDG (the claims contract is not deployed).
+- **Not done:** an independent audit. The contracts in `contracts/` have not been audited. Credits have no monetary value.
 
 Without an AI provider every skill returns a clearly labelled workflow sample.
 

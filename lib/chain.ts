@@ -27,7 +27,7 @@
      REWARD_CONTRACT          a SEPARATE RhioClaims instance deployed for the reward token
      Fixed rate (client, 30 Sep 2026): every complete block of REWARD_RHIO_PER_UNIT RHIO held earns
      REWARD_USD_PER_UNIT_HOUR dollars of the reward token per hour, accrued per second from the Transfer history.
-     REWARD_RHIO_PER_UNIT     whole RHIO per reward unit, default 3000000
+     REWARD_RHIO_PER_UNIT     whole RHIO per reward unit, default 1500000 (the live rule since 3 Oct 2026; 3000000 before)
      REWARD_USD_PER_UNIT_HOUR USD per unit per hour, default 0.01 (stored with 8 decimals: 1000000)
      REWARD_PRICE_FEED        Chainlink USD feed for the reward token (mainnet NVDA: RHNVDA / USD, see .env.coolify.mainnet).
                               Set: the price is read live from the feed at every settlement and every 15 minutes.
@@ -96,7 +96,7 @@ export function rewardConfig(c=chainConfig()){
  const e=E();const token=addr(e.REWARD_TOKEN_ADDRESS),contract=addr(e.REWARD_CONTRACT);
  const start=Number(e.REWARD_START_BLOCK);
  // the rule itself: whole RHIO per unit and USD (8 decimals) per unit per hour; malformed values fall back to the default
- const perUnitWhole=/^\d{1,15}$/.test(e.REWARD_RHIO_PER_UNIT||'')&&BigInt(e.REWARD_RHIO_PER_UNIT!)>0n?BigInt(e.REWARD_RHIO_PER_UNIT!):3_000_000n;
+ const perUnitWhole=/^\d{1,15}$/.test(e.REWARD_RHIO_PER_UNIT||'')&&BigInt(e.REWARD_RHIO_PER_UNIT!)>0n?BigInt(e.REWARD_RHIO_PER_UNIT!):1_500_000n;
  const rate=toE8(e.REWARD_USD_PER_UNIT_HOUR);const rateE8=rate&&rate>0n?rate:1_000_000n;
  // an entry that is not a valid address (wrong length, broken checksum) is counted, never dropped silently: the address it
  // was meant to exclude would start earning rewards, so periods are not built until it is fixed (lib/rewards.ts)

@@ -1,5 +1,6 @@
-/* Holder rewards, fixed rate (client, 30 Sep 2026): every complete block of 3,000,000 RHIO held earns $0.01 of NVDA
-   per hour (REWARD_RHIO_PER_UNIT, REWARD_USD_PER_UNIT_HOUR). Four pieces:
+/* Holder rewards, fixed rate (client, 30 Sep 2026): every complete block of REWARD_RHIO_PER_UNIT RHIO held earns
+   REWARD_USD_PER_UNIT_HOUR of NVDA per hour (live rule since 3 Oct 2026: 1,500,000 RHIO = $0.01; 3,000,000 before).
+   Four pieces:
    1. Holder recorder  (syncHolders)  reads every RHIO Transfer log (settled blocks only) with its block time, so the
                                       server knows each wallet's balance at every second. A token sits in exactly one
                                       wallet at a time: moving RHIO between wallets never earns twice, and a balance only
@@ -7,7 +8,7 @@
                                       right after earns seconds, not hours). A contract that only calls balanceOf() cannot
                                       know this history, which is why the rewards are computed here and not on-chain.
    2. Reward calculator (accrue)      per address: sum over time of units x seconds x rate / 3600, where units =
-                                      floor(balance / 3M RHIO). Integer math, rounded down once per period, never up.
+                                      floor(balance / unit). Integer math, rounded down once per period, never up.
                                       USD is the unit of account; a period converts its USD to NVDA at the operator-set
                                       price (reward_prices) when it is built, so the USD value is fixed and the NVDA amount
                                       follows the price. Team, treasury, pools, burn and the vault itself never earn.
@@ -48,7 +49,8 @@ const rootUpdated=parseAbiItem('event RootUpdated(bytes32 indexed root, bytes32 
 /** Guard rails. The calculator replays the whole Transfer history and every tree carries every address that ever earned;
     past these sizes one build could exhaust the single runtime process and take the whole site down with it. The build
     then stops with a clear message instead (accrual is not lost, periods wait). They are far above normal use at
-    3,000,000 RHIO per unit; reaching them means the token is being spammed or the incremental calculator is due. */
+    1,500,000 RHIO per unit (at most 666 earners of a 1,000,000,000 supply); reaching them means the token is being
+    spammed or the incremental calculator is due. */
 const MAX_REPLAY_TRANSFERS=400_000,MAX_LEAVES=20_000;
 /** A root transaction that is not mined, or was replaced on the vault, is sent again after this many seconds. */
 const POST_RETRY_SECONDS=600;

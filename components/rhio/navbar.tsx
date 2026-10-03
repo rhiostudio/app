@@ -43,7 +43,7 @@ export const RESOURCES:NavLink[]=[
  {id:'docs',title:'Agent skills',icon:'layers',desc:'What each skill does',tone:'iris',doc:'skills'},
  {id:'docs',title:'Credits & prices',icon:'coins',desc:'How pay-per-run works',tone:'amber',doc:'credits'},
  {id:'docs',title:'FAQ',icon:'bulb',desc:'Short answers to common questions',tone:'sky',doc:'faq'},
- {id:'paper',title:'Whitepaper',icon:'doc',desc:'The token draft and economics',tone:'coral'},
+ {id:'paper',title:'Whitepaper',icon:'doc',desc:'The token, holder rewards and economics',tone:'coral'},
  {id:'roadmap',title:'Roadmap',icon:'map',desc:'Shipped, in progress, planned',tone:'mint'},
 ];
 const TONE_TEXT:Record<Tone,string>={lime:'text-[#3f5f00] dark:text-lime',iris:'text-iris',coral:'text-coral',sky:'text-[#1f7fcf] dark:text-sky',amber:'text-[#9a6500] dark:text-amber',mint:'text-[#15845a] dark:text-mint',pink:'text-pink',ink:'text-foreground'};

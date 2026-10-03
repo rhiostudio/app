@@ -15,29 +15,27 @@ const date = C.version.split('·')[1]?.trim() || '';
 
 /* Feature status by what the code actually does. Keep in sync with Docs "What is RHIO". */
 const STATUS = [
- ['Live in the preview', 'live', [
+ ['Live on rhio.studio', 'live', [
   '25 original procedural characters, outfit editor, 20 motions, 6 powers (three.js, in the browser)',
   'Agent builder: persona, tone, answer language, up to 4 of 8 skills',
-  'All 8 skills open, 2 tries per skill per account (operator setting); a failed run gives the try back',
+  'All 8 skills open on a server-side AI provider; runs cost credits, and the operator can cap tries per skill (a failed run gives the try back)',
   'Save, duplicate, archive, export / import JSON, share links, task history',
-  'Pay-per-run marketplace in preview credits: 25 free starting credits, live AI 4–12 credits per run by skill, creator prices 0–500, platform fee 0% in beta, ledger with refunds',
+  'Pay-per-run marketplace in credits: 25 free starting credits, live AI 4–12 credits per run by skill, creator prices 0–500, platform fee 0% in beta, ledger with refunds',
   'Discover gallery of published agents (instructions are never shown)',
   'Schedules: an agent runs a skill 1–24 times a day, paid per run with the skill\'s live price (at least 5 credits), max 3 schedules / 24 runs a day',
   'Wallet-only sign-in (SIWE for Robinhood Chain), several wallets per account',
+  'RHIO token on Robinhood Chain mainnet since 2 October 2026; the contract address is in the CA box on the home page',
+  'Credit top-ups in USDG on Robinhood Chain mainnet (1 USDG = 100 credits)',
+  'Holder tiers from the RHIO balance: monthly credits and a lower platform fee',
+  'NVDA holder rewards: $0.01 of NVDA per hour per 1,500,000 RHIO, Chainlink price, settled and claimable every hour from the reward vault (RhioClaims, owned by the multisig, source-verified, not audited)',
   'Docs, whitepaper and roadmap',
  ]],
- ['Built, switched off until configured', 'off', [
-  'Skills on a server-side AI provider (self-hosted; template: Gemini Flash-Lite); without a provider key they return labelled workflow samples',
-  'Web research that browses: Gemini with Google Search (template), or Claude / OpenAI web search',
-  'Credit top-ups in USDG on Robinhood Chain (1 USDG = 100 credits by default)',
-  'Earnings claims in USDG through the RhioClaims contract (min. 500 earned credits)',
-  'Holder tiers from the RHIO balance: monthly credits and a lower platform fee',
-  'NVDA holder rewards: $0.01 of NVDA per hour per 1,500,000 RHIO, live Chainlink price, reward vault, rewards dashboard',
+ ['Built, switched off', 'off', [
+  'Web research that browses: Gemini with Google Search, or Claude / OpenAI web search (needs a provider plan that includes search; without it the skill answers from the model and says so)',
+  'Earnings claims in USDG through the RhioClaims contract (min. 500 earned credits): written and tested locally, not audited, not deployed',
  ]],
- ['Not live', 'no', [
-  'RHIO token: live only once its contract address is shown in the CA box on the home page; until then tiers stay Free and rewards pay nothing',
-  'NVDA reward vault (RhioClaims): deployed on mainnet and source-verified, owned by the multisig, not audited and with no claims open, so it pays nothing',
-  'RhioClaims for USDG earnings claims (written and tested locally, not audited, not deployed)',
+ ['Not done', 'no', [
+  'Independent audit of RhioClaims (reward vault and claims contract)',
   'Legal review of NVDA Stock Token payouts',
   'Platform fee (10%) after the beta',
   'Wallet monitor skill, on-chain monitoring',
@@ -117,14 +115,14 @@ th{text-align:left;background:#15201a;color:#f1efe6;font-weight:600}th,td{paddin
 </style></head><body>
 <section class="cover"><div><img src="${logo}" alt="RHIO"></div>
 <div><div class="eyebrow">Documentation export · ${esc(date)}</div><h1>RHIO Agent Studio<br><span class="lime">Docs, Whitepaper & Roadmap</span></h1>
-<p>Everything in the studio's docs, the whitepaper draft and the roadmap, with a status page that separates what is live, what is built but switched off, and what does not exist yet.</p></div>
-<div class="eyebrow">${esc(C.version)} · Token and reward parameters are drafts · Not an offer to sell any token</div></section>
+<p>Everything in the studio's docs, the whitepaper and the roadmap, with a status page that separates what is live, what is built but switched off, and what has not been done.</p></div>
+<div class="eyebrow">${esc(C.version)} · ${esc(C.paper.status)} · Not an offer to sell any token</div></section>
 
 <section class="toc"><div class="eyebrow">Contents</div><h1>Contents</h1><ol>${toc.map(([id, t, list]) => `<li><strong>${t}</strong>${list ? `<ol>${list.map(s => `<li>${esc(s.title)}</li>`).join('')}</ol>` : ''}</li>`).join('')}</ol></section>
 
 <section class="part status" id="status"><div class="eyebrow">Where things stand · ${esc(date)}</div><h1>Feature status</h1>
-<p>Status by what the code does today. "Built, switched off" means the feature exists and is tested, but a server operator has to configure it, and some parts also need the RHIO token or deployed contracts.</p>
-${STATUS.map(([t, k, items]) => `<h3><span class="pill ${k}">${k === 'live' ? 'Live' : k === 'off' ? 'Off' : 'Not live'}</span>${t}</h3><ul>${items.map(x => `<li>${inline(x)}</li>`).join('')}</ul>`).join('')}
+<p>Status of rhio.studio on Robinhood Chain mainnet. "Built, switched off" means the feature exists and is tested, but it is not switched on or still needs a deployed contract.</p>
+${STATUS.map(([t, k, items]) => `<h3><span class="pill ${k}">${k === 'live' ? 'Live' : k === 'off' ? 'Off' : 'Not done'}</span>${t}</h3><ul>${items.map(x => `<li>${inline(x)}</li>`).join('')}</ul>`).join('')}
 </section>
 
 <section class="part" id="docs"><div class="eyebrow">Part 1</div><h1>Docs</h1>

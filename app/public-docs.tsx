@@ -51,8 +51,9 @@ export function PublicDocs({kind,page,onPage,onNavigate}:{kind:DocKind;page:stri
      className="h-8 shrink-0 rounded-lg border px-3 text-[13px] whitespace-nowrap text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground aria-[current=page]:border-foreground aria-[current=page]:bg-foreground aria-[current=page]:text-background">{it.title}</button>)}
    </div>
   </div>
-  <div className="mx-auto grid max-w-[1180px] gap-10 px-[clamp(16px,3vw,32px)] pt-10 pb-16 xl:grid-cols-[minmax(0,1fr)_220px]">
-   <article className="mx-auto w-full max-w-[72ch]">
+  {/* minmax(0,1fr) + min-w-0: a wide table scrolls inside its own box instead of widening the page on phones */}
+  <div className="mx-auto grid max-w-[1180px] grid-cols-[minmax(0,1fr)] gap-10 px-[clamp(16px,3vw,32px)] pt-10 pb-16 xl:grid-cols-[minmax(0,1fr)_220px]">
+   <article className="mx-auto w-full max-w-[72ch] min-w-0">
     <div className="doc-md text-[15.5px] leading-[1.75]"><Markdown src={sec.body} idPrefix={prefix}/></div>
     <div className="mt-12 grid gap-3 sm:grid-cols-2">
      {prev?<button onClick={()=>onPage(kind,prev.id)} className="grid gap-1 rounded-xl border p-4 text-left transition-colors hover:border-foreground/30"><span className="font-mono text-[10.5px] tracking-[.08em] text-muted-foreground uppercase">← Previous</span><b className="font-medium">{prev.title}</b></button>:<span/>}

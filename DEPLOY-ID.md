@@ -271,14 +271,15 @@ Holder rewards (4 bagian: pencatat holder, penghitung reward, kontrak distribusi
 (`0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC`, sudah diisi di `.env.coolify.mainnet`). Periode jalan setelah token RHIO ada. Untuk menyalakan: `REWARDS_ENABLED=true`, `RHIO_TOKEN_ADDRESS`,
 `REWARD_TOKEN_ADDRESS` (NVDA setelah review hukum, atau USDG), `REWARD_CONTRACT` (RhioClaims KEDUA, owner = multisig,
 bukan CLAIMS_CONTRACT), `REWARD_START_BLOCK` (blok deploy token RHIO), `REWARD_EXCLUDE` (tim, treasury, pool likuiditas).
-Aturan dari klien (30 Sep 2026, tarif tetap). Detail teknis dan keamanan: `REWARDS-NVDA.md`.
-- Setiap **3.000.000 RHIO** yang di-hold = **$0,01 NVDA per jam** (6 juta = $0,02, 9 juta = $0,03).
-  - Unit dihitung bulat: 2.999.999 RHIO = 0 unit, 5.999.999 = 1 unit.
+Aturan dari klien (tarif tetap; unitnya 1.500.000 RHIO sejak 3 Okt 2026, sebelumnya 3.000.000). Detail teknis dan keamanan: `REWARDS-NVDA.md`.
+- Setiap **1.500.000 RHIO** yang di-hold = **$0,01 NVDA per jam** (3 juta = $0,02, 4,5 juta = $0,03).
+  - Unit dihitung bulat: 1.499.999 RHIO = 0 unit, 2.999.999 = 1 unit.
   - Dihitung per detik dari riwayat transfer RHIO. RHIO yang dipindah ke wallet lain tidak pernah dihitung dua kali,
     dan beli sebentar sebelum jam ditutup hanya dapat hitungan detiknya.
 - Nilai dolarnya tetap; jumlah NVDA mengikuti harga NVDA yang kamu set saat jam itu diselesaikan.
-- Variabel: `REWARD_RHIO_PER_UNIT=3000000`, `REWARD_USD_PER_UNIT_HOUR=0.01`, `REWARD_PRICE_MAX_AGE_HOURS=72`,
-  `REWARD_PERIOD_HOURS=1`. Variabel lama (`REWARD_MIN_HOLD*`, `REWARD_DRIP_HOURS`, `REWARD_SPLIT`, `REWARD_PERIOD_DAYS`)
+- Variabel: `REWARD_RHIO_PER_UNIT=1500000`, `REWARD_USD_PER_UNIT_HOUR=0.01`, `REWARD_PRICE_MAX_AGE_HOURS=72`,
+  `REWARD_PERIOD_HOURS=1`. Setelah mengubah `REWARD_RHIO_PER_UNIT`: Redeploy, lalu jalankan aksi `rebuild` di
+  `/api/rewards/admin` supaya unit tiap wallet dihitung ulang. Jam yang sudah terbit tidak berubah. Variabel lama (`REWARD_MIN_HOLD*`, `REWARD_DRIP_HOURS`, `REWARD_SPLIT`, `REWARD_PERIOD_DAYS`)
   tidak dipakai lagi; container menulis peringatan kalau masih diisi.
 
 **Harga NVDA (otomatis, live dari Chainlink).** Di mainnet `REWARD_PRICE_FEED=0x379EC4f7C378F34a1B47E4F3cbeBCbAC3E8E9F15`
