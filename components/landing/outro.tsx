@@ -53,7 +53,7 @@ export function TokenBand({onNavigate}:{onNavigate:Go}){
   <div className="mx-auto grid max-w-[1180px] items-start gap-8 px-4 pt-16 pb-6 md:grid-cols-[240px_1fr]">
    <Eyebrow tone="amber">{stage==='none'?'What it would add':'What it adds'}</Eyebrow>
    <Reveal className="grid max-w-[640px] gap-6">
-    <p className="text-[clamp(20px,2vw,27px)] leading-snug font-medium tracking-[-.02em]">Creators already earn credits when others run their agents. Holding RHIO adds fee discounts and NVDA rewards: every 3,000,000 RHIO held earns $0.01 of tokenized NVDA per hour on Robinhood Chain.</p>
+    <p className="text-[clamp(20px,2vw,27px)] leading-snug font-medium tracking-[-.02em]">Creators already earn credits when others run their agents. Holding RHIO adds fee discounts and NVDA rewards: every 1,500,000 RHIO held earns $0.01 of tokenized NVDA per hour on Robinhood Chain.</p>
     <p className="text-sm text-muted-foreground">{status} Stock Tokens are debt securities, not shares, and are not available to US persons or in restricted countries; holders confirm eligibility before claiming. Nothing here is financial advice.</p>
     <div className="flex flex-wrap gap-2"><CutButton onClick={()=>onNavigate('paper')}>Tokenomics</CutButton><CutButton variant="outline" onClick={()=>onNavigate('roadmap')}>Roadmap</CutButton></div>
    </Reveal>

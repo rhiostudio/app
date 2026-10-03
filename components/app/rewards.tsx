@@ -1,6 +1,6 @@
 'use client';
 /* Holder rewards dashboard (/dashboard/rewards). Data from /api/rewards (lib/rewards.ts).
-   Fixed rate: every complete block of 3,000,000 RHIO held earns $0.01 of NVDA per hour, counted per second from the
+   Fixed rate: every complete block of REWARD_RHIO_PER_UNIT (1,500,000) RHIO held earns $0.01 of NVDA per hour, counted per second from the
    wallet's Transfer history (holder recorder), converted to NVDA at the live Chainlink price when each hourly period is
    built, and paid from an on-chain vault (a RhioClaims instance) that the holder claims from with their own wallet.
    While the program is off (no RHIO token yet) the page shows the rule, a calculator and what is built. */
@@ -40,8 +40,8 @@ const when=(ts:number)=>new Date(ts*1000).toLocaleString(undefined,{day:'numeric
 const day=(ts:number)=>new Date(ts*1000).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'});
 const closeLabel=(ts:number)=>new Date(ts*1000).toLocaleString(undefined,{weekday:'short',hour:'2-digit',minute:'2-digit'});
 const walletError=(e:any)=>e?.code===4001?'You cancelled the request in your wallet.':(e?.shortMessage||e?.message||'The wallet request failed.');
-const perText=(d:Overview|null)=>Number(d?.rhioPerUnit||3_000_000).toLocaleString('en-US');
-/** "every 3,000,000 RHIO = $0.01 of NVDA per hour" from the live settings. */
+const perText=(d:Overview|null)=>Number(d?.rhioPerUnit||1_500_000).toLocaleString('en-US');
+/** "every 1,500,000 RHIO = $0.01 of NVDA per hour" from the live settings. */
 const ruleText=(d:Overview|null,sym='NVDA')=>`every ${perText(d)} RHIO = $${d?.usdPerUnitHour||'0.01'} of ${sym} per hour`;
 
 export function RewardsPage({wallet,auth,onSignIn,onPaper}:{wallet?:string;auth:boolean;onSignIn:()=>void;onPaper:()=>void}){
@@ -90,7 +90,7 @@ export function RewardsPage({wallet,auth,onSignIn,onPaper}:{wallet?:string;auth:
   </>}
 
   {!live&&<div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,.8fr)]">
-   <Calculator perUnit={Number(data?.rhioPerUnit||3_000_000)} rate={Number(data?.usdPerUnitHour||0.01)} sym={sym}/>
+   <Calculator perUnit={Number(data?.rhioPerUnit||1_500_000)} rate={Number(data?.usdPerUnitHour||0.01)} sym={sym}/>
    <div className="stagger grid gap-3">
     <section className="grid gap-3 rounded-xl border bg-card p-4">
      <b className="text-sm font-semibold">Your wallet</b>
@@ -105,7 +105,7 @@ export function RewardsPage({wallet,auth,onSignIn,onPaper}:{wallet?:string;auth:
 }
 
 function Rules({data,sym}:{data:Overview|null;sym:string}){
- const per=Number(data?.rhioPerUnit||3_000_000);const rate=data?.usdPerUnitHour||'0.01';
+ const per=Number(data?.rhioPerUnit||1_500_000);const rate=data?.usdPerUnitHour||'0.01';
  return <section className="grid gap-2 rounded-xl border bg-t-sky p-4 text-[13px]">
   <b className="font-semibold">Rules in the program</b>
   {[`Every complete ${per.toLocaleString('en-US')} RHIO earns $${rate} per hour: ${(per*2).toLocaleString('en-US')} earns 2×, ${(per*2-1).toLocaleString('en-US')} still earns 1×`,

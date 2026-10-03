@@ -32,7 +32,7 @@ const STATUS = [
   'Credit top-ups in USDG on Robinhood Chain (1 USDG = 100 credits by default)',
   'Earnings claims in USDG through the RhioClaims contract (min. 500 earned credits)',
   'Holder tiers from the RHIO balance: monthly credits and a lower platform fee',
-  'NVDA holder rewards: $0.01 of NVDA per hour per 3,000,000 RHIO, live Chainlink price, reward vault, rewards dashboard',
+  'NVDA holder rewards: $0.01 of NVDA per hour per 1,500,000 RHIO, live Chainlink price, reward vault, rewards dashboard',
  ]],
  ['Not live', 'no', [
   'RHIO token: live only once its contract address is shown in the CA box on the home page; until then tiers stay Free and rewards pay nothing',

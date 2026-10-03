@@ -38,7 +38,7 @@ export function HoldingsCard({auth,onWallet,compact}:{auth:boolean;onWallet:()=>
  const share=tier?.shareBps!=null?tier.shareBps/100:null;
  const pct=(n:number)=>`${fmt(n,n<0.01?4:2)}%`;
  // fixed-rate NVDA rewards: complete blocks of rhioPerUnit RHIO x USD per unit per hour (integer units, exact)
- const perUnit=BigInt(chain?.rewards?.rhioPerUnit||'3000000');const rate=Number(chain?.rewards?.usdPerUnitHour||'0.01');
+ const perUnit=BigInt(chain?.rewards?.rhioPerUnit||'1500000');const rate=Number(chain?.rewards?.usdPerUnitHour||'0.01');
  const units=tier?.balance?BigInt(tier.balance)/(perUnit*10n**18n):0n;const rsym=chain?.rewards?.token?.symbol||'NVDA';
  const tiles:{label:string;value:string;hint:string;icon:string;tone:'lime'|'iris'|'coral'|'sky'}[]=[
   {label:'Monthly credits',value:live&&cur?`${cur.credits} CR`:'—',hint:!tokenLive?'Starts with the token':!live?'From your RHIO balance':tier?.allotment?.claimed?`Claimed for ${tier.period}`:cur?.credits?`Claimable for ${tier?.period}`:'None on Free',icon:'coins',tone:'lime'},
