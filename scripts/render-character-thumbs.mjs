@@ -4,6 +4,7 @@
 //   1. npm run dev                                  (http://localhost:5173)
 //   2. node scripts/render-character-thumbs.mjs     (starts a tiny save server on 127.0.0.1:5199)
 //   3. open http://localhost:5173 and paste the printed snippet into the browser console
+//   4. node scripts/render-agent-cards.mjs          (the link-preview panels are made from these pictures)
 // Run again after changing presets or the engine's look. Every picture is 450x600: rendered larger and scaled down
 // in the page, so the result does not depend on the screen it was made on.
 import http from 'node:http';

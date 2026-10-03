@@ -2,7 +2,7 @@
 /* App shell and every view. UI is shadcn/ui (components/ui) + Tailwind; data logic unchanged. */
 import {lazy,Suspense,useEffect,useMemo,useRef,useState,type ReactNode} from 'react';
 import {usePathname,useRouter} from 'next/navigation';
-import {parsePath,pathFor,LEGACY_HASH,type Area} from '@/lib/routes';
+import {parsePath,pathFor,agentPath,LEGACY_HASH,type Area} from '@/lib/routes';
 import {Toaster,toast} from 'sonner';
 import {starter,skillCatalog,isOpenSkill,triesLeft,MAX_SKILLS,type Trials,type Agent,type Run,type MarketAgent,type LedgerEntry} from '@/lib/agents';
 import {characters,getCharacter,loopMotions,powers,type CharacterId,type Motion} from '@/lib/characters';
@@ -48,6 +48,7 @@ const Overview=lazy(()=>import('@/components/app/overview').then(m=>({default:m.
 const ProfilePage=lazy(()=>import('@/components/app/profile').then(m=>({default:m.ProfilePage})));
 const PublicDocs=lazy(()=>import('./public-docs').then(m=>({default:m.PublicDocs})));
 const PublicRoadmap=lazy(()=>import('./public-docs').then(m=>({default:m.PublicRoadmap})));
+const AgentPage=lazy(()=>import('@/components/rhio/agent-page').then(m=>({default:m.AgentPage})));
 const LoginPage=lazy(()=>import('@/components/rhio/login-page').then(m=>({default:m.LoginPage})));
 const NotFoundPage=lazy(()=>import('@/components/rhio/login-page').then(m=>({default:m.NotFoundPage})));
 const SearchPalette=lazy(()=>import('@/components/rhio/search-palette').then(m=>({default:m.SearchPalette})));
@@ -286,6 +287,7 @@ export default function Studio(){
     </div>
     {visibleMarket===null?<TileSkeletons/>:visibleMarket.length===0?<EmptyState title={query?'No matches':'No published agents yet'} text={query?(mode==='title'?'No agent names match. Try Search everything.':'Nothing matches your search.'):'Publish one of your agents from My agents and it shows up here for everyone.'} chars={['cole','nova','rook']} action={!query?<Button variant="outline" onClick={()=>navigate('agents')}>Go to My agents</Button>:undefined}/>:
     <Grid>{visibleMarket.map((a,k)=><AgentTile key={a.id} a={a} idx={k+2} creator={a.mine?'Your agent':a.creator} price={a.price} status={a.mine?'mine':'live'}
+     actions={[['Open its page',()=>router.push(agentPath(a.id))],['Copy link',()=>copyText(location.origin+agentPath(a.id),toast.success,toast.error)]]}
      footer={<><span className="text-xs text-muted-foreground">{a.uses} run{a.uses===1?'':'s'} · {a.tone}</span><Button size="sm" className="ml-auto" onClick={()=>{if(!requireAuth())return;setMarketAgent(a);}}>Run a task<I id="arrow"/></Button></>}/>)}</Grid>}
     <div className="mt-2 flex items-end justify-between gap-3"><div className="grid gap-1"><h2 className="font-display text-xl font-medium tracking-[-.02em]">Starter templates</h2><p className="text-sm text-muted-foreground">Editable starting points. Published agents run as-is; their instructions are not shown.</p></div></div>
     <div className="stagger grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{TEMPLATES.map((t,k)=><button key={t.name} onClick={()=>applyTemplate(t)} className={cn('lift group grid gap-3 rounded-xl border p-4 text-left',['bg-t-iris','bg-t-mint','bg-t-amber','bg-t-coral'][k%4])}>
@@ -382,6 +384,7 @@ export default function Studio(){
     {(view==='docs'||view==='paper')&&<PublicDocs kind={view as DocKind} page={docPage} onPage={(k,id)=>navigate(k,id,'site')} onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
     {view==='roadmap'&&<PublicRoadmap onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
     {view==='login'&&<LoginPage auth={auth} onDone={()=>{refresh();const n=new URLSearchParams(location.search).get('next');router.replace(n&&n.startsWith('/dashboard')?n:'/dashboard');}} onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
+    {view==='agent'&&route.doc&&<AgentPage id={route.doc} onRun={a=>{if(!requireAuth())return;setMarketAgent(a);}} onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
     {view==='notfound'&&<NotFoundPage onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
    </Suspense>
 
