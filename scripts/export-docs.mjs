@@ -22,6 +22,7 @@ const STATUS = [
   'Whale watch: public page /whales and a skill, both from the server\'s record of the RHIO token (biggest transfers of the last 24 hours, new holders, biggest holders); no prices, no owner names',
   'All 10 skills open on a server-side AI provider; runs cost credits, and the operator can cap tries per skill (a failed run gives the try back)',
   'Save, duplicate, archive, export / import JSON, share links, task history',
+  'Recipes: four ready-made automations (daily whale brief, wallet check, a post a day, morning plan); one click makes the agent and the schedule; public page /recipes',
   'Holder perks: a tier raises schedules (3 / 6 / 12 / 24), scheduled runs a day (24 / 48 / 96 / 192) and delivery channels (4 / 6 / 8 / 12); the Free tier keeps the server\'s own limits',
   'Quests: eight things to try, each checked by the server and worth free credits once per account (5 by default; free credits cannot be claimed or withdrawn)',
   'Share an answer: a public page /s/<id> with the agent\'s character and a preview picture, opt-in per run, removable; not for answers that used Google Search',

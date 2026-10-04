@@ -51,6 +51,7 @@ const PublicDocs=lazy(()=>import('./public-docs').then(m=>({default:m.PublicDocs
 const PublicRoadmap=lazy(()=>import('./public-docs').then(m=>({default:m.PublicRoadmap})));
 const AgentPage=lazy(()=>import('@/components/rhio/agent-page').then(m=>({default:m.AgentPage})));
 const WhalesPage=lazy(()=>import('@/components/rhio/whales-page').then(m=>({default:m.WhalesPage})));
+const RecipesPage=lazy(()=>import('@/components/rhio/recipes-page').then(m=>({default:m.RecipesPage})));
 const TiersPage=lazy(()=>import('@/components/rhio/tiers-page').then(m=>({default:m.TiersPage})));
 const SharePage=lazy(()=>import('@/components/rhio/share-page').then(m=>({default:m.SharePage})));
 const ShareAnswer=lazy(()=>import('@/components/app/share-answer').then(m=>({default:m.ShareAnswer})));
@@ -264,7 +265,7 @@ export default function Studio(){
    {view==='overview'&&<Overview auth={auth} balance={balance} earned={earned} agents={activeAgents.length} published={publishedCount} runs={runs} wallet={wallet} navigate={(v:View)=>navigate(v)} onSignIn={()=>setSignin(true)} onNew={()=>fresh()}/>}
    {view==='profile'&&<ProfilePage auth={auth} label={email} wallet={wallet} balance={balance} earned={earned} feeBps={feeBps} navigate={(v:View)=>navigate(v)} onSignIn={()=>setSignin(true)} onSignOut={signOut}/>}
    {view==='wallet'&&<WalletPage auth={auth} onSignIn={()=>setSignin(true)} onChanged={refresh}/>}
-   {view==='schedules'&&<SchedulesPage auth={auth} agents={agents} balance={balance} onSignIn={()=>setSignin(true)} onOpenHistory={()=>navigate('activity')}/>}
+   {view==='schedules'&&<SchedulesPage auth={auth} agents={agents} balance={balance} onSignIn={()=>setSignin(true)} onOpenHistory={()=>navigate('activity')} onAgents={refresh}/>}
    {view==='quests'&&<QuestsPage auth={auth} onSignIn={()=>setSignin(true)} onGo={v=>navigate(v)} onClaimed={refresh}/>}
    {view==='rewards'&&<RewardsPage wallet={wallet||undefined} auth={auth} onSignIn={()=>setSignin(true)} onPaper={()=>navigate('paper','token')}/>}
 
@@ -392,6 +393,7 @@ export default function Studio(){
     {view==='login'&&<LoginPage auth={auth} onDone={()=>{refresh();const n=new URLSearchParams(location.search).get('next');router.replace(n&&n.startsWith('/dashboard')?n:'/dashboard');}} onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
     {view==='agent'&&route.doc&&<AgentPage id={route.doc} onRun={a=>{if(!requireAuth())return;setMarketAgent(a);}} onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
     {view==='whales'&&<WhalesPage onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
+    {view==='recipes'&&<RecipesPage onNavigate={(v,doc)=>navigate(v,doc)}/>}
     {view==='tiers'&&<TiersPage onNavigate={(v,doc)=>navigate(v,doc,v==='paper'?'site':undefined)}/>}
     {view==='shared'&&route.doc&&<SharePage key={route.doc} id={route.doc} onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
     {view==='notfound'&&<NotFoundPage onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}

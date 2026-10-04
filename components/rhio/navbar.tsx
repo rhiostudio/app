@@ -33,6 +33,7 @@ export const PRODUCT:NavLink[]=[
 export const WORKSPACE:NavLink[]=[
  {id:'agents',title:'My agents',icon:'users',desc:'Saved agents, prices and publishing',tone:'sky'},
  {id:'schedules',title:'Schedules',icon:'cal',desc:'Agents that run a skill on their own, a few times a day',tone:'iris'},
+ {id:'recipes',title:'Recipes',icon:'play',desc:'Ready-made automations: one click and the agent runs it every day',tone:'coral'},
  {id:'quests',title:'Quests',icon:'target',desc:'Try what your agent can do and collect free credits',tone:'lime'},
  {id:'activity',title:'History',icon:'clock',desc:'Every run, output and cost',tone:'mint'},
  {id:'credits',title:'Credits',icon:'coins',desc:'Balance, earnings and ledger',tone:'amber'},

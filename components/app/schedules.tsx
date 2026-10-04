@@ -16,6 +16,7 @@ import {cn} from '@/lib/utils';
 import {skillCatalog,type Agent} from '@/lib/agents';
 import {Thumb} from '@/components/landing/mocks';
 import type {CharacterId} from '@/lib/characters';
+import {RECIPES,recipeTask,type Recipe} from '@/lib/recipes';
 import {DashPage,EmptyState,Kpi,KpiRow,PageHeader,StatusBadge} from './parts';
 
 export type Schedule={id:string;agent_id:string;agent_name:string|null;skin:string|null;skill:string;prompt:string;per_day:number;start_minute:number;mode:string;active:boolean;
@@ -220,7 +221,49 @@ function SendTo({value,channels,onChange,disabled,id}:{value:string|null;channel
  </NativeSelect>;
 }
 
-export function SchedulesPage({auth,agents,balance,onSignIn,onOpenHistory}:{auth:boolean;agents:Agent[];balance:number|null;onSignIn:()=>void;onOpenHistory:()=>void}){
+/** Recipes: a ready agent on a schedule in one click (lib/recipes.ts). Uses the same endpoints as doing it by hand. */
+function RecipeStrip({agents,limits,channels,count,open,onDone,onAgents}:{agents:Agent[];limits:Limits|null;channels:Channel[];count:number;open:string|null;onDone:(d:Data)=>void;onAgents:()=>void}){
+ const offered=RECIPES.filter(r=>r.needs!=='token'||!!limits?.perks);
+ const [pick,setPick]=useState<string|null>(open);const r=offered.find(x=>x.id===pick)||null;
+ const [time,setTime]=useState(()=>r?`${pad(r.hour)}:00`:'08:00');const [topic,setTopic]=useState('');const [notify,setNotify]=useState<string|null>(null);const [busy,setBusy]=useState(false);
+ const choose=(x:Recipe)=>{setPick(p=>p===x.id?null:x.id);setTime(`${pad(x.hour)}:00`);setTopic('');setNotify(channels.find(c=>c.ok)?.id||null);};
+ const full=!!limits&&count>=limits.max;const each=r?runCostOf(limits,r.skill):0;
+ async function start(){
+  if(!r||busy)return;setBusy(true);
+  try{
+   // an agent this recipe made before is used again; otherwise it is made now
+   let id=agents.find(a=>a.id&&!a.archived&&a.name===r.agent.name&&(a.skills as readonly string[]).includes(r.skill))?.id;
+   if(!id){id=(await api('/api/agents',{method:'POST',body:JSON.stringify({...r.agent,language:'English'})})).id;onAgents();}
+   const d=await api('/api/schedules',{method:'POST',body:JSON.stringify({agentId:id,skill:r.skill,prompt:recipeTask(r,topic),perDay:r.perDay,startMinute:toUtcMinute(time),notify:channels.some(c=>c.id===notify)?notify:null})});
+   toast.success(`${r.title} is running`,{description:`${r.agent.name} · ${freq(r.perDay).toLowerCase()}, first run ${when(d.schedules.find((s:Schedule)=>s.id===d.id)?.next_run||new Date().toISOString())}`});
+   setPick(null);onDone(d);
+  }catch(e:any){toast.error(e.message);}finally{setBusy(false);}
+ }
+ if(!offered.length)return null;
+ return <section className="grid gap-3 rounded-xl border bg-card p-5">
+  <div className="flex flex-wrap items-baseline justify-between gap-2"><b className="text-[15px] font-semibold">Recipes</b><span className="text-[12.5px] text-muted-foreground">One click: the agent, the schedule and the delivery</span></div>
+  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">{offered.map(x=><button key={x.id} type="button" onClick={()=>choose(x)} aria-pressed={pick===x.id}
+   className={cn('grid content-start gap-2 rounded-lg border p-3 text-left transition-colors',pick===x.id?'border-lime bg-lime/10':'hover:border-foreground/30')}>
+   <span className="flex items-center gap-2"><Thumb id={x.agent.skin as CharacterId} className="size-8 shrink-0 rounded-md bg-t-lime object-[50%_18%]"/><b className="text-sm font-semibold">{x.title}</b></span>
+   <span className="text-[12.5px] text-muted-foreground">{x.text}</span>
+   <span className="font-mono text-[10.5px] tracking-[.04em] text-muted-foreground uppercase">{skillName(x.skill)} · {freq(x.perDay)} · {runCostOf(limits,x.skill)*x.perDay} CR/day</span>
+  </button>)}</div>
+  {r&&<div className="grid gap-3 rounded-lg border bg-secondary/40 p-4">
+   <p className="text-[13px] text-muted-foreground"><b className="text-foreground">{r.title}.</b> Makes the agent <b className="text-foreground">{r.agent.name}</b> (you can restyle and rename it later), and schedules: “{recipeTask(r,topic||(r.ask?'…':''))}”</p>
+   <div className="grid gap-3 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-end">
+    <div className="grid gap-2"><FieldLabel htmlFor="rec-time">First run</FieldLabel><input id="rec-time" type="time" value={time} onChange={e=>setTime(e.target.value)} className="h-8 rounded-lg border bg-card px-2 text-[13px] tabular-nums"/></div>
+    {r.ask&&<div className="grid gap-2"><FieldLabel htmlFor="rec-topic">{r.ask.label}</FieldLabel><Input id="rec-topic" value={topic} onChange={e=>setTopic(e.target.value)} maxLength={200} placeholder={r.ask.placeholder} className="h-8 text-[13px]"/></div>}
+   </div>
+   {channels.length>0&&<div className="grid gap-2"><FieldLabel htmlFor="rec-send">Send each result to</FieldLabel><SendTo id="rec-send" value={channels.some(c=>c.id===notify)?notify:null} channels={channels} onChange={setNotify}/></div>}
+   <div className="flex flex-wrap items-center gap-3"><Button disabled={busy||full||(!!r.ask&&topic.trim().length<3)} onClick={start}><I id="play"/>{busy?'Starting…':'Start it'}</Button>
+    <span className="text-xs text-muted-foreground">{full?`You have ${limits!.max} schedules, the maximum for your tier. Delete one first.`:`${each*r.perDay} credits a day (${each} per run). Pause or delete it below at any time.`}{channels.length?'':' Connect Discord or Telegram under Delivery to have it sent to you.'}</span></div>
+  </div>}
+ </section>;
+}
+
+export function SchedulesPage({auth,agents,balance,onSignIn,onOpenHistory,onAgents}:{auth:boolean;agents:Agent[];balance:number|null;onSignIn:()=>void;onOpenHistory:()=>void;onAgents?:()=>void}){
+ // a link from the recipes page opens its recipe: /dashboard/schedules?recipe=<id>
+ const [recipe]=useState(()=>{try{return new URLSearchParams(location.search).get('recipe');}catch{return null;}});
  const {data,setData,load}=useSchedules(auth);const [adding,setAdding]=useState(false);const channels=data?.channels||[];
  const list=data?.schedules||[];const L=data?.limits||null;const active=list.filter(s=>s.active);
  const perDay=useMemo(()=>active.reduce((a,s)=>a+s.per_day,0),[active]);
@@ -236,6 +279,7 @@ export function SchedulesPage({auth,agents,balance,onSignIn,onOpenHistory}:{auth
    <Kpi label="Today" value={`${L?.usedToday??0}/${L?.dailyCap??24}`} hint="Scheduled runs, daily cap" tone="iris" icon="layers"/>
    <Kpi label="Cost per run" value={lo===hi?`${lo} CR`:`${lo}–${hi} CR`} hint={L?.mode==='live'?'Live AI':'Workflow sample'} tone="amber" icon="hype"/>
   </KpiRow>
+  {data&&<RecipeStrip agents={agents} limits={L} channels={channels} count={list.length} open={recipe} onDone={setData} onAgents={onAgents||(()=>{})}/>}
   {(adding||(!list.length&&data))&&<section className="grid gap-4 rounded-xl border bg-card p-5">
    <b className="text-[15px] font-semibold">New schedule</b>
    <ScheduleForm agents={agents} limits={L} balance={balance} count={list.length} channels={channels} onSaved={d=>{setData(d);setAdding(false);}}/>
