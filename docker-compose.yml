@@ -70,6 +70,10 @@ services:
       SCHEDULE_RUN_COST: ${SCHEDULE_RUN_COST:-5}
       SCHEDULE_MAX: ${SCHEDULE_MAX:-3}
       SCHEDULE_DAILY_RUNS: ${SCHEDULE_DAILY_RUNS:-24}
+      # delivery of scheduled results: Discord webhooks work as is; Telegram needs a bot token from @BotFather
+      NOTIFY_DISCORD: ${NOTIFY_DISCORD:-true}
+      NOTIFY_MAX: ${NOTIFY_MAX:-4}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       # daily SQLite backups kept under /data/backups (0 = off)
       RHIO_BACKUP_DAYS: ${RHIO_BACKUP_DAYS:-7}
       # Robinhood Chain (all optional; every chain feature stays OFF while its addresses are empty)

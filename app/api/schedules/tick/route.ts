@@ -10,6 +10,7 @@ import {periodBounds,rewardConfig} from '@/lib/chain';
 import {autoRewards,syncHolders} from '@/lib/rewards';
 import {sweepStuckRuns} from '@/lib/runs';
 import {settlePendingTopups} from '@/lib/topups';
+import {pollTelegram,telegramWaiting} from '@/lib/notify';
 
 /** Rows that only pile up: expired sign-in nonces and sessions, used link nonces, old daily counters. */
 async function housekeeping(db:D1Database,now:Date){
@@ -18,6 +19,7 @@ async function housekeeping(db:D1Database,now:Date){
   db.prepare('DELETE FROM ba_verification WHERE expires_at<?').bind(ms),
   db.prepare('DELETE FROM ba_session WHERE expires_at<?').bind(ms),
   db.prepare('DELETE FROM chain_nonces WHERE expires<?').bind(ms),
+  db.prepare('DELETE FROM notify_links WHERE expires<?').bind(ms),
   db.prepare("DELETE FROM ai_quotas WHERE (key LIKE 'u:%' OR key LIKE 'all:%' OR key LIKE 'free:%' OR key LIKE 't:%' OR key LIKE 'search:%') AND substr(key,-10)<?").bind(day),
   db.prepare("DELETE FROM ai_quotas WHERE key LIKE 'h:%' AND CAST(substr(key,-13) AS INTEGER)<?").bind(ms-3*864e5),
  ]);
@@ -42,6 +44,8 @@ export async function POST(request:Request){try{
  }
  const rewards=await autoRewards(db,now).catch(fail);
  if(new Date().getUTCMinutes()%10===3)await housekeeping(db,new Date()).catch(()=>null);
+ // someone is connecting a Telegram chat: read the bot's messages (the page also does while it is open)
+ if(await telegramWaiting(db).catch(()=>false))await pollTelegram(db).catch(()=>null);
  const schedules=await runDue(db,testClock?{now}:{}).catch(fail);
  return Response.json({schedules,stuck,holders,rewards,topups});
 }catch(e){return failure(e)}}

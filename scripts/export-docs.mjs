@@ -24,6 +24,7 @@ const STATUS = [
   'Pay-per-run marketplace in credits: 25 free starting credits, live AI 4–12 credits per run by skill, creator prices 0–500, platform fee 0% in beta, ledger with refunds',
   'Discover gallery of published agents (instructions are never shown)',
   'Schedules: an agent runs a skill 1–24 times a day, paid per run with the skill\'s live price (at least 5 credits), max 3 schedules / 24 runs a day',
+  'Delivery: a schedule sends each result to a Discord channel (webhook) or, where the operator connected a bot, a Telegram chat; up to 4 channels per account',
   'Wallet-only sign-in (SIWE for Robinhood Chain), several wallets per account',
   'RHIO token on Robinhood Chain mainnet since 2 October 2026; the contract address is in the CA box on the home page',
   'Credit top-ups in USDG on Robinhood Chain mainnet (1 USDG = 100 credits)',

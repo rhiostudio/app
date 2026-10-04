@@ -7,12 +7,15 @@
      SCHEDULE_DAILY_RUNS   scheduled runs per account per UTC day, default 24
      SCHEDULER_TOKEN       bearer token for POST /api/schedules/tick (the Docker entrypoint generates one per start)
    Slots: start_minute (UTC minute of day) + k x (1440 / per_day). A missed slot (server down) is skipped, never replayed
-   in a burst. Out of credits or a removed agent/skill pauses the schedule with a readable status. */
+   in a burst. Out of credits or a removed agent/skill pauses the schedule with a readable status.
+   Delivery: a schedule with `notify` (a channel of its owner, lib/notify.ts) sends each completed run there, and one
+   notice when it gets paused. Sending happens after the run is settled and can never fail or refund it. */
 import {env} from 'cloudflare:workers';
 import {aiReady,HttpError} from './server';
 import {isOpenSkill,type Agent,type SkillId} from './agents';
 import {performRun} from './runs';
 import {liveRunCost} from './economy';
+import {deliverRun,deliverNotice} from './notify';
 /** Credits for one scheduled run: the skill's live price (lib/economy.ts), never below SCHEDULE_RUN_COST. */
 export const scheduledRunCost=(runCost:number,skill:string,mode:'live'|'sample')=>mode==='live'?Math.max(runCost,liveRunCost(skill)):runCost;
 
@@ -40,7 +43,7 @@ export function tickAllowed(req:Request){
   if(!want||want.length<32||got.length!==want.length)return false;let d=0;for(let i=0;i<want.length;i++)d|=want.charCodeAt(i)^got.charCodeAt(i);return d===0;});
 }
 
-export type ScheduleRow={id:string;owner:string;agent_id:string;skill:string;prompt:string;per_day:number;start_minute:number;mode:string;active:number;next_run:string;last_run:string|null;last_status:string|null;last_run_id:string|null;runs:number;created:string;updated:string};
+export type ScheduleRow={id:string;owner:string;agent_id:string;skill:string;prompt:string;per_day:number;start_minute:number;mode:string;active:number;next_run:string;last_run:string|null;last_status:string|null;last_run_id:string|null;runs:number;created:string;updated:string;notify?:string|null};
 
 const today=()=>new Date().toISOString().slice(0,10)+'T00:00:00.000Z';
 export async function usedToday(db:D1Database,owner:string){
@@ -72,14 +75,16 @@ export async function runDue(db:D1Database,{limit=10,budgetMs=50000,now=new Date
   if(!claim.meta.changes)continue;
   const set=(status:string,extra='',...args:unknown[])=>db.prepare(`UPDATE schedules SET last_status=?,updated=?${extra} WHERE id=?`).bind(status,new Date().toISOString(),...args,s.id).run();
   if(await usedToday(db,s.owner)>=cfg.dailyCap){await set(`Skipped: daily limit of ${cfg.dailyCap} scheduled runs reached`);skipped++;continue;}
-  try{await checkTarget(db,s.owner,s.agent_id,s.skill);}catch(e){await set(`Paused: ${(e as Error).message}`,',active=0');paused++;continue;}
+  const stopped=async(why:string)=>{await set(`Paused: ${why}`,',active=0');paused++;if(s.notify)await deliverNotice(db,s.owner,s.notify,'',`A schedule was paused: ${why}`);};
+  try{await checkTarget(db,s.owner,s.agent_id,s.skill);}catch(e){await stopped((e as Error).message);continue;}
   const mode=s.mode==='sample'||!aiReady()?'sample':'live';
   try{
    const r=await performRun(db,s.owner,{id:crypto.randomUUID(),agentId:s.agent_id,prompt:s.prompt,skill:s.skill as SkillId,mode},{id:s.id,cost:scheduledRunCost(cfg.runCost,s.skill,mode)});
    await set('Complete',',last_run=?,last_run_id=?,runs=runs+1',r.created,r.id);ran++;
+   if(s.notify)await deliverRun(db,s.owner,s.notify,r);
   }catch(e){
    const st=e instanceof HttpError?e.status:500;
-   if(st===402||st===404||st===400||st===403){await set(`Paused: ${(e as Error).message}`,',active=0');paused++;}
+   if(st===402||st===404||st===400||st===403)await stopped((e as Error).message);
    else{await set('Failed, credits returned. Tries again at the next slot.',',last_run=?',new Date().toISOString());skipped++;}
   }
  }

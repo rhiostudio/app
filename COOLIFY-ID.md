@@ -123,6 +123,12 @@ container. Kalau perlu memicunya sendiri (Coolify → Terminal), perintahnya:
   - `SCHEDULE_MAX`: jumlah jadwal per akun, default 3;
   - `SCHEDULE_DAILY_RUNS`: run terjadwal per akun per hari, default 24.
   - Matikan dengan `SCHEDULES_ENABLED=false`.
+- **Kirim hasil jadwal ke Discord / Telegram** (halaman Schedules → Delivery):
+  - Discord langsung aktif: user menempel alamat webhook channel-nya sendiri. Matikan dengan `NOTIFY_DISCORD=false`.
+  - Telegram aktif setelah `TELEGRAM_BOT_TOKEN` diisi. Buat bot di @BotFather (`/newbot`), salin tokennya langsung ke
+    Environment Variables Coolify (jangan ditempel di chat mana pun), lalu redeploy. Bot itu jangan dipasangi webhook di
+    tempat lain: server membaca pesannya sendiri (getUpdates). Tanpa token, panel menulis "not set up on this server yet".
+  - `NOTIFY_MAX`: jumlah channel per akun, default 4.
 - **NVDA reward**: `.env.coolify.mainnet` sudah memakai `REWARD_TOKEN_ADDRESS` = NVDA Stock Token resmi. Ada tiga syarat supaya periode reward bisa jalan:
   1. token RHIO sudah ada (`RHIO_TOKEN_ADDRESS`);
   2. kontrak reward sudah di-deploy (`REWARD_CONTRACT`, lihat DEPLOY-ID.md bagian 7);
