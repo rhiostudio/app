@@ -28,7 +28,7 @@ function Move({m,explorer}:{m:WhaleMove;explorer:string}){
    <a href={`${explorer}/tx/${m.tx}`} target="_blank" rel="noreferrer noopener" className="font-mono text-[11px] text-muted-foreground underline-offset-4 hover:underline">{utc(m.ts)} ↗</a></div>
   <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted-foreground">
    {m.kind==='mint'?<>minted to <Addr a={m.to} explorer={explorer} off={m.toOff}/></>:m.kind==='burn'?<>burned by <Addr a={m.from} explorer={explorer} off={m.fromOff}/></>
-    :<><Addr a={m.from} explorer={explorer} off={m.fromOff}/><I id="arrow" className="i size-3.5"/><Addr a={m.to} explorer={explorer} off={m.toOff}/></>}
+    :<><Addr a={m.from} explorer={explorer} off={m.fromOff}/><I id="arrow" className="i size-3.5"/><Addr a={m.to} explorer={explorer} off={m.toOff}/>{m.others&&<span className="text-[12px]">and others</span>}</>}
   </div>
  </li>;
 }
@@ -54,7 +54,7 @@ export function WhalesPage({onNavigate}:{onNavigate:Go}){
  </>;
 
  const kpis:[string,string,string][]=w?[['Holders',w.holders.toLocaleString('en-US'),'addresses with a balance'],['New in 24 h',w.newHolders.toLocaleString('en-US'),'first RHIO ever, still holding'],
-  ['Transfers in 24 h',w.day.transfers.toLocaleString('en-US'),`between ${w.day.wallets.toLocaleString('en-US')} wallets`],['Moved in 24 h',w.day.volumeShort,`${w.day.volume.split('.')[0]} RHIO`]]:[];
+  ['Transactions in 24 h',w.day.txs.toLocaleString('en-US'),`moved RHIO between ${w.day.wallets.toLocaleString('en-US')} addresses`],['Moved in 24 h',w.day.volumeShort,`${w.day.volume.split('.')[0]} RHIO`]]:[];
  return <>
   <section className="mx-auto grid max-w-[1120px] gap-10 px-[clamp(16px,3vw,32px)] pt-10 pb-16">
    <div className="grid gap-5">{head}
@@ -64,7 +64,7 @@ export function WhalesPage({onNavigate}:{onNavigate:Go}){
     </div>
    </div>
 
-   <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{(w?kpis:[['Holders','—',''],['New in 24 h','—',''],['Transfers in 24 h','—',''],['Moved in 24 h','—','']] as [string,string,string][]).map(([l,v,h])=>
+   <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{(w?kpis:[['Holders','—',''],['New in 24 h','—',''],['Transactions in 24 h','—',''],['Moved in 24 h','—','']] as [string,string,string][]).map(([l,v,h])=>
     <div key={l} className="grid gap-1 rounded-xl border bg-card p-4"><span className="font-mono text-[10px] tracking-[.1em] text-muted-foreground uppercase">{l}</span>
      <b className="font-display text-[clamp(26px,3.4vw,38px)] leading-none font-medium tracking-[-.03em] tabular-nums">{v}</b><span className="text-[12px] text-muted-foreground">{h||' '}</span></div>)}</div>
 
@@ -73,7 +73,7 @@ export function WhalesPage({onNavigate}:{onNavigate:Go}){
      <h2 className="font-display text-2xl font-medium tracking-[-.03em]">Biggest transfers <span className="text-muted-foreground">· last 24 hours</span></h2>
      {w.moves.length?<ul className="grid gap-2">{w.moves.map(m=><Move key={m.tx+m.from+m.to+m.amount} m={m} explorer={w.explorer}/>)}</ul>
       :<p className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">No RHIO transfer was recorded in the 24 hours before that block.</p>}
-     {w.day.capped&&<p className="text-xs text-muted-foreground">A very busy day: only the latest 20,000 transfers were counted.</p>}
+     <p className="text-xs text-muted-foreground">One line per transaction: from the address the tokens left to the address they ended up at. Addresses that only passed them along inside the transaction (a router, for example) are left out, so a swap is counted once.{w.day.capped?' A very busy day: only the latest 20,000 transfers were read.':''}</p>
     </div>
     <div className="grid gap-3">
      <h2 className="font-display text-2xl font-medium tracking-[-.03em]">Biggest holders</h2>

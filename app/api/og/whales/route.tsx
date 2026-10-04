@@ -23,7 +23,7 @@ export async function GET(request:Request){
  if(!w)return Response.redirect(`${origin}/og.png`,302);
  const logo=await asset(`${origin}/brands/rhio-logo-lime.png`,'image/png');
  const big=w.moves.find(m=>m.kind==='transfer')||w.moves[0];
- const stats:[string,string][]=[['Holders',w.holders.toLocaleString('en-US')],['New in 24 h',w.newHolders.toLocaleString('en-US')],['Transfers in 24 h',w.day.transfers.toLocaleString('en-US')],['Moved in 24 h',`${w.day.volumeShort} RHIO`]];
+ const stats:[string,string][]=[['Holders',w.holders.toLocaleString('en-US')],['New in 24 h',w.newHolders.toLocaleString('en-US')],['Transactions, 24 h',w.day.txs.toLocaleString('en-US')],['Moved in 24 h',`${w.day.volumeShort} RHIO`]];
  return new ImageResponse(
   <div style={{width:W,height:H,display:'flex',flexDirection:'column',justifyContent:'space-between',padding:'56px 64px',backgroundColor:'#0b110d',color:'#f4f6f1',fontFamily:'sans-serif'}}>
    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>

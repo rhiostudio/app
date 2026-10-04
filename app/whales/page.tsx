@@ -10,7 +10,7 @@ export async function generateMetadata():Promise<Metadata>{
  const db=(env as unknown as {DB?:D1Database}).DB;
  const w=db?await whales(db).catch(()=>null):null;
  const title='RHIO whale watch';
- const description=w?`${w.holders.toLocaleString('en-US')} addresses hold RHIO. Last 24 hours: ${w.day.transfers.toLocaleString('en-US')} transfers moved ${w.day.volumeShort} RHIO, ${w.newHolders.toLocaleString('en-US')} new holders. Biggest transfers and holders, from the chain.`
+ const description=w?`${w.holders.toLocaleString('en-US')} addresses hold RHIO. Last 24 hours: ${w.day.txs.toLocaleString('en-US')} transactions moved ${w.day.volumeShort} RHIO, ${w.newHolders.toLocaleString('en-US')} new holders. Biggest transfers and holders, from the chain.`
   :'The biggest RHIO transfers and holders on Robinhood Chain, from the chain.';
  const image=w?`/api/og/whales?v=${Math.floor(w.asOf.ts/3600)}`:'/og.png';
  return {
