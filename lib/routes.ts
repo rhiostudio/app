@@ -2,14 +2,14 @@
    reads the pathname to decide what to render, so state such as the agent draft survives navigation.
    Public site:  /  /docs[/slug]  /whitepaper[/slug]  /roadmap  /login  /a/<agent id> (one published agent)
                  /whales (the RHIO token's biggest transfers and holders)  /s/<id> (one shared answer)
-   Dashboard:    /dashboard  /dashboard/{studio,agents,discover,skills,schedules,history,credits,wallet,rewards,profile}
+   Dashboard:    /dashboard  /dashboard/{studio,agents,discover,skills,schedules,quests,history,credits,wallet,rewards,profile}
                  /dashboard/docs[/slug]  /dashboard/whitepaper[/slug]  /dashboard/roadmap
    Signed-in only (proxy.ts redirects to /login?next=...): see PROTECTED_PATHS. */
-export type View='home'|'login'|'notfound'|'agent'|'shared'|'whales'|'overview'|'profile'|'rewards'|'wallet'|'studio'|'agents'|'discover'|'skills'|'schedules'|'activity'|'credits'|'docs'|'paper'|'roadmap';
+export type View='home'|'login'|'notfound'|'agent'|'shared'|'whales'|'overview'|'profile'|'rewards'|'wallet'|'studio'|'agents'|'discover'|'skills'|'schedules'|'quests'|'activity'|'credits'|'docs'|'paper'|'roadmap';
 export type Area='site'|'dash';
 export type Route={view:View;area:Area;doc?:string};
 
-const DASH:Partial<Record<View,string>>={overview:'',studio:'studio',agents:'agents',discover:'discover',skills:'skills',schedules:'schedules',activity:'history',
+const DASH:Partial<Record<View,string>>={overview:'',studio:'studio',agents:'agents',discover:'discover',skills:'skills',schedules:'schedules',quests:'quests',activity:'history',
  credits:'credits',wallet:'wallet',rewards:'rewards',profile:'profile',docs:'docs',paper:'whitepaper',roadmap:'roadmap'};
 const DASH_BY_SEGMENT=Object.fromEntries(Object.entries(DASH).map(([v,s])=>[s,v as View])) as Record<string,View>;
 /** Views that exist on the public site too (with a different, editorial layout). */
@@ -57,4 +57,4 @@ export function parsePath(pathname:string):Route{
 }
 
 /** Legacy hash links (#studio, #agents, ...) from before routes existed. */
-export const LEGACY_HASH:Record<string,View>={studio:'studio',agents:'agents',discover:'discover',skills:'skills',schedules:'schedules',activity:'activity',credits:'credits',wallet:'wallet',rewards:'rewards',docs:'docs',paper:'paper',roadmap:'roadmap'};
+export const LEGACY_HASH:Record<string,View>={studio:'studio',agents:'agents',discover:'discover',skills:'skills',schedules:'schedules',quests:'quests',activity:'activity',credits:'credits',wallet:'wallet',rewards:'rewards',docs:'docs',paper:'paper',roadmap:'roadmap'};

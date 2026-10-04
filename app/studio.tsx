@@ -42,6 +42,7 @@ const WalletPage=lazy(()=>import('@/components/app/wallet').then(m=>({default:m.
 const SchedulesPage=lazy(()=>import('@/components/app/schedules').then(m=>({default:m.SchedulesPage})));
 const AgentSchedules=lazy(()=>import('@/components/app/schedules').then(m=>({default:m.AgentSchedules})));
 const RewardsPage=lazy(()=>import('@/components/app/rewards').then(m=>({default:m.RewardsPage})));
+const QuestsPage=lazy(()=>import('@/components/app/quests').then(m=>({default:m.QuestsPage})));
 const AccountPanel=lazy(()=>import('@/components/app/account').then(m=>({default:m.AccountPanel})));
 const SignIn=lazy(()=>import('@/components/rhio/sign-in').then(m=>({default:m.SignIn})));
 const Overview=lazy(()=>import('@/components/app/overview').then(m=>({default:m.Overview})));
@@ -263,6 +264,7 @@ export default function Studio(){
    {view==='profile'&&<ProfilePage auth={auth} label={email} wallet={wallet} balance={balance} earned={earned} feeBps={feeBps} navigate={(v:View)=>navigate(v)} onSignIn={()=>setSignin(true)} onSignOut={signOut}/>}
    {view==='wallet'&&<WalletPage auth={auth} onSignIn={()=>setSignin(true)} onChanged={refresh}/>}
    {view==='schedules'&&<SchedulesPage auth={auth} agents={agents} balance={balance} onSignIn={()=>setSignin(true)} onOpenHistory={()=>navigate('activity')}/>}
+   {view==='quests'&&<QuestsPage auth={auth} onSignIn={()=>setSignin(true)} onGo={v=>navigate(v)} onClaimed={refresh}/>}
    {view==='rewards'&&<RewardsPage wallet={wallet||undefined} auth={auth} onSignIn={()=>setSignin(true)} onPaper={()=>navigate('paper','token')}/>}
 
    {view==='agents'&&<DashPage>

@@ -129,6 +129,9 @@ container. Kalau perlu memicunya sendiri (Coolify → Terminal), perintahnya:
     Environment Variables Coolify (jangan ditempel di chat mana pun), lalu redeploy. Bot itu jangan dipasangi webhook di
     tempat lain: server membaca pesannya sendiri (getUpdates). Tanpa token, panel menulis "not set up on this server yet".
   - `NOTIFY_MAX`: jumlah channel per akun, default 4.
+  - **Quests** (halaman Quests di dashboard): tiap quest yang selesai memberi kredit GRATIS sekali per akun.
+    `QUEST_CREDITS` = kredit per quest (default 5, isi 0 kalau tidak mau memberi kredit); `QUESTS_ENABLED=false` mematikannya.
+    Kredit quest sama seperti kredit awal akun: hanya untuk menjalankan agen, tidak bisa diklaim atau ditarik.
   - **Agen menjawab di Telegram** memakai bot yang sama, tanpa env baru. Container menjalankan pembaca pesan sendiri
     (long poll), jadi jawaban mulai dalam satu-dua detik. Biarkan privacy mode bot tetap aktif (bawaan BotFather):
     di grup hanya `/ask …` yang sampai ke bot. Tiap jawaban adalah run live biasa yang memotong kredit pemilik chat.
