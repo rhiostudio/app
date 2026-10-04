@@ -1,12 +1,13 @@
 /* Shared answers (lib/share.ts). GET ?id= is public: the answer of one run its owner made public (/s/<id>).
-   POST {runId, showTask} makes a run of the signed-in account public, or changes whether its task is shown;
+   POST {runId, showTask, turns?} makes a run of the signed-in account public (a chat message with up to five earlier turns), or changes whether its task is shown;
    DELETE {runId} takes it down. */
 import {z} from 'zod';
 import {env} from 'cloudflare:workers';
 import {context,failure,body,HttpError} from '@/lib/server';
-import {shareRun,sharedRun,unshareRun} from '@/lib/share';
+import {shareRun,sharedRun,unshareRun,SHARE_TURNS} from '@/lib/share';
 
-const post=z.object({runId:z.string().uuid(),showTask:z.boolean().default(true)});
+// turns: for a chat message, how many earlier turns of its conversation the page shows
+const post=z.object({runId:z.string().uuid(),showTask:z.boolean().default(true),turns:z.number().int().min(0).max(SHARE_TURNS).default(0)});
 
 export async function GET(request:Request){try{
  const db=(env as unknown as {DB?:D1Database}).DB;if(!db)throw new HttpError(503,'Storage is unavailable.');
@@ -18,7 +19,7 @@ export async function GET(request:Request){try{
 
 export async function POST(request:Request){try{
  const {db,owner}=await context(request,true);const p=post.safeParse(await body(request));if(!p.success)throw new HttpError(400,'Choose the run to share.');
- return Response.json({id:await shareRun(db,owner,p.data.runId,p.data.showTask),task:p.data.showTask});
+ return Response.json({id:await shareRun(db,owner,p.data.runId,p.data.showTask,p.data.turns),task:p.data.showTask});
 }catch(e){return failure(e)}}
 
 export async function DELETE(request:Request){try{

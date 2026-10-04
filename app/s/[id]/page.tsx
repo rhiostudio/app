@@ -17,11 +17,12 @@ async function load({params}:P){
 export async function generateMetadata(p:P):Promise<Metadata>{
  const s=await load(p);
  if(!s)return {title:'Answer not available',robots:{index:false,follow:false}};
- const title=`${s.agentName} answered · RHIO`,description=excerpt(s.text,180),url=`/s/${s.id}`;
- const image=`/api/og/share/${s.id}`;
+ const title=s.chat?`A conversation with ${s.agentName} · RHIO`:`${s.agentName} answered · RHIO`,description=excerpt(s.text,180),url=`/s/${s.id}`;
+ // the picture of a conversation changes with the number of turns shown, so its address does too
+ const image=`/api/og/share/${s.id}${s.chat?`?t=${s.earlier.length}`:''}`;
  return {
   title:{absolute:title},description,alternates:{canonical:url},robots:{index:false,follow:false},
-  openGraph:{type:'article',siteName:'RHIO Agent Studio',title,description,url,images:[{url:image,width:1200,height:630,alt:`An answer by ${s.agentName}, an AI agent on RHIO`}]},
+  openGraph:{type:'article',siteName:'RHIO Agent Studio',title,description,url,images:[{url:image,width:1200,height:630,alt:s.chat?`A conversation with ${s.agentName}, an AI agent on RHIO`:`An answer by ${s.agentName}, an AI agent on RHIO`}]},
   twitter:{card:'summary_large_image',title,description,images:[image]},
  };
 }

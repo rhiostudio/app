@@ -1,6 +1,7 @@
 'use client';
 /* Public page of one shared answer (/s/<id>): what an agent wrote, with the agent's character next to it, put up by
-   the run's owner (GET /api/share, lib/share.ts). It shows the answer, the skill, the date and, when the owner allowed
+   the run's owner (GET /api/share, lib/share.ts). A shared message of a conversation reads as the conversation: the
+   turns its owner chose to show, as bubbles. It shows the answer, the skill, the date and, when the owner allowed
    it, the start of the task; never who the owner is or the agent's instructions. Its link preview comes from
    app/s/[id]/page.tsx and /api/og/share/<id>. */
 import {useEffect,useState} from 'react';
@@ -34,7 +35,12 @@ export function SharePage({id,onNavigate}:{id:string;onNavigate:Go}){
  </>;
 
  const link=typeof location!=='undefined'?location.origin+'/s/'+id:'/s/'+id;
- const post=s?`https://x.com/intent/post?text=${encodeURIComponent(`${s.agentName}, an AI agent on RHIO, answered:`)}&url=${encodeURIComponent(link)}`:'#';
+ const post=s?`https://x.com/intent/post?text=${encodeURIComponent(s.chat?`I talked to ${s.agentName}, an AI agent on RHIO:`:`${s.agentName}, an AI agent on RHIO, answered:`)}&url=${encodeURIComponent(link)}`:'#';
+ /** One turn of a shared conversation: what was asked on the right, the agent's answer on the left. */
+ const turn=(asked:string|null,answer:string,k:number)=><div key={k} className="grid gap-2">
+  {asked&&<p className="max-w-[85%] justify-self-end rounded-2xl rounded-br-md bg-lime px-4 py-2.5 text-[15px] break-words whitespace-pre-wrap text-ink">{asked}</p>}
+  <div className="max-w-[92%] justify-self-start rounded-2xl rounded-bl-md border bg-card px-4 py-3"><TextOut text={answer}/></div>
+ </div>;
  return <>
   <section className="mx-auto grid max-w-[1120px] items-start gap-8 px-[clamp(16px,3vw,32px)] pt-10 pb-16 md:grid-cols-[minmax(0,320px)_minmax(0,1fr)] md:gap-12">
    <div className="grid gap-3 md:sticky md:top-[calc(var(--top)+16px)]">
@@ -43,16 +49,17 @@ export function SharePage({id,onNavigate}:{id:string;onNavigate:Go}){
     </div>
     {s&&<div className="grid gap-2 max-md:justify-items-center max-md:text-center">
      <b className="font-display text-2xl font-medium tracking-[-.03em] break-words">{s.agentName}</b>
-     <div className="flex flex-wrap items-center gap-2"><StatusBadge kind={s.sample?'sample':'live_ai'}>{s.sample?'Workflow sample':'AI answer'}</StatusBadge>{s.skillName&&<span className="font-mono text-[11px] tracking-[.08em] text-muted-foreground uppercase">{s.skillName}</span>}</div>
-     {s.agentId&&<Button variant="outline" className="justify-self-start max-md:justify-self-center" onClick={()=>onNavigate('agent',s.agentId!)}>Run this agent<I id="arrow"/></Button>}
+     <div className="flex flex-wrap items-center gap-2"><StatusBadge kind={s.sample?'sample':'live_ai'}>{s.sample?'Workflow sample':s.chat?'AI character':'AI answer'}</StatusBadge>{s.skillName&&<span className="font-mono text-[11px] tracking-[.08em] text-muted-foreground uppercase">{s.skillName}</span>}</div>
+     {s.agentId&&<Button variant="outline" className="justify-self-start max-md:justify-self-center" onClick={()=>onNavigate('agent',s.agentId!)}>{s.chat?'Talk to this agent':'Run this agent'}<I id="arrow"/></Button>}
     </div>}
    </div>
    <div className="grid min-w-0 gap-5">
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] tracking-[.08em] text-muted-foreground uppercase"><span>Shared answer</span>{s&&<span>{new Date(s.created).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'})}</span>}</div>
-    {s?.task&&<div className="grid gap-1.5"><span className="font-mono text-[10px] tracking-[.1em] text-muted-foreground uppercase">Asked</span>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] tracking-[.08em] text-muted-foreground uppercase"><span>{s?.chat?'Shared conversation':'Shared answer'}</span>{s&&<span>{new Date(s.created).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'})}</span>}</div>
+    {s?.chat&&<div className="grid gap-4">{s.earlier.map((t,k)=>turn(t.asked,t.answer,k))}{turn(s.task,s.text,s.earlier.length)}</div>}
+    {!s?.chat&&s?.task&&<div className="grid gap-1.5"><span className="font-mono text-[10px] tracking-[.1em] text-muted-foreground uppercase">Asked</span>
      <p className="rounded-xl border bg-secondary/50 p-4 text-[15px] leading-relaxed break-words whitespace-pre-wrap">{s.task}</p></div>}
-    <div className="grid gap-1.5"><span className="font-mono text-[10px] tracking-[.1em] text-muted-foreground uppercase">{s?`${s.agentName} answered`:'Answer'}</span>
-     <div className="min-h-32 rounded-xl border bg-card p-5">{s?<TextOut text={s.text}/>:<p className="text-sm text-muted-foreground">Loading…</p>}</div></div>
+    {!s?.chat&&<div className="grid gap-1.5"><span className="font-mono text-[10px] tracking-[.1em] text-muted-foreground uppercase">{s?`${s.agentName} answered`:'Answer'}</span>
+     <div className="min-h-32 rounded-xl border bg-card p-5">{s?<TextOut text={s.text}/>:<p className="text-sm text-muted-foreground">Loading…</p>}</div></div>}
     <div className="flex flex-wrap gap-2">
      <Button size="lg" onClick={()=>onNavigate('studio')}>Build your own agent<I id="arrow"/></Button>
      <Button size="lg" variant="outline" onClick={()=>copyText(link,toast.success,toast.error)}><I id="copy"/>Copy link</Button>

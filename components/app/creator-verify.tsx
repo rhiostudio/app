@@ -2,7 +2,8 @@
 /* Creator verification (Profile page): a creator shows that an X handle is theirs by posting a code from it, and a
    reviewer on the team confirms it; then the creator's published agents say "@handle, verified creator".
    Data: /api/creator (lib/creators.ts). A reviewer (an account listed in CREATOR_ADMINS) also sees the requests
-   that wait, each with the link to open and the code to look for. */
+   that wait, each with the link to open and the code to look for, and can publish the starter cast
+   (lib/starter-agents.ts) from their own account in one click, so Discover and the plaza are not empty. */
 import {useCallback,useEffect,useState} from 'react';
 import {toast} from 'sonner';
 import {FaXTwitter} from 'react-icons/fa6';
@@ -10,6 +11,28 @@ import {api,copyText,I,FieldLabel} from '@/app/ui';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {StatusBadge} from './parts';
+import {STARTER_AGENTS,STARTER_PRICE} from '@/lib/starter-agents';
+
+/** Reviewer only: saves and publishes the starter agents this account does not have yet. They become ordinary agents
+    of this account (My agents): edit, reprice or unpublish them there. */
+function StarterCast(){
+ const [busy,setBusy]=useState(false);const [note,setNote]=useState('');
+ async function add(){
+  if(busy)return;setBusy(true);setNote('');
+  try{
+   const ws=await api('/api/workspace');const have=new Set((ws.agents as {name:string;archived?:number}[]).filter(a=>!a.archived).map(a=>a.name));let n=0;
+   for(const a of STARTER_AGENTS){if(have.has(a.name))continue;
+    const saved=await api('/api/agents',{method:'POST',body:JSON.stringify(a)});
+    await api('/api/agents',{method:'PATCH',body:JSON.stringify({id:saved.id,published:true,...STARTER_PRICE})});n++;}
+   setNote(n?`${n} agent${n===1?'':'s'} published from this account. Find them in My agents.`:'All of them are already on this account.');
+  }catch(e:any){toast.error(e.message);}finally{setBusy(false);}
+ }
+ return <div className="grid gap-2 border-t pt-3">
+  <b className="text-sm font-semibold">Starter cast</b>
+  <p className="text-[12.5px] text-muted-foreground">Publish {STARTER_AGENTS.length} ready-made agents from this account ({STARTER_AGENTS.map(a=>a.name).join(', ')}), free to talk to and {STARTER_PRICE.price} credits per task, so Discover and the plaza have someone in them. They are yours afterwards: change or unpublish them in My agents.</p>
+  <div className="flex flex-wrap items-center gap-3"><Button size="sm" variant="outline" disabled={busy} onClick={add}><I id="plus"/>{busy?'Publishing…':'Publish the starter cast'}</Button>{note&&<span className="text-[12.5px] text-muted-foreground">{note}</span>}</div>
+ </div>;
+}
 
 type Mine={status:'none'|'pending'|'review'|'verified'|'rejected';handle?:string;code?:string;proof?:string|null;note?:string|null;post?:string};
 type Item={owner:string;handle:string;code:string;post:string;proof:string;updated:string};
@@ -66,6 +89,7 @@ export function CreatorVerify({auth}:{auth:boolean}){
       <Button size="sm" variant="ghost" disabled={busy} onClick={()=>{const note=prompt('Why not? The creator sees this (optional).');if(note!==null)act({action:'reject',owner:r.owner,note},'Rejected');}}>Reject</Button>
      </div>
     </div>)}
+   <StarterCast/>
   </section>}
  </>;
 }
