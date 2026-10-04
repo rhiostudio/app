@@ -2,7 +2,7 @@
    Credits are an internal unit. They have no monetary value in the preview. */
 import {runtime} from './server';
 import {tierById} from './chain';
-import {DEFAULT_TRIAL_LIMIT} from './agents';
+import {DEFAULT_TRIAL_LIMIT,ANSWER_LANGUAGE} from './agents';
 import {searchesWeb,type ProviderConfig} from './provider';
 export const SAMPLE_COST=5;            // workflow sample run, paid to the platform
 const envInt=(name:string,fallback:number,max:number)=>{const raw=(runtime() as Record<string,unknown>)[name];const v=Number(raw);return typeof raw==='string'&&raw.trim()!==''&&Number.isFinite(v)?Math.min(Math.max(Math.round(v),0),max):fallback;};
@@ -135,6 +135,6 @@ export async function ensureWallet(db:D1Database,owner:string){
 /** Public shape of a published agent: no instructions, no owner identity. */
 export function publicAgent(row:{id:string;name:string;config:string;price:number;talk_price?:number|null;uses:number;published_at:string|null;owner:string},viewer?:string){
  const c=JSON.parse(row.config);
- return {id:row.id,name:row.name,skin:c.skin,look:c.look,appearance:c.appearance,motion:c.motion,skills:c.skills,tone:c.tone,language:c.language,tagline:c.tagline||'',price:row.price,/* per chat message; the task price when the creator set none */talkPrice:row.talk_price??row.price,uses:row.uses,publishedAt:row.published_at,creator:'creator-'+hash(row.owner),mine:viewer===row.owner};
+ return {id:row.id,name:row.name,skin:c.skin,look:c.look,appearance:c.appearance,motion:c.motion,skills:c.skills,tone:c.tone,language:ANSWER_LANGUAGE,tagline:c.tagline||'',price:row.price,/* per chat message; the task price when the creator set none */talkPrice:row.talk_price??row.price,uses:row.uses,publishedAt:row.published_at,creator:'creator-'+hash(row.owner),mine:viewer===row.owner};
 }
 function hash(s:string){let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return (h>>>0).toString(36).slice(0,6);}

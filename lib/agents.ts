@@ -5,6 +5,9 @@ export type {Agent};
 export const skillIds=['research','write','document','summarize','translate','brainstorm','code','planner','monitor','whales'] as const;
 export type SkillId=typeof skillIds[number];
 export const MAX_SKILLS=4;
+/** Agents answer in English: the studio is English only (client, 4 Oct 2026). An agent saved earlier with another
+    answer language is read as English (lib/agent-schema.ts, lib/provider.ts, lib/economy.ts). */
+export const ANSWER_LANGUAGE='English' as const;
 /** Skills open right now. A skill left out stays visible but locked (no equip, runs refused by /api/runs).
     Since 30 Sep 2026 all of them are open (the wallet monitor joined on 4 Oct 2026) and each user gets a few tries per skill (SKILL_TRIAL_LIMIT, default 2,
     enforced by /api/runs and reported by /api/workspace as `trials`). */

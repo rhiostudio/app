@@ -115,6 +115,48 @@ export async function GET(request:Request){
    {width:W,height:H,headers:{'Cache-Control':'public, max-age=3600'}},
   );
  }
+ if(key==='creators'){
+  // In the website's style: three pasted posts turn into one card of the hero deck, the creator's agent.
+  const who=await asset(`${origin}/characters/card/deck-echo.png`,'image/png');
+  const INK='#1f201e',BG='#171816',TEXT='#f3f4ef',MUTED='#a0a59c',LINE='rgba(255,255,255,0.14)';
+  const posts=[{t:'ship small. ship daily.',left:612,top:128,turn:-3},{t:'nobody reads the roadmap. they read the changelog.',left:596,top:226,turn:2},{t:'gm builders',left:624,top:372,turn:-2}];
+  return new ImageResponse(
+   <div style={{width:W,height:H,display:'flex',position:'relative',backgroundColor:BG,color:TEXT,fontFamily:'sans-serif'}}>
+    <div style={{display:'flex',flexDirection:'column',justifyContent:'space-between',width:560,height:H,padding:'54px 0 52px 64px'}}>
+     <div style={{display:'flex',alignItems:'center',gap:18}}>
+      {logo?<img src={logo} width={146} height={44}/>:<div style={{display:'flex',fontSize:24,letterSpacing:6,color:'#c8ff24'}}>RHIO</div>}
+      <div style={{display:'flex',alignItems:'center',gap:10,fontSize:16,letterSpacing:3.5,color:MUTED}}><div style={{display:'flex',width:9,height:9,borderRadius:9,backgroundColor:'#c8ff24'}}/>{c.kicker}</div>
+     </div>
+     <div style={{display:'flex',flexDirection:'column',fontSize:72,lineHeight:1.04,letterSpacing:-3}}>
+      <div style={{display:'flex',color:MUTED}}>Your posts.</div>
+      <div style={{display:'flex',color:TEXT}}>Your agent.</div>
+     </div>
+     <div style={{display:'flex',flexDirection:'column',gap:14}}>
+      <div style={{display:'flex',gap:10}}>
+       {['OPT-IN ONLY','YOUR VOICE','EARN PER MESSAGE'].map(l=><div key={l} style={{display:'flex',alignItems:'center',flexShrink:0,height:40,padding:'0 16px',borderRadius:999,border:`1px solid ${LINE}`,fontSize:14,letterSpacing:2,whiteSpace:'nowrap',color:TEXT}}>{l}</div>)}
+      </div>
+      <div style={{display:'flex',fontSize:15,letterSpacing:2.6,color:MUTED}}>RHIO.STUDIO/CREATORS</div>
+     </div>
+    </div>
+    {posts.map(p=><div key={p.t} style={{display:'flex',flexDirection:'column',gap:8,position:'absolute',left:p.left,top:p.top,width:232,padding:'14px 16px',borderRadius:18,backgroundColor:TEXT,color:INK,transform:`rotate(${p.turn}deg)`,boxShadow:'0 18px 40px rgba(0,0,0,0.4)'}}>
+     <div style={{display:'flex',alignItems:'center',gap:8,fontSize:12,letterSpacing:1.6,color:'#5d6259'}}><div style={{display:'flex',width:16,height:16,borderRadius:16,backgroundColor:INK}}/>YOU</div>
+     <div style={{display:'flex',fontSize:20,lineHeight:1.25}}>{p.t}</div>
+    </div>)}
+    <div style={{display:'flex',flexDirection:'column',justifyContent:'space-between',position:'absolute',left:892,top:128,width:268,height:366,padding:20,borderRadius:22,backgroundColor:'#5b5bf6',color:'#ffffff',transform:'rotate(4deg)',boxShadow:'0 24px 60px rgba(0,0,0,0.45)'}}>
+     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:14,letterSpacing:2.2}}>
+      <div style={{display:'flex'}}>#01</div>
+      <div style={{display:'flex',padding:'4px 10px',borderRadius:9,border:'1px solid rgba(255,255,255,0.35)'}}>YOUR VOICE</div>
+     </div>
+     {who?<img src={who} width={195} height={260} style={{position:'absolute',left:36,top:44}}/>:null}
+     <div style={{display:'flex',fontSize:25,lineHeight:1.1,letterSpacing:-0.8}}>Talks like you</div>
+    </div>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'center',position:'absolute',left:826,top:274,width:76,height:76,borderRadius:76,backgroundColor:INK,border:`5px solid ${BG}`}}>
+     <svg width="36" height="36" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6" stroke="#c8ff24" strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
+    </div>
+   </div>,
+   {width:W,height:H,headers:{'Cache-Control':'public, max-age=3600'}},
+  );
+ }
  if(key==='discover'){
   // In the website's style, like the agent teams card: one card of the hero deck and a short conversation next to it.
   const who=await asset(`${origin}/characters/card/deck-juno.png`,'image/png');

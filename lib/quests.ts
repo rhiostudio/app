@@ -8,7 +8,7 @@
    A quest whose feature is off on this server (Telegram without a bot, the token without a recorder) is left out.
    Env (server only): QUESTS_ENABLED (default true), QUEST_CREDITS (free credits per quest, default 5; 0 = no credits). */
 import {env} from 'cloudflare:workers';
-import {HttpError} from './server';
+import {HttpError,aiReady} from './server';
 import {ensureWallet,ledgerRow} from './economy';
 import {notifyConfig} from './notify';
 import {chainConfig} from './chain';
@@ -34,6 +34,9 @@ export const QUESTS:Quest[]=[
   check:(db,o)=>has(db,"SELECT 1 AS x FROM runs WHERE owner=? AND status='complete' AND relay IS NOT NULL AND step>=2 LIMIT 1",o)},
  {id:'talk',title:'Talk to an agent',text:'Open a published agent from Discover and send it a message on its page.',go:'discover',icon:'users',
   check:(db,o)=>has(db,"SELECT 1 AS x FROM runs WHERE owner=? AND status='complete' AND talk IS NOT NULL LIMIT 1",o)},
+ {id:'voice',title:'Give an agent your voice',text:'In the Studio, open Persona, paste posts you wrote and let it draft the instructions in your style.',go:'studio',icon:'pen',
+  on:()=>aiReady(),
+  check:(db,o)=>has(db,"SELECT 1 AS x FROM runs WHERE owner=? AND status='complete' AND skill='voice' LIMIT 1",o)},
  {id:'schedule',title:'Let it work on its own',text:'Put a skill on a schedule so the agent runs it without you.',go:'schedules',icon:'clock',
   check:(db,o)=>has(db,'SELECT 1 AS x FROM schedules WHERE owner=? LIMIT 1',o)},
  {id:'deliver',title:'Get the report where you are',text:'Connect a Discord channel or a Telegram chat under Schedules → Delivery.',go:'schedules',icon:'share',

@@ -1,7 +1,7 @@
 /* Zod schemas for saved agents (server routes; the studio imports this lazily). Old configs still validate. */
 import {z} from 'zod';
 import {skinIds,motionNames,legacyMotions,accessories,getCharacter,wardrobe} from './characters';
-import {skillIds,MAX_SKILLS} from './agents';
+import {skillIds,MAX_SKILLS,ANSWER_LANGUAGE} from './agents';
 const color=z.string().regex(/^#[0-9a-fA-F]{6}$/,'Use a six-digit hex color');
 const oneOf=(key:keyof typeof wardrobe)=>{const values=(wardrobe[key] as [string,string][]).map(v=>v[0]);return z.string().refine(v=>values.includes(v),`Unknown ${String(key)} option`);};
 export const appearanceSchema=z.object({outfit:color,accent:color,skinTone:color,hair:color,accessory:z.enum(accessories),finish:z.enum(['Matte','Gloss'])});
@@ -13,7 +13,7 @@ export const lookSchema=z.object({
  shoes:z.object({type:oneOf('shoes'),color}),head:oneOf('head'),face:oneOf('face'),back:oneOf('back'),accColor:color,glow:color,finish:z.enum(['matte','gloss']),
 }).partial().strict();
 const motion=z.preprocess(v=>typeof v==='string'&&legacyMotions[v]?legacyMotions[v]:v,z.enum(motionNames));
-export const agentSchema=z.object({id:z.string().uuid().optional(),name:z.string().trim().min(1).max(40),tagline:z.string().trim().max(140).optional(),skin:z.enum(skinIds),appearance:appearanceSchema.optional(),look:lookSchema.optional(),motion:motion.optional(),personality:z.string().trim().min(1).max(2000),tone:z.enum(['Friendly','Professional','Concise']),language:z.enum(['English','Bahasa Indonesia']),skills:z.array(z.enum(skillIds)).min(1).max(MAX_SKILLS).transform(v=>[...new Set(v)])}).superRefine((v,ctx)=>{if(v.appearance&&getCharacter(v.skin).category==='Companion'&&v.appearance.accessory!=='None')ctx.addIssue({code:z.ZodIssueCode.custom,path:['appearance','accessory'],message:'Accessories are available on humanoid characters.'});if(v.look?.kind&&v.look.kind!==(getCharacter(v.skin).category==='Companion'?'companion':'human'))ctx.addIssue({code:z.ZodIssueCode.custom,path:['look','kind'],message:'This look does not match the selected character.'});});
+export const agentSchema=z.object({id:z.string().uuid().optional(),name:z.string().trim().min(1).max(40),tagline:z.string().trim().max(140).optional(),skin:z.enum(skinIds),appearance:appearanceSchema.optional(),look:lookSchema.optional(),motion:motion.optional(),personality:z.string().trim().min(1).max(2000),tone:z.enum(['Friendly','Professional','Concise']),/* one answer language; whatever an older config or export carries is read as it */language:z.string().max(40).optional().transform(()=>ANSWER_LANGUAGE),skills:z.array(z.enum(skillIds)).min(1).max(MAX_SKILLS).transform(v=>[...new Set(v)])}).superRefine((v,ctx)=>{if(v.appearance&&getCharacter(v.skin).category==='Companion'&&v.appearance.accessory!=='None')ctx.addIssue({code:z.ZodIssueCode.custom,path:['appearance','accessory'],message:'Accessories are available on humanoid characters.'});if(v.look?.kind&&v.look.kind!==(getCharacter(v.skin).category==='Companion'?'companion':'human'))ctx.addIssue({code:z.ZodIssueCode.custom,path:['look','kind'],message:'This look does not match the selected character.'});});
 /** One readable sentence for the first validation problem (the studio and the API both show it). */
 export function agentIssue(error:z.ZodError){
  const i=error.issues[0];const key=String(i?.path[0]??'');

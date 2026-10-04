@@ -18,6 +18,7 @@ import {monitorTarget,readWallet,saveReading} from './monitor';
 import {whaleReading} from './whales';
 import {handover,type Relay} from './teams';
 import {talkContext,talkCost,TALK_SKILL} from './talk';
+import {voiceCost,VOICE_SKILL,VOICE_WRITER} from './voice';
 import {SAMPLE_COST,liveRunCost,aiDailyRuns,aiDailyFreeRuns,liveDailyPerUser,quotaKeys,quotaStep,ensureWallet,ledgerRow,split,tierFeePermille,skillTrialLimit,refillFree,heavyWindow,heavyKey,searchForFreeCredits,takeSearchSlot,returnSearchSlot} from './economy';
 /** Heavy skills on manual live runs count against the 5-hour window (lib/economy.ts heavyWindow). */
 const isHeavy=(mode:string,skill:string,scheduled:boolean)=>mode==='live'&&!scheduled&&heavyWindow().skills.includes(skill);
@@ -25,8 +26,9 @@ const isHeavy=(mode:string,skill:string,scheduled:boolean)=>mode==='live'&&!sche
 const TIMED_OUT='The task took too long and was cancelled. Any credits were returned.';
 
 /** `expectedPrice`: the creator price the buyer saw. When the creator changed it meanwhile, the run is refused. */
-export type RunInput={id:string;agentId:string;prompt:string;skill:SkillId|typeof TALK_SKILL;mode:'sample'|'live';expectedPrice?:number;
+export type RunInput={id:string;agentId:string;prompt:string;skill:SkillId|typeof TALK_SKILL|typeof VOICE_SKILL;mode:'sample'|'live';expectedPrice?:number;
  /** a message of a conversation with the agent (lib/talk.ts): the id of the conversation. The run then uses no skill. */talk?:string;
+ /** a draft of the agent's instructions from its creator's own posts (lib/voice.ts): own agents only, no skill used */voice?:boolean;
  /** a step of a team run (lib/teams.ts): the run works from the answer of the step before it */relay?:Relay};
 type AgentRow={owner:string;config:string;name:string;published:number;price:number;talk_price:number|null;archived:number};
 export type RunRow={id:string;agent_id:string;agent_name:string;prompt:string;output:string;mode:string;cost:number;status:string;created:string;skill:string;schedule_id?:string|null;relay?:string|null;step?:number|null;talk?:string|null};
@@ -46,16 +48,18 @@ export async function performRun(db:D1Database,owner:string,data:RunInput,schedu
  if(!mine&&data.expectedPrice!==undefined&&data.expectedPrice!==asked)throw new HttpError(409,`The creator changed the price of ${record.name} to ${asked} credits. Check the new price and ${data.talk?'send it':'run'} again.`);
  // a message of a conversation is answered in the agent's own voice and needs none of its skills
  const talk=!schedule&&data.talk?data.talk:null;if(!!talk!==(data.skill===TALK_SKILL))throw new HttpError(400,'Choose one of the agent\u2019s skills.');
- const agent=JSON.parse(record.config) as Agent;if(!talk&&!agent.skills.includes(data.skill as SkillId))throw new HttpError(400,'Equip this skill on your agent first.');
- if(!talk&&!isOpenSkill(data.skill))throw new HttpError(403,`This skill is locked for now. Open skills: ${skillCatalog.filter(s=>isOpenSkill(s.id)).map(s=>s.name).join(', ')}.`);
+ // a voice draft is written for the creator's own agent by a neutral writer, from the posts in the task
+ const voice=!schedule&&!!data.voice;if(voice!==(data.skill===VOICE_SKILL)||(voice&&(!mine||!!talk)))throw new HttpError(voice&&!mine?404:400,voice&&!mine?'Save this agent before writing its voice.':'Choose one of the agent\u2019s skills.');
+ const agent=JSON.parse(record.config) as Agent;if(!talk&&!voice&&!agent.skills.includes(data.skill as SkillId))throw new HttpError(400,'Equip this skill on your agent first.');
+ if(!talk&&!voice&&!isOpenSkill(data.skill))throw new HttpError(403,`This skill is locked for now. Open skills: ${skillCatalog.filter(s=>isOpenSkill(s.id)).map(s=>s.name).join(', ')}.`);
  // skill tries apply to manual runs; scheduled runs are paid with credits instead
- const limit=schedule||talk?0:skillTrialLimit();const skillName=skillCatalog.find(s=>s.id===data.skill)?.name||data.skill;
+ const limit=schedule||talk||voice?0:skillTrialLimit();const skillName=skillCatalog.find(s=>s.id===data.skill)?.name||data.skill;
  const tryUsed=async()=>limit?((await db.prepare('SELECT used FROM skill_trials WHERE owner=? AND skill=?').bind(owner,data.skill).first<{used:number}>())?.used??0):0;
  const tryLimitError=()=>new HttpError(429,`You have used your ${limit} ${limit===1?'try':'tries'} of ${skillName}. Other skills still have tries left, and schedules run any skill with credits.`);
  if(limit&&await tryUsed()>=limit)throw tryLimitError();
  if(data.mode==='live'&&!aiReady())throw new HttpError(503,'AI is not connected yet. Try a workflow sample.');
  // price: platform sample or live AI cost + creator price when running someone else's agent; schedules have their own cost
- const base=schedule?schedule.cost:data.mode==='sample'?SAMPLE_COST:talk?talkCost():liveRunCost(data.skill);const price=mine?0:asked;const cost=base+price;const {fee,creator}=split(price,price>0?await tierFeePermille(db,record.owner):1000);
+ const base=schedule?schedule.cost:data.mode==='sample'?SAMPLE_COST:talk?talkCost():voice?voiceCost():liveRunCost(data.skill);const price=mine?0:asked;const cost=base+price;const {fee,creator}=split(price,price>0?await tierFeePermille(db,record.owner):1000);
  const created=new Date().toISOString();await ensureWallet(db,owner);await refillFree(db,owner);
  const w=await db.prepare('SELECT balance,paid FROM preview_wallets WHERE owner=?').bind(owner).first<{balance:number;paid:number}>();if((w?.balance??0)<cost)throw new HttpError(402,`This run costs ${cost} credits and you have ${w?.balance??0}. You can still edit and export agents.`);
  // The wallet monitor reads the chain before anything is charged: a task without an address, or a chain that does not
@@ -65,7 +69,7 @@ export async function performRun(db:D1Database,owner:string,data:RunInput,schedu
  const reading=wallet||(data.skill==='whales'?await whaleReading(db):null);
  // A step of a team run works from the answer of the step before it. Checked here, before anything is charged: a
  // step whose predecessor did not complete (or belongs to another account or team run) costs nothing.
- const relay=!schedule&&!talk&&data.relay?data.relay:null;const handed=relay?await handover(db,owner,relay):null;
+ const relay=!schedule&&!talk&&!voice&&data.relay?data.relay:null;const handed=relay?await handover(db,owner,relay):null;
  // a conversation: the last turns this account had with this agent in it go to the model as context
  const spoken=talk?await talkContext(db,owner,data.agentId,talk):null;
  // an account that holds bought credits is on the paid tier: more heavy runs, and not limited by the free pool
@@ -81,7 +85,7 @@ export async function performRun(db:D1Database,owner:string,data:RunInput,schedu
   // the CHECK on the balance aborts the whole batch when it would go below zero: two parallel runs can never overdraw
   db.prepare('UPDATE preview_wallets SET balance=balance-?,paid=paid-(SELECT paid_cost FROM runs WHERE id=? AND owner=?) WHERE owner=?').bind(cost,data.id,owner,owner),
  ];
- if(cost>0)statements.push(ledgerRow(db,owner,-cost,'run',schedule?`Scheduled run · ${record.name}`:mine?`${opts.label||(talk?'Chat':relay?`Team run, step ${relay.step}`:data.mode==='sample'?'Workflow sample':'Live run')} · ${record.name}`:`${talk?'Talked to':'Ran'} ${record.name} (${price} to creator${base?`, ${base} sample`:''})`,data.id,created));
+ if(cost>0)statements.push(ledgerRow(db,owner,-cost,'run',schedule?`Scheduled run · ${record.name}`:mine?`${opts.label||(voice?'Voice draft':talk?'Chat':relay?`Team run, step ${relay.step}`:data.mode==='sample'?'Workflow sample':'Live run')} · ${record.name}`:`${talk?'Talked to':'Ran'} ${record.name} (${price} to creator${base?`, ${base} sample`:''})`,data.id,created));
  // every run by someone else counts as a use, free agents included (Discover sorts by it)
  if(!mine){if(price>0)await ensureWallet(db,record.owner);statements.push(db.prepare('UPDATE agents SET uses=uses+1 WHERE id=?').bind(data.agentId));}
  // one try used; at the limit the counter becomes -1, the CHECK fails and the whole batch rolls back (no race)
@@ -124,7 +128,7 @@ export async function performRun(db:D1Database,owner:string,data:RunInput,schedu
  // guard: someone else's published agent keeps its instructions private from the person running it
  try{
   if(data.mode==='sample')output=sampleResult(agent,data.prompt,data.skill);
-  else{const r=await runAI(runtime(),agent,data.skill,[data.prompt,spoken,handed?.facts,reading?.facts].filter(Boolean).join('\n\n'),data.id,{free,guard:!mine||!!opts.guard||!!talk,search});output=r.output;if(search&&!r.searched)await returnSearchSlot(db,created).catch(()=>null);}
+  else{const r=await runAI(runtime(),voice?VOICE_WRITER:agent,data.skill,[data.prompt,spoken,handed?.facts,reading?.facts].filter(Boolean).join('\n\n'),data.id,{free,guard:!mine||!!opts.guard||!!talk,search});output=r.output;if(search&&!r.searched)await returnSearchSlot(db,created).catch(()=>null);}
   if(reading)output=`${output}\n\n${reading.note}`;
   if(handed)output=`${output}\n\n${handed.note}`;
  }

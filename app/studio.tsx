@@ -42,6 +42,8 @@ const WalletPage=lazy(()=>import('@/components/app/wallet').then(m=>({default:m.
 const SchedulesPage=lazy(()=>import('@/components/app/schedules').then(m=>({default:m.SchedulesPage})));
 const AgentSchedules=lazy(()=>import('@/components/app/schedules').then(m=>({default:m.AgentSchedules})));
 const RewardsPage=lazy(()=>import('@/components/app/rewards').then(m=>({default:m.RewardsPage})));
+const VoiceBox=lazy(()=>import('@/components/app/voice').then(m=>({default:m.VoiceBox})));
+const CreatorsPage=lazy(()=>import('@/components/rhio/creators-page').then(m=>({default:m.CreatorsPage})));
 const TeamsPage=lazy(()=>import('@/components/app/teams').then(m=>({default:m.TeamsPage})));
 const TeamsInfoPage=lazy(()=>import('@/components/rhio/teams-page').then(m=>({default:m.TeamsInfoPage})));
 const QuestsPage=lazy(()=>import('@/components/app/quests').then(m=>({default:m.QuestsPage})));
@@ -85,7 +87,7 @@ const TEMPLATES=[
  {name:'Knowledge keeper',skin:'guardian',skills:['document','summarize','planner'],personality:'Use only the text provided. Extract key points, exact supporting passages and clear next actions.'},
  {name:'Builder buddy',skin:'rook',skills:['code','planner','research'],personality:'Be practical and direct. Prefer small, testable steps. Point out risks early.'},
 ] as const;
-const TONES=['Friendly','Professional','Concise'] as const;const LANGS=['English','Bahasa Indonesia'] as const;
+const TONES=['Friendly','Professional','Concise'] as const;
 const SKILL_CATS=['All','Research','Creative','Knowledge','Language','Builder','Productivity','Automation'];
 function encoded(a:Agent){const {id,updated,archived,published,price,uses,...config}=a as any;return btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(config))));}
 const C_DOCS=CONTENT.docs;const C_PAPER=CONTENT.paper.sections;
@@ -101,7 +103,10 @@ export default function Studio(){
  const pathname=usePathname()||'/';const router=useRouter();const route=useMemo(()=>parsePath(pathname),[pathname]);
  const view=route.view;const area=route.area;
  const docPage=route.doc||(view==='paper'?C_PAPER[0].id:'overview');
- const [draft,setDraft]=useState<Agent>({...starter,skills:[...starter.skills]});const restored=useRef(false);const [tab,setTab]=useState('look');
+ const [draft,setDraft]=useState<Agent>({...starter,skills:[...starter.skills]});const restored=useRef(false);
+ // a link from the creators page opens the Persona tab with the voice box open: /dashboard/studio?voice=1
+ const [voiceOpen,setVoiceOpen]=useState(false);const [tab,setTab]=useState('look');
+ useEffect(()=>{try{if(new URLSearchParams(location.search).has('voice')){setVoiceOpen(true);setTab('persona');}}catch{/* no link, nothing to open */}},[]);
  const [paused,setPaused]=useState(false);const [speed,setSpeed]=useState(1);
  const [agents,setAgents]=useState<Agent[]>([]);const [runs,setRuns]=useState<Run[]>([]);const [balance,setBalance]=useState<number|null>(null);const [email,setEmail]=useState('');const [wallet,setWallet]=useState('');const [earned,setEarned]=useState(0);const [ledger,setLedger]=useState<LedgerEntry[]>([]);const [feeBps,setFeeBps]=useState(0);const [liveCost,setLiveCost]=useState(5);const [skillCosts,setSkillCosts]=useState<Record<string,number>>({});const [startCredits,setStartCredits]=useState(25);const [refill,setRefill]=useState<FreeRefill|null>(null);const [liveToday,setLiveToday]=useState<LiveToday|null>(null);const [trials,setTrials]=useState<Trials|null>(null);const [ready,setReady]=useState(false);const [auth,setAuth]=useState(true);const [loading,setLoading]=useState(true);const [loadError,setLoadError]=useState('');const [busy,setBusy]=useState(false);
  const [market,setMarket]=useState<MarketAgent[]|null>(null);const [marketAgent,setMarketAgent]=useState<MarketAgent|null>(null);const [priceDraft,setPriceDraft]=useState<Record<string,string>>({});const [talkDraft,setTalkDraft]=useState<Record<string,string>>({});
@@ -222,7 +227,7 @@ export default function Studio(){
      </div>
      {scan&&<Card className="absolute top-24 right-4 w-60 gap-2 border-lime/50 bg-background/90 p-3.5 text-[13px] backdrop-blur-md max-[820px]:top-auto max-[820px]:bottom-44">
       <Mono className="text-brand">Scan · {character.name}</Mono>
-      {[['Agent',draft.name],['Class',character.role],['Tone',`${draft.tone} · ${draft.language}`],['Skills',draft.skills.map(skillName).join(', ')],['Signature',sig?.name]].map(([k,v])=><div key={k} className="flex justify-between gap-3"><Mono className="pt-0.5 text-[10px]">{k}</Mono><b className="text-right font-semibold">{v}</b></div>)}
+      {[['Agent',draft.name],['Class',character.role],['Tone',draft.tone],['Skills',draft.skills.map(skillName).join(', ')],['Signature',sig?.name]].map(([k,v])=><div key={k} className="flex justify-between gap-3"><Mono className="pt-0.5 text-[10px]">{k}</Mono><b className="text-right font-semibold">{v}</b></div>)}
       <Progress value={40+draft.skills.length*15} className="h-1 bg-secondary [&>div]:bg-lime"/>
      </Card>}
      <div className="absolute top-1/2 left-4 -translate-y-1/2 max-[820px]:top-auto max-[820px]:bottom-[68px] max-[820px]:left-1/2 max-[820px]:-translate-x-1/2 max-[820px]:translate-y-0"><Powers skin={draft.skin}/></div>
@@ -240,8 +245,8 @@ export default function Studio(){
         <div className="grid gap-2"><FieldLabel htmlFor="fName">Agent name</FieldLabel><Input id="fName" maxLength={40} value={draft.name} onChange={e=>change('name',e.target.value)}/></div>
         <div className="grid gap-2"><FieldLabel htmlFor="fTag">Tagline <span className="font-normal">(shown in Discover when published)</span></FieldLabel><Input id="fTag" maxLength={140} value={draft.tagline||''} onChange={e=>change('tagline',e.target.value)} placeholder="One line about what this agent is good at"/></div>
         <div className="grid gap-2"><FieldLabel htmlFor="fPersona">Personality &amp; instructions</FieldLabel><Textarea id="fPersona" maxLength={2000} value={draft.personality} onChange={e=>change('personality',e.target.value)} className="min-h-28"/><span className="text-xs text-muted-foreground">Sent to the AI with every task this agent runs.</span></div>
+        <Suspense fallback={null}><VoiceBox auth={auth} balance={balance} open={voiceOpen} onSignIn={()=>setSignin(true)} ensureSaved={ensureCurrent} onSpent={refresh} onUse={(persona,tagline)=>setDraft(d=>({...d,personality:persona,tagline:d.tagline||tagline||undefined}))}/></Suspense>
         <Options label="Tone" value={draft.tone} options={TONES.map(t=>[t,t])} onChange={v=>change('tone',v as Agent['tone'])}/>
-        <Options label="Answer language" value={draft.language} options={LANGS.map(t=>[t,t])} onChange={v=>change('language',v as Agent['language'])}/>
         <div className="grid gap-1.5"><Options label="Default stance" value={draft.motion||'Idle'} options={loopMotions.map(m=>[m,m])} onChange={v=>{change('motion',v as Motion);playMotion(v);}}/><span className="text-xs text-muted-foreground">The looping motion the agent returns to on the stage.</span></div>
         <div className="grid gap-2.5 border-t pt-5"><Mono>Start from a template</Mono><div className="flex flex-wrap gap-1.5">{TEMPLATES.map(t=><Button key={t.name} variant="outline" size="sm" shape="pill" onClick={()=>applyTemplate(t)}>{t.name}</Button>)}</div><span className="text-xs text-muted-foreground">Templates set character, skills and instructions. Your outfit changes are replaced.</span></div>
        </TabsContent>
@@ -346,7 +351,7 @@ export default function Studio(){
      <div className="overflow-hidden rounded-xl border max-md:hidden"><Table>
       <TableHeader className="bg-secondary/60"><TableRow className="hover:bg-transparent">{['Agent','Task','Mode','Status','Cost','When'].map(h=><TableHead key={h} className="h-10 font-mono text-[10.5px] tracking-[.08em] text-muted-foreground uppercase">{h}</TableHead>)}</TableRow></TableHeader>
       <TableBody className="stagger">{shownRuns.map(r=><TableRow key={r.id} onClick={()=>setRunDetail(r)} className="cursor-pointer">
-       <TableCell className="font-medium">{r.agent_name}{!!r.step&&<span className="ml-1.5 inline-flex items-center gap-1 rounded bg-t-iris px-1.5 py-px align-middle font-mono text-[9.5px] font-semibold text-iris uppercase"><I id="link" className="i size-2.5"/>Team · {r.step}</span>}{!!r.talk&&<span className="ml-1.5 inline-flex items-center gap-1 rounded bg-t-sky px-1.5 py-px align-middle font-mono text-[9.5px] font-semibold text-[#1f7fcf] uppercase dark:text-sky"><I id="users" className="i size-2.5"/>Chat</span>}{r.schedule_id&&<span className="ml-1.5 inline-flex items-center gap-1 rounded bg-t-mint px-1.5 py-px align-middle font-mono text-[9.5px] font-semibold text-[#15845a] uppercase dark:text-mint"><I id="clock" className="i size-2.5"/>Scheduled</span>}</TableCell>
+       <TableCell className="font-medium">{r.agent_name}{!!r.step&&<span className="ml-1.5 inline-flex items-center gap-1 rounded bg-t-iris px-1.5 py-px align-middle font-mono text-[9.5px] font-semibold text-iris uppercase"><I id="link" className="i size-2.5"/>Team · {r.step}</span>}{!!r.talk&&<span className="ml-1.5 inline-flex items-center gap-1 rounded bg-t-sky px-1.5 py-px align-middle font-mono text-[9.5px] font-semibold text-[#1f7fcf] uppercase dark:text-sky"><I id="users" className="i size-2.5"/>Chat</span>}{r.skill==='voice'&&<span className="ml-1.5 inline-flex items-center gap-1 rounded bg-t-amber px-1.5 py-px align-middle font-mono text-[9.5px] font-semibold text-[#9a6500] uppercase dark:text-amber"><I id="pen" className="i size-2.5"/>Voice</span>}{r.schedule_id&&<span className="ml-1.5 inline-flex items-center gap-1 rounded bg-t-mint px-1.5 py-px align-middle font-mono text-[9.5px] font-semibold text-[#15845a] uppercase dark:text-mint"><I id="clock" className="i size-2.5"/>Scheduled</span>}</TableCell>
        <TableCell className="max-w-[360px] truncate text-muted-foreground">{r.prompt}</TableCell>
        <TableCell><StatusBadge kind={r.mode==='sample'?'sample':'live_ai'}>{r.mode==='sample'?'Sample':'AI'}</StatusBadge></TableCell>
        <TableCell><StatusBadge kind={r.status}/></TableCell>
@@ -405,6 +410,7 @@ export default function Studio(){
     {view==='whales'&&<WhalesPage onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
     {view==='invite'&&route.doc&&<InvitePage key={route.doc} code={route.doc} auth={auth} onNavigate={(v,doc)=>navigate(v,doc)} onSignIn={()=>setSignin(true)}/>}
     {view==='referral'&&<ReferralPage onNavigate={(v,doc)=>navigate(v,doc)}/>}
+    {view==='creators'&&<CreatorsPage onNavigate={(v,doc)=>navigate(v,doc)}/>}
     {view==='teamup'&&<TeamsInfoPage onNavigate={(v,doc)=>navigate(v,doc)}/>}
     {view==='recipes'&&<RecipesPage onNavigate={(v,doc)=>navigate(v,doc)}/>}
     {view==='tiers'&&<TiersPage onNavigate={(v,doc)=>navigate(v,doc,v==='paper'?'site':undefined)}/>}
