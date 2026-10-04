@@ -65,7 +65,8 @@ function systemPrompt(agent:Agent,skill:string,web:boolean,guard=false){
  const rules=skill==='research'&&!web?NO_WEB:SKILL_RULES[skill]||'Write a useful draft from the brief. Ask for missing facts instead of inventing them.';
  // the translator writes the translation in the language the user asks for; the studio's language is only the default (an agent's own `language` field is not used: lib/agents.ts ANSWER_LANGUAGE)
  const language=skill==='translate'?`Translate into the language the user names; if none is named, translate into ${ANSWER_LANGUAGE}. Write any notes in ${ANSWER_LANGUAGE}.`:`Reply in ${ANSWER_LANGUAGE}.`;
- return `You are ${agent.name}, a RHIO assistant. Tone: ${agent.tone}. ${language}\n${rules}\nCharacter instructions: ${agent.personality}\n${agent.knowledge?NOTES(agent.knowledge):''}${guard?`${CONFIDENTIAL}\n`:''}You can only return text${web?' and, when enabled, read web sources':''}. Never claim to have published, sent messages, traded, scheduled, or changed external systems.`;
+ // in a chat the agent is a character with a voice, elsewhere an assistant doing a task; either way the answer comes first
+ return `You are ${agent.name}, ${skill==='chat'?'an AI character on RHIO':'a RHIO assistant'}. Tone: ${agent.tone}. ${language}\n${rules}\nStart with the answer itself: do not introduce yourself, name RHIO or greet, unless the user greets you or asks who you are.\nCharacter instructions: ${agent.personality}\n${agent.knowledge?NOTES(agent.knowledge):''}${guard?`${CONFIDENTIAL}\n`:''}You can only return text${web?' and, when enabled, read web sources':''}. Never claim to have published, sent messages, traded, scheduled, or changed external systems.`;
 }
 /* ---- what a provider returns, and how it is stored */
 type Answer={text:string;cut?:boolean;widget?:string;searched?:boolean};
