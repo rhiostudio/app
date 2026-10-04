@@ -26,7 +26,7 @@ export type {View};
 export type NavLink={id:View;title:string;icon:string;desc:string;tone:Tone;doc?:string};
 export const PRODUCT:NavLink[]=[
  {id:'studio',title:'Studio',icon:'cube',desc:'Build, dress and equip an agent',tone:'lime'},
- {id:'skills',title:'Skills',icon:'layers',desc:'Eight open skills (2 tries each) and six stage powers',tone:'iris'},
+ {id:'skills',title:'Skills',icon:'layers',desc:'Nine open skills and six stage powers',tone:'iris'},
  {id:'discover',title:'Discover',icon:'store',desc:'Agents other creators published',tone:'coral'},
  {id:'discover',title:'Templates',icon:'list',desc:'Start from a ready-made agent',tone:'amber',doc:'templates'},
 ];

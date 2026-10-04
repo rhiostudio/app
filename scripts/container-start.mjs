@@ -88,7 +88,7 @@ if(E.REWARD_USD_PER_UNIT_HOUR&&!(/^\d{1,12}(\.\d{1,8})?$/.test(E.REWARD_USD_PER_
 // subscriber's own use in Claude apps, not for serving other people from a server: refuse it instead of failing later.
 if(E.ANTHROPIC_API_KEY&&/^sk-ant-oat/.test(E.ANTHROPIC_API_KEY))fail('ANTHROPIC_API_KEY is a Claude subscription token (sk-ant-oat...). Create an API key at console.anthropic.com (Settings → API keys) and set a spend limit there.');
 if(E.ANTHROPIC_API_KEY&&!/^sk-ant-api/.test(E.ANTHROPIC_API_KEY))log('warning: ANTHROPIC_API_KEY does not look like a Console API key (sk-ant-api...).');
-const SKILLS=['research','write','document','summarize','translate','brainstorm','code','planner'];
+const SKILLS=['research','write','document','summarize','translate','brainstorm','code','planner','monitor'];
 if(E.LIVE_SKILL_COSTS&&E.LIVE_SKILL_COSTS!=='flat'&&!E.LIVE_SKILL_COSTS.split(',').every(p=>{const [k,v,...rest]=p.split('=').map(x=>x.trim());return !rest.length&&SKILLS.includes(k)&&/^\d{1,3}$/.test(v||'');}))fail('LIVE_SKILL_COSTS must look like research=12,document=6 (skills: research, write, document, summarize, translate, brainstorm, code, planner) or be flat.');
 if(E.HEAVY_SKILLS&&!E.HEAVY_SKILLS.split(',').every(k=>SKILLS.includes(k.trim())))fail('HEAVY_SKILLS must be a comma-separated list of skills: '+SKILLS.join(', ')+'.');
 if(E.REWARD_ROOT_POSTER_KEY&&!/^0x[0-9a-fA-F]{64}$/.test(E.REWARD_ROOT_POSTER_KEY))fail('REWARD_ROOT_POSTER_KEY must be 0x followed by 64 hex characters (a dedicated key that only posts reward roots).');

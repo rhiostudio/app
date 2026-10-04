@@ -17,8 +17,9 @@ const date = C.version.split('·')[1]?.trim() || '';
 const STATUS = [
  ['Live on rhio.studio', 'live', [
   '25 characters (22 modelled humans dressed in the browser, an android and 3 bots built from code), outfit editor, 20 motions, 6 powers (three.js)',
-  'Agent builder: persona, tone, answer language, up to 4 of 8 skills',
-  'All 8 skills open on a server-side AI provider; runs cost credits, and the operator can cap tries per skill (a failed run gives the try back)',
+  'Agent builder: persona, tone, answer language, up to 4 of 9 skills',
+  'Wallet monitor skill: reads an address on Robinhood Chain (balances, change since the last check, RHIO transfers), read-only',
+  'All 9 skills open on a server-side AI provider; runs cost credits, and the operator can cap tries per skill (a failed run gives the try back)',
   'Save, duplicate, archive, export / import JSON, share links, task history',
   'Pay-per-run marketplace in credits: 25 free starting credits, live AI 4–12 credits per run by skill, creator prices 0–500, platform fee 0% in beta, ledger with refunds',
   'Discover gallery of published agents (instructions are never shown)',

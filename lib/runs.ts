@@ -14,6 +14,7 @@ import {runtime,aiReady,HttpError,safeMessage} from './server';
 import {sampleResult} from './runner';
 import {runAI,AIError,searchesWeb} from './provider';
 import {isOpenSkill,skillCatalog,type Agent,type SkillId} from './agents';
+import {monitorTarget,readWallet,saveReading} from './monitor';
 import {SAMPLE_COST,liveRunCost,aiDailyRuns,aiDailyFreeRuns,liveDailyPerUser,quotaKeys,quotaStep,ensureWallet,ledgerRow,split,tierFeePermille,skillTrialLimit,refillFree,heavyWindow,heavyKey,searchForFreeCredits,takeSearchSlot,returnSearchSlot} from './economy';
 /** Heavy skills on manual live runs count against the 5-hour window (lib/economy.ts heavyWindow). */
 const isHeavy=(mode:string,skill:string,scheduled:boolean)=>mode==='live'&&!scheduled&&heavyWindow().skills.includes(skill);
@@ -46,6 +47,9 @@ export async function performRun(db:D1Database,owner:string,data:RunInput,schedu
  const base=schedule?schedule.cost:data.mode==='sample'?SAMPLE_COST:liveRunCost(data.skill);const price=mine?0:record.price;const cost=base+price;const {fee,creator}=split(price,price>0?await tierFeePermille(db,record.owner):1000);
  const created=new Date().toISOString();await ensureWallet(db,owner);await refillFree(db,owner);
  const w=await db.prepare('SELECT balance,paid FROM preview_wallets WHERE owner=?').bind(owner).first<{balance:number;paid:number}>();if((w?.balance??0)<cost)throw new HttpError(402,`This run costs ${cost} credits and you have ${w?.balance??0}. You can still edit and export agents.`);
+ // The wallet monitor reads the chain before anything is charged: a task without an address, or a chain that does not
+ // answer, costs nothing. What it read goes to the model with the task and is attached under the answer.
+ const reading=data.skill==='monitor'?await readWallet(db,owner,await monitorTarget(db,owner,data.prompt)):null;
  // an account that holds bought credits is on the paid tier: more heavy runs, and not limited by the free pool
  const holdsPaid=(w?.paid??0)>0;
  const statements=[
@@ -102,7 +106,8 @@ export async function performRun(db:D1Database,owner:string,data:RunInput,schedu
  // guard: someone else's published agent keeps its instructions private from the person running it
  try{
   if(data.mode==='sample')output=sampleResult(agent,data.prompt,data.skill);
-  else{const r=await runAI(runtime(),agent,data.skill,data.prompt,data.id,{free,guard:!mine,search});output=r.output;if(search&&!r.searched)await returnSearchSlot(db,created).catch(()=>null);}
+  else{const r=await runAI(runtime(),agent,data.skill,reading?`${data.prompt}\n\n${reading.facts}`:data.prompt,data.id,{free,guard:!mine,search});output=r.output;if(search&&!r.searched)await returnSearchSlot(db,created).catch(()=>null);}
+  if(reading)output=`${output}\n\n${reading.note}`;
  }
  catch(e){
   if(search&&e instanceof AIError&&!e.billed)await returnSearchSlot(db,created).catch(()=>null);
@@ -123,6 +128,8 @@ export async function performRun(db:D1Database,owner:string,data:RunInput,schedu
  }
  const [completed]=await db.batch(settle);
  if(!completed.meta.changes)throw new HttpError(504,TIMED_OUT);
+ // the reading becomes "the last check" only once its report exists
+ if(reading)await saveReading(db,owner,reading).catch(e=>console.error('RHIO wallet monitor: reading not saved:',safeMessage((e as Error)?.message||e)));
  return {id:data.id,agent_id:data.agentId,agent_name:record.name,prompt:data.prompt,output,mode:data.mode,cost,status:'complete',created,skill:data.skill,schedule_id:schedule?.id??null};
 }
 
