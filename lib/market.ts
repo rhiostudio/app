@@ -22,6 +22,7 @@ export function agentSummary(a:{tagline:string;skills:string[];price:number}){
  return [a.tagline,skills&&`Skills: ${skills}`,priceLabel(a.price)].filter(Boolean).join(' · ');
 }
 /** Changes whenever what the preview shows changes, so X and Telegram fetch a new picture instead of a cached one. */
-export function previewVersion(a:{name:string;tagline:string;skin:string;skills:string[];price:number}){
- const s=[a.name,a.tagline,a.skin,a.skills.join(','),a.price].join('|');let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return (h>>>0).toString(36);
+export function previewVersion(a:{name:string;tagline:string;skin:string;skills:string[];price:number;talkPrice?:number;creator?:string;verified?:boolean}){
+ // 'card2' is the picture's design (the card to show off, 4 Oct 2026): raise it when the drawing changes
+ const s=['card2',a.name,a.tagline,a.skin,a.skills.join(','),a.price,a.talkPrice??'',a.verified?a.creator:''].join('|');let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return (h>>>0).toString(36);
 }

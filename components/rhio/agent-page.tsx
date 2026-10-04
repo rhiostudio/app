@@ -2,7 +2,8 @@
 /* Public page of one published agent (/a/<id>): the link people post on X or send to a friend. It shows what
    Discover shows (name, character, skills, price, how often it ran); the creator's instructions are never part of
    the data. Under it is the chat (agent-talk.tsx): anyone signed in can talk to the agent, paid per message; the
-   character thinks while it answers and nods when the answer is there. Its link preview comes from
+   character thinks while it answers and nods when the answer is there. At the bottom is the agent's card
+   (/api/og/agent/<id>, the same picture a link to this page shows): post it, or download it to post yourself. Its link preview comes from
    app/a/[id]/page.tsx and /api/og/agent/<id>. */
 import {useEffect,useRef,useState} from 'react';
 import {toast} from 'sonner';
@@ -24,6 +25,14 @@ export function AgentPage({id,auth,onSignIn,onSpent,onRun,onNavigate}:{id:string
  const [mood,setMood]=useState<'think'|'answer'|'idle'>('idle');const calm=useRef<ReturnType<typeof setTimeout>|null>(null);const talk=useRef<HTMLDivElement|null>(null);
  const onMood=(m:'think'|'answer'|'idle')=>{if(calm.current)clearTimeout(calm.current);setMood(m);if(m==='answer')calm.current=setTimeout(()=>setMood('idle'),3500);};
  useEffect(()=>()=>{if(calm.current)clearTimeout(calm.current);},[]);
+ const [saving,setSaving]=useState(false);
+ /** Saves the agent's card as a PNG file. */
+ async function downloadCard(src:string,name:string){
+  if(saving)return;setSaving(true);
+  try{const r=await fetch(src);if(!r.ok||!(r.headers.get('content-type')||'').startsWith('image/'))throw new Error();
+   const url=URL.createObjectURL(await r.blob());const el=document.createElement('a');el.href=url;el.download=`rhio-${name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'agent'}-card.png`;document.body.appendChild(el);el.click();el.remove();setTimeout(()=>URL.revokeObjectURL(url),4000);
+  }catch{toast.error('The card could not be downloaded. Try again in a moment.');}finally{setSaving(false);}
+ }
  const [agent,setAgent]=useState<MarketAgent|null>(null);const [state,setState]=useState<'loading'|'ready'|'missing'>('loading');
  useEffect(()=>{let alive=true;setState('loading');setAgent(null);
   api(`/api/market?id=${encodeURIComponent(id)}`).then(d=>{if(!alive)return;setAgent(d.agent);setState('ready');}).catch(()=>{if(alive)setState('missing');});
@@ -41,7 +50,7 @@ export function AgentPage({id,auth,onSignIn,onSpent,onRun,onNavigate}:{id:string
 
  const c=agent?getCharacter(agent.skin):null;
  const link=typeof location!=='undefined'?location.origin+agentPath(id):agentPath(id);
- const post=agent?`https://x.com/intent/post?text=${encodeURIComponent(`${agent.name}, an AI agent on RHIO`)}&url=${encodeURIComponent(link)}`:'#';
+ const post=agent?`https://x.com/intent/post?text=${encodeURIComponent(agent.mine?`Meet ${agent.name}, my AI agent on RHIO. Talk to it:`:`${agent.name}, an AI agent on RHIO. Talk to it:`)}&url=${encodeURIComponent(link)}`:'#';
  return <>
   <section className="mx-auto grid max-w-[1120px] items-start gap-8 px-[clamp(16px,3vw,32px)] pt-10 pb-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:gap-12">
    <div className="relative aspect-[4/5] overflow-hidden rounded-2xl border bg-stage max-md:aspect-[4/4.2]">
@@ -80,7 +89,21 @@ export function AgentPage({id,auth,onSignIn,onSpent,onRun,onNavigate}:{id:string
     <p className="text-[12.5px] text-muted-foreground">{agent?`By ${agent.mine?'you':agent.creator}${agent.verified?', a creator the team verified on X':''}. `:''}You pay in credits when you talk to it or run it. The creator's instructions are never shown.</p>
    </div>
   </section>
-  <div ref={talk} className="mx-auto max-w-[1120px] scroll-mt-24 px-[clamp(16px,3vw,32px)] pb-16">{agent&&<AgentTalk agent={agent} auth={auth} onSignIn={onSignIn} onSpent={onSpent} onMood={onMood}/>}</div>
+  <div ref={talk} className="mx-auto max-w-[1120px] scroll-mt-24 px-[clamp(16px,3vw,32px)] pb-8">{agent&&<AgentTalk agent={agent} auth={auth} onSignIn={onSignIn} onSpent={onSpent} onMood={onMood}/>}</div>
+  {agent&&(()=>{const card=`/api/og/agent/${agent.id}?v=${agent.uses}-${agent.price}-${agent.talkPrice}-${agent.verified?1:0}`;
+   return <section className="mx-auto grid max-w-[1120px] items-center gap-6 px-[clamp(16px,3vw,32px)] pb-16 md:grid-cols-[minmax(0,1.15fr)_minmax(0,.85fr)]" aria-label={`The card of ${agent.name}`}>
+    <img src={card} alt={`The card of ${agent.name}: its character, its name, runs and prices`} width={1200} height={630} loading="lazy" className="h-auto w-full rounded-2xl border"/>
+    <div className="grid gap-3">
+     <span className="font-mono text-[10px] tracking-[.1em] text-muted-foreground uppercase">Its card</span>
+     <b className="font-display text-[clamp(26px,3vw,36px)] leading-[1.02] font-medium tracking-[-.04em]">{agent.mine?'Show it off':'Pass it on'}</b>
+     <p className="max-w-[44ch] text-[14.5px] text-muted-foreground">{agent.mine?'This is the card a link to your agent shows.':'This is the card a link to this agent shows.'} Post the link and the card comes with it, or download the picture and post it yourself.</p>
+     <div className="flex flex-wrap gap-2">
+      <Button asChild><a href={post} target="_blank" rel="noreferrer noopener"><FaXTwitter aria-hidden="true"/>Post on X</a></Button>
+      <Button variant="outline" disabled={saving} onClick={()=>downloadCard(card,agent.name)}><I id="download"/>{saving?'Preparing…':'Download card'}</Button>
+      <Button variant="outline" onClick={()=>copyText(link,toast.success,toast.error)}><I id="copy"/>Copy link</Button>
+     </div>
+    </div>
+   </section>;})()}
   <SiteFooter onNavigate={onNavigate}/>
  </>;
 }
