@@ -26,6 +26,7 @@ const STATUS = [
   'Holder perks: a tier raises schedules (3 / 6 / 12 / 24), scheduled runs a day (24 / 48 / 96 / 192) and delivery channels (4 / 6 / 8 / 12); the Free tier keeps the server\'s own limits',
   'Quests: eight things to try, each checked by the server and worth free credits once per account (5 by default; free credits cannot be claimed or withdrawn)',
   'Invite a friend: an invite link per account; both sides get free credits (10 by default) after the invited account completes its first run, up to 20 rewarded invitations per account',
+  'Holder reward boost for inviters: +10% of their own NVDA holder reward per invited friend who holds a reward unit through the whole hour, up to 5 friends (1.5x); paid from the same vault',
   'Share an answer: a public page /s/<id> with the agent\'s character and a preview picture, opt-in per run, removable; not for answers that used Google Search',
   'Pay-per-run marketplace in credits: 25 free starting credits, live AI 4–12 credits per run by skill, creator prices 0–500, platform fee 0% in beta, ledger with refunds',
   'Discover gallery of published agents (instructions are never shown)',

@@ -51,6 +51,7 @@ const PublicDocs=lazy(()=>import('./public-docs').then(m=>({default:m.PublicDocs
 const PublicRoadmap=lazy(()=>import('./public-docs').then(m=>({default:m.PublicRoadmap})));
 const AgentPage=lazy(()=>import('@/components/rhio/agent-page').then(m=>({default:m.AgentPage})));
 const WhalesPage=lazy(()=>import('@/components/rhio/whales-page').then(m=>({default:m.WhalesPage})));
+const ReferralPage=lazy(()=>import('@/components/rhio/referral-page').then(m=>({default:m.ReferralPage})));
 const InvitePage=lazy(()=>import('@/components/rhio/invite-page').then(m=>({default:m.InvitePage})));
 const RecipesPage=lazy(()=>import('@/components/rhio/recipes-page').then(m=>({default:m.RecipesPage})));
 const TiersPage=lazy(()=>import('@/components/rhio/tiers-page').then(m=>({default:m.TiersPage})));
@@ -400,6 +401,7 @@ export default function Studio(){
     {view==='agent'&&route.doc&&<AgentPage id={route.doc} onRun={a=>{if(!requireAuth())return;setMarketAgent(a);}} onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
     {view==='whales'&&<WhalesPage onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
     {view==='invite'&&route.doc&&<InvitePage key={route.doc} code={route.doc} auth={auth} onNavigate={(v,doc)=>navigate(v,doc)} onSignIn={()=>setSignin(true)}/>}
+    {view==='referral'&&<ReferralPage onNavigate={(v,doc)=>navigate(v,doc)}/>}
     {view==='recipes'&&<RecipesPage onNavigate={(v,doc)=>navigate(v,doc)}/>}
     {view==='tiers'&&<TiersPage onNavigate={(v,doc)=>navigate(v,doc,v==='paper'?'site':undefined)}/>}
     {view==='shared'&&route.doc&&<SharePage key={route.doc} id={route.doc} onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}

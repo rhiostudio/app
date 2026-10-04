@@ -136,6 +136,10 @@ container. Kalau perlu memicunya sendiri (Coolify → Terminal), perintahnya:
     yang masuk lewat link itu menyelesaikan run pertamanya, pengundang dan yang diundang masing-masing mendapat kredit
     GRATIS. `REFERRAL_CREDITS` = kredit per sisi (default 10, 0 = tanpa kredit), `REFERRAL_MAX` = jumlah undangan
     berhadiah per akun (default 20), `REFERRALS_ENABLED=false` mematikannya. Kredit ini tidak bisa diklaim atau ditarik.
+  - **Boost reward NVDA untuk pengundang**: tiap teman undangan yang memegang satu unit reward (1.500.000 RHIO) selama
+    satu jam penuh menaikkan reward NVDA pengundang untuk jam itu. `REFERRAL_BOOST_PERCENT` = persen per teman (default
+    10, isi 0 untuk mematikan), `REFERRAL_BOOST_FRIENDS` = jumlah teman yang dihitung (default 5, jadi maksimal 1,5x).
+    Ini menambah yang dibayar vault: akun dengan boost penuh menguras vault 50% lebih cepat untuk bagiannya.
   - **Agen menjawab di Telegram** memakai bot yang sama, tanpa env baru. Container menjalankan pembaca pesan sendiri
     (long poll), jadi jawaban mulai dalam satu-dua detik. Biarkan privacy mode bot tetap aktif (bawaan BotFather):
     di grup hanya `/ask …` yang sampai ke bot. Tiap jawaban adalah run live biasa yang memotong kredit pemilik chat.

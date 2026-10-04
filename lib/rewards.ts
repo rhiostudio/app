@@ -32,6 +32,8 @@
 import {createWalletClient,defineChain,getAddress,http,parseAbi,parseAbiItem,type Address,type Hex} from 'viem';
 import {privateKeyToAccount} from 'viem/accounts';
 import {chainClient,chainConfig,erc20Abi,fromE8,periodBounds,readMany,rewardConfig,toE8,type ChainConfig,type RewardConfig} from './chain';
+import {applyBoost} from './boost';
+import {boostData} from './referrals';
 import {buildTree} from './merkle';
 import {HttpError} from './server';
 
@@ -349,7 +351,9 @@ export async function buildPeriod(db:D1Database,{label,end}:{label?:string;end?:
  const age=priceAgeHours(price,e);
  if(age>rc.priceMaxAgeHours)throw new HttpError(409,`The ${sym} price is ${Math.floor(age)} hours older than this period (limit ${rc.priceMaxAgeHours}; stock feeds pause over weekends and US market holidays). Accrual continues and is settled when the price resumes.`);
  const priceE8=BigInt(price.price_e8);
- const {rows}=accrue(await storedTransfers(db,token,e),{start:s,end:e,perUnit:rc.perUnit,rateE8:rc.rateE8,exclude:rc.exclude});
+ // the fixed-rate accrual, then the referral boost on the inviters' own amounts (lib/boost.ts: a friend must have held
+ // a full unit through this whole period). Everything after this line, the vault check included, uses the boosted amounts.
+ const rows=applyBoost(accrue(await storedTransfers(db,token,e),{start:s,end:e,perUnit:rc.perUnit,rateE8:rc.rateE8,exclude:rc.exclude}).rows,e-s,await boostData(db));
  const paid=rows.map(r=>({...r,amount:tokensFor(r.usdE8,priceE8,dec)})).filter(r=>r.amount>0n);
  if(!paid.length)throw new HttpError(409,`Nobody held ${rc.perUnitWhole.toLocaleString('en-US')} RHIO in this period. Accrual continues.`);
  const last=await latestPublished(db);
@@ -371,7 +375,7 @@ export async function buildPeriod(db:D1Database,{label,end}:{label?:string;end?:
    JSON.stringify(Object.fromEntries(Object.entries(leaves).map(([a,v])=>[a,v.toString()]))),'built',created,usdTotal.toString(),priceE8.toString(),rc.contract,rc.token.address,c.id,prev??-1).first<{id:number}>();
  if(!ins)throw new HttpError(409,'Another period was built at the same moment. Nothing was changed; try again.');
  const id=ins.id;
- const stmts=[...paid.map(r=>db.prepare('INSERT INTO reward_allocations (period_id,address,weight,amount,balance,since,usd,units) VALUES (?,?,?,?,?,?,?,?)').bind(id,r.address,r.unitSeconds.toString(),r.amount.toString(),r.balance.toString(),null,r.usdE8.toString(),Number(r.units))),
+ const stmts=[...paid.map(r=>db.prepare('INSERT INTO reward_allocations (period_id,address,weight,amount,balance,since,usd,units,boost) VALUES (?,?,?,?,?,?,?,?,?)').bind(id,r.address,r.unitSeconds.toString(),r.amount.toString(),r.balance.toString(),null,r.usdE8.toString(),Number(r.units),r.boost)),
   // informational: the first period built after each funding
   db.prepare('UPDATE reward_fundings SET period_id=? WHERE period_id IS NULL AND ts<=?').bind(id,e)];
  for(let i=0;i<stmts.length;i+=80)await db.batch(stmts.slice(i,i+80));
@@ -387,7 +391,8 @@ export async function previewPeriod(db:D1Database){
  const e=sync.last_ts;const prev=await lastEnd(db);const s=prev&&prev<e?prev:e-rc.periodHours*HOUR;
  if(await transferCount(db,token,e)>MAX_REPLAY_TRANSFERS)throw tooManyTransfers();
  const price=await latestPrice(db);const priceE8=price?BigInt(price.price_e8):0n;
- const {rows,usdTotal}=accrue(await storedTransfers(db,token,e),{start:s,end:e,perUnit:rc.perUnit,rateE8:rc.rateE8,exclude:rc.exclude});
+ const rows=applyBoost(accrue(await storedTransfers(db,token,e),{start:s,end:e,perUnit:rc.perUnit,rateE8:rc.rateE8,exclude:rc.exclude}).rows,e-s,await boostData(db));
+ const usdTotal=rows.reduce((a,r)=>a+r.usdE8,0n);
  const tokens=rows.reduce((a,r)=>a+tokensFor(r.usdE8,priceE8,dec),0n);
  let vault=null;
  if(rc.live&&rc.token&&rc.contract){const last=await latestPublished(db);const leaves=last?parseLeaves(last.leaves):{};
@@ -611,11 +616,12 @@ export async function attest(db:D1Database,owner:string,country:string,confirm:b
     finished result is kept (never a promise: a promise made by one request must not be awaited by another). */
 let openCache:{key:string;rows:Map<string,bigint>}|null=null;
 async function openAccrual(db:D1Database,token:string,rc:RewardConfig,start:number,end:number){
- const key=[token,start,end,rc.perUnit,rc.rateE8,rc.exclude.join(',')].join('|');
+ const boost=await boostData(db);
+ const key=[token,start,end,rc.perUnit,rc.rateE8,rc.exclude.join(','),boost?`${boost.percent}:${boost.maxFriends}:${boost.pairs.length}:${boost.wallets.length}`:'-'].join('|');
  if(openCache?.key===key)return openCache.rows;
  const rows=new Map<string,bigint>();
  if(await transferCount(db,token,end)<=MAX_REPLAY_TRANSFERS)
-  for(const r of accrue(await storedTransfers(db,token,end),{start,end,perUnit:rc.perUnit,rateE8:rc.rateE8,exclude:rc.exclude}).rows)rows.set(r.address.toLowerCase(),r.usdE8);
+  for(const r of applyBoost(accrue(await storedTransfers(db,token,end),{start,end,perUnit:rc.perUnit,rateE8:rc.rateE8,exclude:rc.exclude}).rows,end-start,boost))rows.set(r.address.toLowerCase(),r.usdE8);
  openCache={key,rows};return rows;
 }
 
@@ -656,13 +662,13 @@ export async function rewardsOverview(db:D1Database,wallets:Address[]|null,owner
   fundings:fundings.results.map(f=>({tx:f.tx_hash,amount:f.amount,ts:f.ts,note:f.note,period:f.period_id})),
   periods:periods.results.map(p=>({id:p.id,label:p.label,start:p.start_ts,end:p.end_ts,usd:p.usd_total?fromE8(BigInt(p.usd_total)):null,price:p.price_e8?fromE8(BigInt(p.price_e8)):null,distributed:p.distributed,eligible:p.eligible,status:p.status,tx:p.tx_hash})),
   mine:null as null|{wallets:{address:string;balance:string;units:string;usdPerHour:string;since:number|null;excluded:boolean;accruedUsd:string;accruedTokens:string}[];
-   allocations:{period:number;label:string;end:number;address:string;amount:string;usd:string|null;units:number|null;balance:string}[];
+   allocations:{period:number;label:string;end:number;address:string;amount:string;usd:string|null;units:number|null;balance:string;boost:number|null}[];
    claims:{address:string;cumulative:string;proof:Hex[];claimed:string|null}[];period:number|null;attested:boolean;country:string|null;accruedSince:number|null;accruedUntil:number|null}};
  if(!wallets)return out;
  const qs=wallets.map(()=>'?').join(',')||"''";
  const [bal,allocs]=await Promise.all([
   db.prepare(`SELECT address,balance,since FROM holder_balances WHERE token=? AND address IN (${qs})`).bind(token,...wallets).all<{address:string;balance:string;since:number|null}>(),
-  db.prepare(`SELECT a.period_id,p.label,p.end_ts,a.address,a.amount,a.usd,a.units,a.balance FROM reward_allocations a JOIN reward_periods p ON p.id=a.period_id WHERE p.status<>'built' AND a.address IN (${qs}) ORDER BY a.period_id DESC LIMIT 60`).bind(...wallets).all<{period_id:number;label:string;end_ts:number;address:string;amount:string;usd:string|null;units:number|null;balance:string}>(),
+  db.prepare(`SELECT a.period_id,p.label,p.end_ts,a.address,a.amount,a.usd,a.units,a.balance,a.boost FROM reward_allocations a JOIN reward_periods p ON p.id=a.period_id WHERE p.status<>'built' AND a.address IN (${qs}) ORDER BY a.period_id DESC LIMIT 60`).bind(...wallets).all<{period_id:number;label:string;end_ts:number;address:string;amount:string;usd:string|null;units:number|null;balance:string;boost:number|null}>(),
  ]);
  // accrued but not yet in a root: from the end of the last period to what the recorder has read
  const from=await lastEnd(db);const until=sync?.last_ts??null;
@@ -686,7 +692,7 @@ export async function rewardsOverview(db:D1Database,wallets:Address[]|null,owner
  }
  out.mine={wallets:wallets.map(a=>{const b=byAddr.get(a.toLowerCase());const balance=BigInt(b?.balance??'0');const excluded=ex.has(a.toLowerCase());const units=excluded?0n:unitsOf(balance);const usd=accrued.get(a.toLowerCase())??0n;
    return {address:a,balance:balance.toString(),units:units.toString(),usdPerHour:fromE8(units*rc.rateE8),since:b?.since??null,excluded,accruedUsd:fromE8(usd),accruedTokens:tokensFor(usd,priceE8,dec).toString()};}),
-  allocations:allocs.results.map(x=>({period:x.period_id,label:x.label,end:x.end_ts,address:x.address,amount:x.amount,usd:x.usd?fromE8(BigInt(x.usd)):null,units:x.units,balance:x.balance})),
+  allocations:allocs.results.map(x=>({period:x.period_id,label:x.label,end:x.end_ts,address:x.address,amount:x.amount,usd:x.usd?fromE8(BigInt(x.usd)):null,units:x.units,balance:x.balance,boost:x.boost})),
   claims,period:last?.id??null,attested,country:att?.country??null,accruedSince:from??null,accruedUntil:until};
  return out;
 }

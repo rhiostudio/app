@@ -14,7 +14,8 @@ import {DashPage,EmptyState,Kpi,KpiRow,PageHeader,StatusBadge} from './parts';
 type Quest={id:string;title:string;text:string;go:string;icon:string;credits:number;done:boolean;claimed:boolean};
 type Data={signedIn:boolean;enabled:boolean;credits:number;earned:number;quests:Quest[]};
 
-type Invite={enabled:boolean;code?:string;credits?:number;max?:number;invited?:number;active?:number;earned?:number;invitedBy?:'waiting'|'paid'|null};
+type Invite={enabled:boolean;code?:string;credits?:number;max?:number;invited?:number;active?:number;earned?:number;invitedBy?:'waiting'|'paid'|null;
+ boost?:{percent:number;maxFriends:number;unit:string;holding:number;multiplier:number;token:string}|null};
 /** The account's invite link and how its invitations are doing (/api/referrals, lib/referrals.ts). */
 function InviteCard({auth}:{auth:boolean}){
  const [d,setD]=useState<Invite|null>(null);
@@ -29,6 +30,11 @@ function InviteCard({auth}:{auth:boolean}){
   <div className="flex gap-2"><Input readOnly value={link} aria-label="Your invite link" onFocus={e=>e.currentTarget.select()} className="h-9 font-mono text-[12px]"/>
    <Button variant="outline" className="h-9" onClick={()=>copyText(link,toast.success,toast.error)}><I id="copy"/>Copy</Button>
    <Button className="h-9" asChild><a href={post} target="_blank" rel="noreferrer noopener"><FaXTwitter aria-hidden="true"/>Post on X</a></Button></div>
+  {d.boost&&<div className="grid gap-1 rounded-lg border bg-secondary/40 p-3">
+   <span className="flex flex-wrap items-baseline justify-between gap-2"><b className="text-[13px] font-semibold">Holder reward boost</b>
+    <span className="font-mono text-[12px] tabular-nums"><b className="text-foreground">×{(d.boost.multiplier/100).toFixed(1)}</b> now · {d.boost.holding} of your friends hold {Number(d.boost.unit).toLocaleString('en-US')} RHIO</span></span>
+   <p className="text-[12.5px] text-muted-foreground">Every friend you invited who holds {Number(d.boost.unit).toLocaleString('en-US')} RHIO for a whole hour raises your own {d.boost.token} holder reward for that hour by {d.boost.percent}%, up to {d.boost.maxFriends} friends (×{(1+d.boost.percent*d.boost.maxFriends/100).toFixed(1)}). You need a reward of your own to boost: it multiplies what your wallets earn. It stops for a friend who no longer holds. <a href="/invite" className="underline underline-offset-4 hover:text-foreground">How it works</a></p>
+  </div>}
   {d.invitedBy&&<p className="text-xs text-muted-foreground">{d.invitedBy==='paid'?'You were invited by a friend: your welcome bonus has been added.':'You were invited by a friend: your welcome bonus arrives after your first completed run.'}</p>}
  </section>;
 }

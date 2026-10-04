@@ -11,7 +11,7 @@ type Go=(v:View,doc?:string)=>void;
 const COLS:[string,[View,string,string?][]][]=[
  ['Product',[['studio','Studio'],['discover','Discover'],['skills','Skills'],['recipes','Recipes'],['overview','Dashboard']]],
  ['Learn',[['docs','Getting started',"start"],['docs','FAQ','faq'],['paper','Whitepaper'],['roadmap','Roadmap'],['whales','Whale watch'],['tiers','Holder tiers']]],
- ['Account',[['login','Connect wallet'],['wallet','Wallet & chain'],['rewards','Holder rewards'],['profile','Profile']]],
+ ['Account',[['login','Connect wallet'],['wallet','Wallet & chain'],['rewards','Holder rewards'],['referral','Invite friends'],['profile','Profile']]],
 ];
 
 export function SocialLinks({className=''}:{className?:string}){

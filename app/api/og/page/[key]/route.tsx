@@ -10,7 +10,7 @@ import {appOrigin} from '@/lib/server';
 import {PAGE_CARDS,isPageCard,type PageCard} from '@/lib/page-cards';
 import {rewardsOverview} from '@/lib/rewards';
 import {tierRows} from '@/lib/schedules';
-import {referralConfig} from '@/lib/referrals';
+import {referralConfig,referralProgram} from '@/lib/referrals';
 import {getCharacter} from '@/lib/characters';
 
 const W=1200,H=630;
@@ -43,12 +43,17 @@ export async function GET(request:Request){
  const [img,logo]=await Promise.all([asset(`${origin}/characters/card/${getCharacter(c.character).id}.jpg`,'image/jpeg'),asset(`${origin}/brands/rhio-logo-lime.png`,'image/png')]);
  const headline=live?.headline||c.headline;
  const tiers=key==='tiers'?tierRows():null;
- if(key==='invite'){
+ if(key==='invite'||key==='referral'){
   // the same picture for every invite link: it says what an invitation gives, never who sent it
   const ref=referralConfig();const credits=ref.enabled?ref.credits:0;
   const pair=await asset(`${origin}/characters/card/pair-invite.jpg`,'image/jpeg');
-  const head=credits>0?['You are invited.','You both get',`${credits} free credits.`]:['You are invited.','Build an AI agent','with a face.'];
-  const points=credits>0?['Sign in with a new account','Run your first task',`${credits} free credits for you and your friend`]:c.lines;
+  // the program page says what the inviter gets (the holder reward boost, where it runs); an invite link says what the
+  // invited person gets
+  const prog=key==='referral'?referralProgram():null;const b=prog?.boost||null;
+  const head=key==='referral'?(b?['Invite friends.',`Earn up to ${(1+b.percent*b.maxFriends/100).toFixed(1)}x`,`${b.token} rewards.`]:credits>0?['Invite friends.','You both get',`${credits} free credits.`]:['Invite friends','to build an AI agent','with a face.'])
+   :credits>0?['You are invited.','You both get',`${credits} free credits.`]:['You are invited.','Build an AI agent','with a face.'];
+  const points=key==='referral'?(b?[`+${b.percent}% per friend who holds ${Number(b.unit)>=1e6?`${Number(b.unit)/1e6}M`:Number(b.unit).toLocaleString('en-US')} RHIO`,`Up to ${b.maxFriends} friends`,...(credits>0?[`${credits} free credits each, too`]:[])]:c.lines)
+   :credits>0?['Sign in with a new account','Run your first task',`${credits} free credits for you and your friend`]:c.lines;
   return new ImageResponse(
    <div style={{width:W,height:H,display:'flex',position:'relative',backgroundColor:'#0b110d',color:'#f4f6f1',fontFamily:'sans-serif'}}>
     {pair?<img src={pair} width={640} height={H} style={{position:'absolute',right:-30,top:0}}/>:null}

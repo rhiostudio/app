@@ -28,7 +28,7 @@ type Overview={signedIn:boolean;live:boolean;rhio:string|null;token:Token|null;c
  fundings:{tx:string;amount:string;ts:number;note:string|null;period:number|null}[];
  periods:{id:number;label:string;start:number;end:number;usd:string|null;price:string|null;distributed:string;eligible:number;status:string;tx:string|null}[];
  mine:null|{wallets:{address:string;balance:string;units:string;usdPerHour:string;since:number|null;excluded:boolean;accruedUsd:string;accruedTokens:string}[];
-  allocations:{period:number;label:string;end:number;address:string;amount:string;usd:string|null;units:number|null;balance:string}[];
+  allocations:{period:number;label:string;end:number;address:string;amount:string;usd:string|null;units:number|null;balance:string;boost?:number|null}[];
   claims:{address:string;cumulative:string;proof:string[];claimed:string|null}[];period:number|null;attested:boolean;country:string|null;accruedSince:number|null;accruedUntil:number|null}};
 
 const short=(a:string)=>`${a.slice(0,6)}…${a.slice(-4)}`;
@@ -192,7 +192,7 @@ function MyAllocations({data}:{data:Overview}){
   <h2 className="font-display text-xl font-medium tracking-[-.02em]">Your settled hours</h2>
   {!rows.length?<p className="rounded-xl border border-dashed p-4 text-[13px] text-muted-foreground">Nothing settled yet. Hold {perText(data)} RHIO; each hour that closes adds your share here.</p>
    :<div className="overflow-x-auto rounded-xl border"><Table><TableHeader><TableRow><TableHead>Period</TableHead><TableHead>Ended</TableHead><TableHead>Wallet</TableHead><TableHead className="text-right">Units</TableHead><TableHead className="text-right">USD</TableHead><TableHead className="text-right">{data.token?.symbol||'NVDA'}</TableHead></TableRow></TableHeader>
-    <TableBody>{rows.map(r=><TableRow key={r.period+r.address}><TableCell>{r.label}</TableCell><TableCell>{when(r.end)}</TableCell><TableCell className="font-mono text-xs">{short(r.address)}</TableCell><TableCell className="text-right tabular-nums">{r.units??'—'}</TableCell><TableCell className="text-right tabular-nums">{r.usd?usd(r.usd):'—'}</TableCell><TableCell className="text-right font-semibold tabular-nums">{amount(r.amount,dec,6)}</TableCell></TableRow>)}</TableBody></Table></div>}
+    <TableBody>{rows.map(r=><TableRow key={r.period+r.address}><TableCell>{r.label}</TableCell><TableCell>{when(r.end)}</TableCell><TableCell className="font-mono text-xs">{short(r.address)}</TableCell><TableCell className="text-right tabular-nums">{r.units??'—'}{r.boost&&r.boost>100?<span title="Referral boost: invited friends held a reward unit through this period" className="ml-1.5 rounded-full bg-lime/20 px-1.5 py-px font-mono text-[10px] font-semibold">×{(r.boost/100).toFixed(1)}</span>:null}</TableCell><TableCell className="text-right tabular-nums">{r.usd?usd(r.usd):'—'}</TableCell><TableCell className="text-right font-semibold tabular-nums">{amount(r.amount,dec,6)}</TableCell></TableRow>)}</TableBody></Table></div>}
  </section>;
 }
 

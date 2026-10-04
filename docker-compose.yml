@@ -81,6 +81,10 @@ services:
       REFERRALS_ENABLED: ${REFERRALS_ENABLED:-true}
       REFERRAL_CREDITS: ${REFERRAL_CREDITS:-10}
       REFERRAL_MAX: ${REFERRAL_MAX:-20}
+      # holder reward boost for inviters: percent per invited friend who holds a reward unit, and how many friends count
+      # (10 and 5: at most 1.5x; 0 turns it off). This raises what the reward vault pays.
+      REFERRAL_BOOST_PERCENT: ${REFERRAL_BOOST_PERCENT:-10}
+      REFERRAL_BOOST_FRIENDS: ${REFERRAL_BOOST_FRIENDS:-5}
       # daily SQLite backups kept under /data/backups (0 = off)
       RHIO_BACKUP_DAYS: ${RHIO_BACKUP_DAYS:-7}
       # Robinhood Chain (all optional; every chain feature stays OFF while its addresses are empty)
