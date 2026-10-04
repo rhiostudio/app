@@ -50,6 +50,8 @@ const PublicDocs=lazy(()=>import('./public-docs').then(m=>({default:m.PublicDocs
 const PublicRoadmap=lazy(()=>import('./public-docs').then(m=>({default:m.PublicRoadmap})));
 const AgentPage=lazy(()=>import('@/components/rhio/agent-page').then(m=>({default:m.AgentPage})));
 const WhalesPage=lazy(()=>import('@/components/rhio/whales-page').then(m=>({default:m.WhalesPage})));
+const SharePage=lazy(()=>import('@/components/rhio/share-page').then(m=>({default:m.SharePage})));
+const ShareAnswer=lazy(()=>import('@/components/app/share-answer').then(m=>({default:m.ShareAnswer})));
 const LoginPage=lazy(()=>import('@/components/rhio/login-page').then(m=>({default:m.LoginPage})));
 const NotFoundPage=lazy(()=>import('@/components/rhio/login-page').then(m=>({default:m.NotFoundPage})));
 const SearchPalette=lazy(()=>import('@/components/rhio/search-palette').then(m=>({default:m.SearchPalette})));
@@ -97,7 +99,7 @@ export default function Studio(){
  const [agents,setAgents]=useState<Agent[]>([]);const [runs,setRuns]=useState<Run[]>([]);const [balance,setBalance]=useState<number|null>(null);const [email,setEmail]=useState('');const [wallet,setWallet]=useState('');const [earned,setEarned]=useState(0);const [ledger,setLedger]=useState<LedgerEntry[]>([]);const [feeBps,setFeeBps]=useState(0);const [liveCost,setLiveCost]=useState(5);const [skillCosts,setSkillCosts]=useState<Record<string,number>>({});const [startCredits,setStartCredits]=useState(25);const [refill,setRefill]=useState<FreeRefill|null>(null);const [liveToday,setLiveToday]=useState<LiveToday|null>(null);const [trials,setTrials]=useState<Trials|null>(null);const [ready,setReady]=useState(false);const [auth,setAuth]=useState(true);const [loading,setLoading]=useState(true);const [loadError,setLoadError]=useState('');const [busy,setBusy]=useState(false);
  const [market,setMarket]=useState<MarketAgent[]|null>(null);const [marketAgent,setMarketAgent]=useState<MarketAgent|null>(null);const [priceDraft,setPriceDraft]=useState<Record<string,string>>({});
  const [query,setQuery]=useState('');const [mode,setMode]=useState<SearchMode>('title');const [filter,setFilter]=useState('All');const [agentFilter,setAgentFilter]=useState<'all'|'published'|'private'|'archived'>('all');const [publishFor,setPublishFor]=useState<Agent|null>(null);const [importOpen,setImportOpen]=useState(false);const [sort,setSort]=useState<'popular'|'cheap'|'new'>('popular');const [runFilter,setRunFilter]=useState<'all'|'complete'|'failed'>('all');
- const [share,setShare]=useState(false);const [settings,setSettings]=useState(false);const [signin,setSignin]=useState(false);const [runDetail,setRunDetail]=useState<Run|null>(null);const [embed,setEmbed]=useState(false);const [scan,setScan]=useState(false);const [palette,setPalette]=useState(false);
+ const [share,setShare]=useState(false);const [settings,setSettings]=useState(false);const [signin,setSignin]=useState(false);const [runDetail,setRunDetail]=useState<Run|null>(null);const [shares,setShares]=useState<Record<string,{id:string;task:boolean}>>({});const [embed,setEmbed]=useState(false);const [scan,setScan]=useState(false);const [palette,setPalette]=useState(false);
  async function refresh(){setLoading(true);setLoadError('');try{
   // ask who is signed in first so signed-out visitors do not trigger a 401 on every page
   const me=await api('/api/auth/me').catch(()=>({signedIn:true}));if(!me.signedIn){setAuth(false);setBalance(null);setAgents([]);setRuns([]);setWallet('');setEmail('');return;}
@@ -105,7 +107,7 @@ export default function Studio(){
   // first load only: a returning creator lands on the agent edited last instead of a blank copy (Run would save the
   // blank one as a duplicate). An edited draft, a shared #agent= link or "New" is never replaced.
   if(!restored.current){restored.current=true;const last=(d.agents as Agent[]).filter(a=>!a.archived).sort((a,b)=>String(b.updated||'').localeCompare(String(a.updated||'')))[0];
-   if(last)setDraft(cur=>!cur.id&&sameConfig(cur,starter)?{...last}:cur);}setRuns(d.runs);setBalance(d.balance);setEarned(d.earned||0);setEmail(d.email||'');setWallet(d.wallet||'');setLedger(d.ledger||[]);setFeeBps(d.feeBps||0);setLiveCost(typeof d.liveCost==='number'?d.liveCost:5);setSkillCosts(d.skillCosts||{});if(typeof d.startingCredits==='number')setStartCredits(d.startingCredits);setRefill(d.freeRefill||null);setLiveToday(d.liveToday||null);setSpent(d.spent||0);setTrials(d.trials||null);setReady(d.aiReady);setAuth(true);}catch(e:any){setAuth(e.status!==401);if(e.status!==401)setLoadError(e.message);}finally{setLoading(false)}}
+   if(last)setDraft(cur=>!cur.id&&sameConfig(cur,starter)?{...last}:cur);}setRuns(d.runs);setShares(d.shares||{});setBalance(d.balance);setEarned(d.earned||0);setEmail(d.email||'');setWallet(d.wallet||'');setLedger(d.ledger||[]);setFeeBps(d.feeBps||0);setLiveCost(typeof d.liveCost==='number'?d.liveCost:5);setSkillCosts(d.skillCosts||{});if(typeof d.startingCredits==='number')setStartCredits(d.startingCredits);setRefill(d.freeRefill||null);setLiveToday(d.liveToday||null);setSpent(d.spent||0);setTrials(d.trials||null);setReady(d.aiReady);setAuth(true);}catch(e:any){setAuth(e.status!==401);if(e.status!==401)setLoadError(e.message);}finally{setLoading(false)}}
  useEffect(()=>{refresh();
   try{/* a fixed message: the text of a URL parameter is never shown as if the site had written it */if(new URLSearchParams(location.search).has('auth_error')){toast.error('Sign-in did not complete. Try again.');history.replaceState(null,'',location.pathname+location.hash);}}catch{}
   try{const hash=location.hash;if(hash.startsWith('#agent=')){if(hash.length>12000)throw new Error();const raw=JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(hash.slice(7)),c=>c.charCodeAt(0))));const isEmbed=new URLSearchParams(location.search).get('view')==='embed';setEmbed(isEmbed);if(!isEmbed&&parsePath(location.pathname).view!=='studio')router.replace('/dashboard/studio');agentSchema().then(sc=>{const data=sc.parse(raw);delete data.id;setDraft(data);toast.success('Agent configuration loaded');}).catch(()=>toast.error('This agent link is invalid.'));}
@@ -242,7 +244,7 @@ export default function Studio(){
         <Mono className="mt-3">Planned</Mono>
         {skillCatalog.filter(s=>s.planned).map(s=><SkillRow key={s.id} muted icon={SKILL_ICON[s.icon]||'globe'} name={s.name} tag="planned" desc={s.description}/>)}
        </TabsContent>
-       <TabsContent value="run" className="grid gap-4"><RunPanel target={{id:draft.id,name:draft.name,skills:draft.skills,price:0,mine:true}} ready={ready} liveCost={liveCost} skillCosts={skillCosts} liveToday={liveToday} balance={balance} trials={trials} auth={auth} ensureSaved={ensureCurrent} onDone={refresh} onSignIn={()=>setSignin(true)}/></TabsContent>
+       <TabsContent value="run" className="grid gap-4"><RunPanel target={{id:draft.id,name:draft.name,skills:draft.skills,price:0,mine:true}} ready={ready} liveCost={liveCost} skillCosts={skillCosts} liveToday={liveToday} balance={balance} trials={trials} auth={auth} ensureSaved={ensureCurrent} onDone={refresh} onSignIn={()=>setSignin(true)} onShare={setRunDetail}/></TabsContent>
        <TabsContent value="automate" className="grid gap-4"><Suspense fallback={<Loading/>}><AgentSchedules auth={auth} agent={draft} agents={agents} balance={balance} onSignIn={()=>setSignin(true)} ensureSaved={ensureCurrent}/></Suspense></TabsContent>
       </div>
      </Tabs>
@@ -387,6 +389,7 @@ export default function Studio(){
     {view==='login'&&<LoginPage auth={auth} onDone={()=>{refresh();const n=new URLSearchParams(location.search).get('next');router.replace(n&&n.startsWith('/dashboard')?n:'/dashboard');}} onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
     {view==='agent'&&route.doc&&<AgentPage id={route.doc} onRun={a=>{if(!requireAuth())return;setMarketAgent(a);}} onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
     {view==='whales'&&<WhalesPage onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
+    {view==='shared'&&route.doc&&<SharePage key={route.doc} id={route.doc} onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
     {view==='notfound'&&<NotFoundPage onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
    </Suspense>
 
@@ -394,7 +397,7 @@ export default function Studio(){
   </>}
   {palette&&<Suspense fallback={null}><SearchPalette open={palette} onOpenChange={setPalette} items={paletteItems} suggestions={suggestions}/></Suspense>}
   <Modal open={!!marketAgent} onClose={()=>setMarketAgent(null)} title={marketAgent?`Work with ${marketAgent.name}`:''} description={marketAgent?`${marketAgent.mine?'Your agent: no creator price':marketAgent.price===0?'No creator price':`${marketAgent.price} credits per run to the creator`} · ${marketAgent.skills.map(skillName).join(', ')}`:''}>
-   {marketAgent&&<div className="grid gap-4"><RunPanel target={{id:marketAgent.id,name:marketAgent.name,skills:marketAgent.skills,price:marketAgent.price,mine:!!marketAgent.mine}} ready={ready} liveCost={liveCost} skillCosts={skillCosts} liveToday={liveToday} balance={balance} trials={trials} auth={auth} ensureSaved={async()=>marketAgent.id} onDone={()=>{refresh();loadMarket();}} onSignIn={()=>setSignin(true)}/></div>}
+   {marketAgent&&<div className="grid gap-4"><RunPanel target={{id:marketAgent.id,name:marketAgent.name,skills:marketAgent.skills,price:marketAgent.price,mine:!!marketAgent.mine}} ready={ready} liveCost={liveCost} skillCosts={skillCosts} liveToday={liveToday} balance={balance} trials={trials} auth={auth} ensureSaved={async()=>marketAgent.id} onDone={()=>{refresh();loadMarket();}} onSignIn={()=>setSignin(true)} onShare={setRunDetail}/></div>}
   </Modal>
   <Modal open={share} onClose={()=>setShare(false)} title="Take your agent with you" description="Share its configuration or embed a character preview. The link contains the name, instructions and skills.">
    <div className="grid gap-2"><FieldLabel>Configuration link</FieldLabel><Textarea readOnly value={shareURL} rows={3} className="min-h-[70px] font-mono text-xs"/></div>
@@ -411,6 +414,7 @@ export default function Studio(){
      <div className="grid gap-1.5"><span className="font-mono text-[10.5px] tracking-[.08em] text-muted-foreground uppercase">Task</span><p className="rounded-lg border bg-secondary/50 p-3 text-sm">{runDetail.prompt}</p></div>
      <div className="grid gap-1.5"><span className="font-mono text-[10.5px] tracking-[.08em] text-muted-foreground uppercase">Output</span><div className="rounded-lg border p-3"><TextOut text={runDetail.output||'This task has no output yet.'}/></div></div>
      <div className="flex gap-2"><Button variant="outline" onClick={()=>copyText(outputText(runDetail.output),toast.success,toast.error)}><I id="copy"/>Copy</Button><Button variant="outline" onClick={()=>download('rhio-result.txt',outputText(runDetail.output),'text/plain')}><I id="download"/>Download</Button></div>
+     <Suspense fallback={null}><ShareAnswer key={runDetail.id} run={runDetail} share={shares[runDetail.id]||null} onChange={s=>setShares(cur=>{const next={...cur};if(s)next[runDetail.id]=s;else delete next[runDetail.id];return next;})}/></Suspense>
     </div>
    </>}</SheetContent>
   </Sheet>
@@ -485,7 +489,7 @@ type FreeRefill={credits:number;hours:number;next:string|null};
 const clock=(iso:string)=>new Date(iso).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
 /** Live AI price range across skills, e.g. "4–12" (a single number when every skill costs the same). */
 function liveRange(costs:Record<string,number>,fallback:number){const v=Object.values(costs);if(!v.length)return String(fallback);const lo=Math.min(...v),hi=Math.max(...v);return lo===hi?String(lo):`${lo}–${hi}`;}
-function RunPanel({target,ready,liveCost,skillCosts,liveToday,balance,trials,auth,ensureSaved,onDone,onSignIn}:{target:RunTarget;ready:boolean;liveCost:number;skillCosts:Record<string,number>;liveToday:LiveToday|null;balance:number|null;trials:Trials|null;auth:boolean;ensureSaved:()=>Promise<string|null>;onDone:()=>void;onSignIn:()=>void}){
+function RunPanel({target,ready,liveCost,skillCosts,liveToday,balance,trials,auth,ensureSaved,onDone,onSignIn,onShare}:{onShare?:(r:Run)=>void;target:RunTarget;ready:boolean;liveCost:number;skillCosts:Record<string,number>;liveToday:LiveToday|null;balance:number|null;trials:Trials|null;auth:boolean;ensureSaved:()=>Promise<string|null>;onDone:()=>void;onSignIn:()=>void}){
  const runnable=target.skills.filter(isOpenSkill) as typeof target.skills;const [skillPick,setSkill]=useState(runnable[0]);const skill=runnable.includes(skillPick)?skillPick:runnable[0];const [mode,setMode]=useState<'sample'|'live'>('sample');const [task,setTask]=useState('');const [running,setRunning]=useState(false);const [result,setResult]=useState<Run|null>(null);
  const cost=(mode==='sample'?5:skillCosts[skill]??liveCost)+(target.mine?0:target.price);const short=balance!==null&&cost>balance;const left=skill?triesLeft(trials,skill):null;const out=auth&&left===0;
  const timer=useRef(0);
@@ -504,7 +508,7 @@ function RunPanel({target,ready,liveCost,skillCosts,liveToday,balance,trials,aut
   <div className="flex flex-wrap items-center gap-3"><Button className="h-10 flex-1" disabled={running||!skill||task.trim().length<3||short||out} onClick={run}>{running?'Working…':out?`No tries left for ${skillName(skill)}`:`Run ${skillName(skill)}`}</Button><span className="text-xs text-muted-foreground">{cost} credits{target.mine?'':` · ${target.price} to the creator`}{short?' · not enough credits':''}{auth&&left!==null&&trials?` · ${left} of ${trials.limit} tries left`:''}</span></div>
   {out&&<p className="text-[12.5px] text-muted-foreground">You have used every try of {skillName(skill)} in this preview. Pick another skill above, or equip one in the Skills tab.</p>}
   <Card className="gap-0 rounded-xl p-0 shadow-none">
-   <div className="flex items-center justify-between gap-2 border-b px-3 py-2"><Mono className="text-[10px]">{running?'Working':result?(result.mode==='sample'?'Workflow sample':'AI output'):'Output'}</Mono>{result&&<div className="flex gap-1"><Button size="sm" variant="ghost" onClick={()=>copyText(outputText(result.output),toast.success,toast.error)}><I id="copy"/>Copy</Button><Button size="icon-sm" variant="ghost" aria-label="Download" onClick={()=>download('rhio-task.txt',outputText(result.output),'text/plain')}><I id="download"/></Button></div>}</div>
+   <div className="flex items-center justify-between gap-2 border-b px-3 py-2"><Mono className="text-[10px]">{running?'Working':result?(result.mode==='sample'?'Workflow sample':'AI output'):'Output'}</Mono>{result&&<div className="flex gap-1"><Button size="sm" variant="ghost" onClick={()=>copyText(outputText(result.output),toast.success,toast.error)}><I id="copy"/>Copy</Button><Button size="icon-sm" variant="ghost" aria-label="Download" onClick={()=>download('rhio-task.txt',outputText(result.output),'text/plain')}><I id="download"/></Button>{onShare&&result.status==='complete'&&<Button size="sm" variant="ghost" onClick={()=>onShare(result)}><I id="share"/>Share</Button>}</div>}</div>
    <div className="min-h-24 p-4">{running?<div className="flex items-center gap-2 text-sm text-muted-foreground">{[0,1,2].map(k=><i key={k} className="size-2 animate-pulse rounded-lg bg-lime" style={{animationDelay:`${k*.15}s`}}/>)} {target.name} is working…</div>:result?<TextOut text={result.output}/>:<p className="text-sm text-muted-foreground">Results appear here. The character works on the stage while the task runs.</p>}</div>
   </Card>
  </>;

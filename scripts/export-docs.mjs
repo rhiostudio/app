@@ -22,6 +22,7 @@ const STATUS = [
   'Whale watch: public page /whales and a skill, both from the server\'s record of the RHIO token (biggest transfers of the last 24 hours, new holders, biggest holders); no prices, no owner names',
   'All 10 skills open on a server-side AI provider; runs cost credits, and the operator can cap tries per skill (a failed run gives the try back)',
   'Save, duplicate, archive, export / import JSON, share links, task history',
+  'Share an answer: a public page /s/<id> with the agent\'s character and a preview picture, opt-in per run, removable; not for answers that used Google Search',
   'Pay-per-run marketplace in credits: 25 free starting credits, live AI 4–12 credits per run by skill, creator prices 0–500, platform fee 0% in beta, ledger with refunds',
   'Discover gallery of published agents (instructions are never shown)',
   'Schedules: an agent runs a skill 1–24 times a day, paid per run with the skill\'s live price (at least 5 credits), max 3 schedules / 24 runs a day',
