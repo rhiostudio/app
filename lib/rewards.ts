@@ -432,6 +432,45 @@ export async function watchRoots(db:D1Database){
  }
  return {checked};
 }
+/** Refills of the reward vault, read from the chain: every transfer of the reward token to the vault, in settled
+    blocks. A refill used to appear on the page only after the operator registered its transaction (recordFunding); one
+    sent straight from a wallet was missing. The first call finds the block the vault was deployed in (binary search on
+    its code; needs the archive RPC, else it looks back FUND_LOOKBACK blocks) and stores it; later calls read forward
+    from there, a few ranges at a time, then follow the head. The cursor is a row of reward_watch under the key
+    "funds:<vault>" (watchRoots only reads the row keyed by the vault's own address). Nothing here moves or decides
+    money: the list is what the page shows under "Vault refills". */
+const FUND_LOOKBACK=5_000_000;let fundStep=100_000;
+export async function scanFundings(db:D1Database,{ranges=8}:{ranges?:number}={}){
+ const c=chainConfig();const rc=rewardConfig(c);if(!rc.contract||!rc.token)return null;
+ const vault=rc.contract,token=rc.token.address,key=`funds:${vault.toLowerCase()}`;
+ const logs=chainClient(c,{logs:true});
+ const head=Number((await logs.getBlock({blockTag:blockTag(c)})).number);
+ const save=(block:number)=>db.prepare('INSERT INTO reward_watch (contract,last_block,alert,updated) VALUES (?,?,NULL,?) ON CONFLICT(contract) DO UPDATE SET last_block=excluded.last_block,updated=excluded.updated').bind(key,block,new Date().toISOString()).run();
+ const w=await db.prepare('SELECT last_block FROM reward_watch WHERE contract=?').bind(key).first<{last_block:number}>();
+ if(!w){
+  let first=Math.max(0,head-FUND_LOOKBACK);
+  try{
+   const state=chainClient(c);const has=async(b:number)=>{const code=await state.getCode({address:vault,blockNumber:BigInt(b)});return !!code&&code!=='0x';};
+   if(await has(head)){let lo=0,hi=head;while(lo<hi){const mid=Math.floor((lo+hi)/2);if(await has(mid))hi=mid;else lo=mid+1;}first=lo;}
+  }catch{/* no archive state on this RPC: the fixed look-back stands */}
+  await save(first-1);return {recorded:0,from:first,head,caughtUp:false};
+ }
+ let from=w.last_block+1,recorded=0;
+ for(let i=0;i<ranges&&from<=head;i++){
+  const to=Math.min(from+fundStep-1,head);
+  let found;try{found=await logs.getLogs({address:token,event:erc20Abi[0],args:{to:vault},fromBlock:BigInt(from),toBlock:BigInt(to)});}
+  catch(e){if(fundStep<=2000)throw e;fundStep=Math.floor(fundStep/2);continue;}
+  for(const l of found){
+   if(!l.transactionHash||l.args.value===undefined||!l.args.from)continue;
+   const ts=Number((await logs.getBlock({blockNumber:l.blockNumber})).timestamp);
+   const r=await db.prepare('INSERT OR IGNORE INTO reward_fundings (tx_hash,log_index,token,from_addr,amount,block,ts,note,period_id,created) VALUES (?,?,?,?,?,?,?,NULL,NULL,?)')
+    .bind(l.transactionHash.toLowerCase(),l.logIndex,token,getAddress(l.args.from),l.args.value.toString(),Number(l.blockNumber),ts,new Date().toISOString()).run();
+   recorded+=r.meta.changes||0;
+  }
+  await save(to);from=to+1;
+ }
+ return {recorded,upTo:from-1,head,caughtUp:from>head};
+}
 /** Operator: clears a watchRoots alert after the vault was checked (events are read again from the current block). */
 export async function ackRootAlert(db:D1Database){
  const c=chainConfig();const rc=rewardConfig(c);if(!rc.contract)throw new HttpError(503,'Holder rewards are not switched on.');
@@ -614,7 +653,7 @@ export async function rewardsOverview(db:D1Database,wallets:Address[]|null,owner
    allocatedUsd:fromE8(done.reduce((a,p)=>a+BigInt(p.usd_total??'0'),0n)),periods:done.length,units:totalUnits.toString(),hourlyUsd:fromE8(hourlyUsd),
    hourlyTokens:tokensFor(hourlyUsd,priceE8,dec).toString()},
   vault,
-  fundings:fundings.results.map(f=>({tx:f.tx_hash,from:f.from_addr,amount:f.amount,ts:f.ts,note:f.note,period:f.period_id})),
+  fundings:fundings.results.map(f=>({tx:f.tx_hash,amount:f.amount,ts:f.ts,note:f.note,period:f.period_id})),
   periods:periods.results.map(p=>({id:p.id,label:p.label,start:p.start_ts,end:p.end_ts,usd:p.usd_total?fromE8(BigInt(p.usd_total)):null,price:p.price_e8?fromE8(BigInt(p.price_e8)):null,distributed:p.distributed,eligible:p.eligible,status:p.status,tx:p.tx_hash})),
   mine:null as null|{wallets:{address:string;balance:string;units:string;usdPerHour:string;since:number|null;excluded:boolean;accruedUsd:string;accruedTokens:string}[];
    allocations:{period:number;label:string;end:number;address:string;amount:string;usd:string|null;units:number|null;balance:string}[];

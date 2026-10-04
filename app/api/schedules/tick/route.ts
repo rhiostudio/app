@@ -7,7 +7,7 @@ import {env} from 'cloudflare:workers';
 import {failure,HttpError,safeMessage} from '@/lib/server';
 import {runDue,tickAllowed} from '@/lib/schedules';
 import {periodBounds,rewardConfig} from '@/lib/chain';
-import {autoRewards,syncHolders} from '@/lib/rewards';
+import {autoRewards,scanFundings,syncHolders} from '@/lib/rewards';
 import {sweepStuckRuns} from '@/lib/runs';
 import {settlePendingTopups} from '@/lib/topups';
 import {chatActive,pollTelegram,readerFresh,telegramWaiting} from '@/lib/notify';
@@ -44,6 +44,8 @@ export async function POST(request:Request){try{
   if(!s||Date.now()-Date.parse(s.updated)>(behind?45e3:120e3))holders=await syncHolders(db,{maxBlocks:50_000}).catch(fail);
  }
  const rewards=await autoRewards(db,now).catch(fail);
+ // refills of the reward vault are read from the chain (shown on the rewards page; nothing depends on them)
+ if(rc.live)await scanFundings(db).catch(()=>null);
  if(new Date().getUTCMinutes()%10===3)await housekeeping(db,new Date()).catch(()=>null);
  // someone is connecting a Telegram chat, or an agent answers in one: read the bot's messages here when no reader
  // does it (the container runs one, POST /api/notify/poll; other hosts get an answer within a minute this way)

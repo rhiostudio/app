@@ -25,7 +25,7 @@ type Overview={signedIn:boolean;live:boolean;rhio:string|null;token:Token|null;c
  recorder:{lastBlock:number;lastTs:number;updated:string;holders:number;earners:number}|null;
  totals:{funded:string;allocated:string;allocatedUsd:string;periods:number;units:string;hourlyUsd:string;hourlyTokens:string}|null;
  vault:{balance:string;owed:string;status:'funded'|'low'|'short'}|null;
- fundings:{tx:string;from:string;amount:string;ts:number;note:string|null;period:number|null}[];
+ fundings:{tx:string;amount:string;ts:number;note:string|null;period:number|null}[];
  periods:{id:number;label:string;start:number;end:number;usd:string|null;price:string|null;distributed:string;eligible:number;status:string;tx:string|null}[];
  mine:null|{wallets:{address:string;balance:string;units:string;usdPerHour:string;since:number|null;excluded:boolean;accruedUsd:string;accruedTokens:string}[];
   allocations:{period:number;label:string;end:number;address:string;amount:string;usd:string|null;units:number|null;balance:string}[];
@@ -37,7 +37,6 @@ const num=(v:string)=>{const n=Number(String(v).replace(/[, _]/g,''));return Num
 const fmt=(n:number,d=2)=>n.toLocaleString('en-US',{maximumFractionDigits:d});
 const usd=(v:string|number|null|undefined,d=4)=>`$${fmt(Number(v??0),d)}`;
 const when=(ts:number)=>new Date(ts*1000).toLocaleString(undefined,{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
-const day=(ts:number)=>new Date(ts*1000).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'});
 const closeLabel=(ts:number)=>new Date(ts*1000).toLocaleString(undefined,{weekday:'short',hour:'2-digit',minute:'2-digit'});
 const walletError=(e:any)=>e?.code===4001?'You cancelled the request in your wallet.':(e?.shortMessage||e?.message||'The wallet request failed.');
 const perText=(d:Overview|null)=>Number(d?.rhioPerUnit||1_500_000).toLocaleString('en-US');
@@ -197,24 +196,44 @@ function MyAllocations({data}:{data:Overview}){
  </section>;
 }
 
+/** At most five rows of a list, with a small switch to see the rest. */
+function useFirst<T>(rows:T[],n=5){
+ const [all,setAll]=useState(false);
+ const more=rows.length>n?<button type="button" onClick={()=>setAll(a=>!a)} className="justify-self-start font-mono text-[11px] tracking-[.04em] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">{all?'Show fewer':`Show all ${rows.length}`}</button>:null;
+ return {shown:all?rows:rows.slice(0,n),more};
+}
+const clock=(ts:number)=>new Date(ts*1000).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit',hour12:false});
+const dayShort=(ts:number)=>new Date(ts*1000).toLocaleDateString(undefined,{day:'numeric',month:'short'});
+/** Money with exactly two decimals, so a column lines up. */
+const usd2=(v:string|number)=>`$${Number(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+const fixed=(raw:string|bigint,dec:number,digits:number)=>Number(formatUnits(BigInt(raw),dec)).toLocaleString('en-US',{minimumFractionDigits:digits,maximumFractionDigits:digits});
+
 function Fundings({data}:{data:Overview}){
- const dec=data.token?.decimals??18;
+ const dec=data.token?.decimals??18,sym=data.token?.symbol||'NVDA';const {shown,more}=useFirst(data.fundings);
+ const total=data.totals?.funded&&data.totals.funded!=='0'?data.totals.funded:null;const price=Number(data.price?.usd||0);
  return <section className="grid content-start gap-3">
-  <h2 className="font-display text-xl font-medium tracking-[-.02em]">Vault refills</h2>
-  {!data.fundings.length?<p className="rounded-xl border border-dashed p-4 text-[13px] text-muted-foreground">No refill recorded yet.</p>
-   :<div className="overflow-x-auto rounded-xl border"><Table><TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Transaction</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
-    <TableBody>{data.fundings.map(f=><TableRow key={f.tx+f.ts}><TableCell>{day(f.ts)}</TableCell><TableCell><a className="font-mono text-xs underline underline-offset-2" href={`${data.explorer}/tx/${f.tx}`} target="_blank" rel="noreferrer">{short(f.tx)}</a></TableCell><TableCell className="text-right tabular-nums">{amount(f.amount,dec,4)} {data.token?.symbol}</TableCell></TableRow>)}</TableBody></Table></div>}
+  <div className="flex flex-wrap items-baseline justify-between gap-2"><h2 className="font-display text-xl font-medium tracking-[-.02em]">Vault refills</h2>
+   {total&&<span className="text-[12.5px] text-muted-foreground tabular-nums">{fixed(total,dec,4)} {sym} in {data.fundings.length} {data.fundings.length===1?'refill':'refills'}</span>}</div>
+  {!data.fundings.length?<p className="rounded-xl border border-dashed p-4 text-[13px] text-muted-foreground">No refill has been read from the chain yet.</p>
+   :<div className="overflow-hidden rounded-xl border"><Table className="table-fixed"><TableHeader><TableRow><TableHead className="w-[38%]">Date</TableHead><TableHead className="text-right">{sym}</TableHead><TableHead className="w-[26%] text-right">Proof</TableHead></TableRow></TableHeader>
+    <TableBody>{shown.map(f=><TableRow key={f.tx+f.ts+f.amount}><TableCell><span className="grid"><span>{dayShort(f.ts)}</span><span className="text-[11px] text-muted-foreground tabular-nums">{clock(f.ts)}</span></span></TableCell>
+     <TableCell className="text-right"><span className="grid"><span className="font-medium tabular-nums">{fixed(f.amount,dec,4)}</span>{price>0&&<span className="text-[11px] text-muted-foreground tabular-nums">about {usd2(Number(formatUnits(BigInt(f.amount),dec))*price)}</span>}</span></TableCell>
+     <TableCell className="text-right"><a className="font-mono text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground" href={`${data.explorer}/tx/${f.tx}`} target="_blank" rel="noreferrer noopener">tx ↗</a></TableCell></TableRow>)}</TableBody></Table></div>}
+  {more}
  </section>;
 }
 
 function Periods({data}:{data:Overview}){
- const dec=data.token?.decimals??18;
+ const dec=data.token?.decimals??18,sym=data.token?.symbol||'NVDA';const {shown,more}=useFirst(data.periods);
  return <section className="grid content-start gap-3">
-  <h2 className="font-display text-xl font-medium tracking-[-.02em]">Settled periods</h2>
+  <div className="flex flex-wrap items-baseline justify-between gap-2"><h2 className="font-display text-xl font-medium tracking-[-.02em]">Settled periods</h2>
+   {data.price&&<span className="text-[12.5px] text-muted-foreground tabular-nums">{sym} at {usd2(data.price.usd)}</span>}</div>
   {!data.periods.length?<p className="rounded-xl border border-dashed p-4 text-[13px] text-muted-foreground">No periods yet.</p>
-   :<div className="overflow-x-auto rounded-xl border"><Table><TableHeader><TableRow><TableHead>Period</TableHead><TableHead className="text-right">USD</TableHead><TableHead className="text-right">Price</TableHead><TableHead className="text-right">{data.token?.symbol||'NVDA'}</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
-    <TableBody>{data.periods.map(p=><TableRow key={p.id}><TableCell><span className="grid"><span>{p.label}</span><span className="text-[11px] text-muted-foreground">{when(p.start)} – {when(p.end)} · {p.eligible} holders</span></span></TableCell><TableCell className="text-right tabular-nums">{p.usd?usd(p.usd):'—'}</TableCell><TableCell className="text-right tabular-nums">{p.price?usd(p.price,2):'—'}</TableCell><TableCell className="text-right tabular-nums">{amount(p.distributed,dec,6)}</TableCell>
-     <TableCell><StatusBadge kind={p.status==='published'?'live':p.status==='built'?'pending':'private'}>{p.status==='superseded'?'included':p.status==='built'?'waiting for root':p.status}</StatusBadge></TableCell></TableRow>)}</TableBody></Table></div>}
+   :<div className="overflow-hidden rounded-xl border"><Table className="table-fixed"><TableHeader><TableRow><TableHead className="w-[38%]">Period</TableHead><TableHead className="text-right">Paid</TableHead><TableHead className="w-[26%] text-right">Status</TableHead></TableRow></TableHeader>
+    <TableBody>{shown.map(p=><TableRow key={p.id}><TableCell><span className="grid"><span className="tabular-nums">{dayShort(p.end)}, {clock(p.start)} – {clock(p.end)}</span><span className="text-[11px] text-muted-foreground">{p.eligible} {p.eligible===1?'holder':'holders'}</span></span></TableCell>
+     <TableCell className="text-right"><span className="grid"><span className="font-medium tabular-nums">{fixed(p.distributed,dec,6)} {sym}</span><span className="text-[11px] text-muted-foreground tabular-nums">{p.usd?usd2(p.usd):'—'}</span></span></TableCell>
+     <TableCell className="text-right"><StatusBadge kind={p.status==='published'?'live':p.status==='built'?'pending':'private'}>{p.status==='superseded'?'included':p.status==='built'?'waiting for root':p.status}</StatusBadge></TableCell></TableRow>)}</TableBody></Table></div>}
+  {more}
  </section>;
 }
 
