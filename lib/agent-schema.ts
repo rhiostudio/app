@@ -7,7 +7,7 @@ const oneOf=(key:keyof typeof wardrobe)=>{const values=(wardrobe[key] as [string
 export const appearanceSchema=z.object({outfit:color,accent:color,skinTone:color,hair:color,accessory:z.enum(accessories),finish:z.enum(['Matte','Gloss'])});
 /** Full 3D look (outfit system). Every field is optional and merged onto the character preset. */
 export const lookSchema=z.object({
- kind:z.enum(['human','companion']),model:z.enum(['scout','maker','guardian']).nullable(),build:oneOf('build'),headStyle:z.enum(['human','screen']),
+ kind:z.enum(['human','companion']),model:z.enum(['scout','maker','guardian']).nullable(),body:oneOf('body'),build:oneOf('build'),headStyle:z.enum(['human','screen']),
  skin:color,eyes:color,facial:oneOf('facial'),hair:z.object({style:oneOf('hair'),color}),
  top:z.object({type:oneOf('top'),color,accent:color}),bottom:z.object({type:oneOf('bottom'),color}),legwear:oneOf('legwear'),
  shoes:z.object({type:oneOf('shoes'),color}),head:oneOf('head'),face:oneOf('face'),back:oneOf('back'),accColor:color,glow:color,finish:z.enum(['matte','gloss']),

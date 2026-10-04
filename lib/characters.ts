@@ -17,7 +17,7 @@ export type Appearance={outfit:string;accent:string;skinTone:string;hair:string;
 export const defaultAppearance:Appearance={outfit:'#252b31',accent:'#c8ff24',skinTone:'#bd855d',hair:'#261e1c',accessory:'None',finish:'Matte'};
 
 function clone<T>(v:T):T{return JSON.parse(JSON.stringify(v));}
-const DEFAULT_LOOK:Look={kind:'human',model:null,build:'regular',headStyle:'human',skin:'#c98e66',eyes:'#4a3526',facial:'none',hair:{style:'short',color:'#2b201c'},top:{type:'tee',color:'#2b3a33',accent:'#c8ff24'},bottom:{type:'pants',color:'#1f2528'},legwear:'bare',shoes:{type:'sneaker',color:'#e9ece4'},head:'none',face:'none',back:'none',accColor:'#20262a',glow:'#c8ff24',finish:'matte'};
+const DEFAULT_LOOK:Look={kind:'human',model:null,body:'masculine',build:'regular',headStyle:'human',skin:'#c98e66',eyes:'#4a3526',facial:'none',hair:{style:'short',color:'#2b201c'},top:{type:'tee',color:'#2b3a33',accent:'#c8ff24'},bottom:{type:'pants',color:'#1f2528'},legwear:'bare',shoes:{type:'sneaker',color:'#e9ece4'},head:'none',face:'none',back:'none',accColor:'#20262a',glow:'#c8ff24',finish:'matte'};
 function merge(base:Look,over?:Partial<Look>|null):Look{
  const out=clone(base) as unknown as Record<string,unknown>;if(!over)return out as unknown as Look;
  for(const [k,v] of Object.entries(over)){if(v&&typeof v==='object'&&!Array.isArray(v))out[k]={...((out[k] as object)||{}),...v};else if(v!==undefined)out[k]=v;}

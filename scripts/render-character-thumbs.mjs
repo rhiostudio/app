@@ -25,10 +25,10 @@ http.createServer((req,res)=>{
  });
 }).listen(PORT,'127.0.0.1',()=>console.log(`Save server on http://127.0.0.1:${PORT}. Paste this in the console of http://localhost:5173:
 
-(async()=>{const THREE=await import('/node_modules/three/build/three.module.js');const {createEngine}=await import('/lib/rhio3d/engine.js');
-const {characters,lookFor}=await import('/lib/characters.ts');const R=createEngine(THREE);
+(async()=>{const {loadEngine}=await import('/app/avatar.tsx');const R=await loadEngine();
+const {characters,lookFor}=await import('/lib/characters.ts');
 const out=document.createElement('canvas');out.width=450;out.height=600;const g=out.getContext('2d');g.imageSmoothingQuality='high';
-for(const c of characters){const img=new Image();img.src=R.renderThumb(lookFor(c.id),600,800);await img.decode();
+for(const c of characters){const img=await createImageBitmap(await (await fetch(await R.renderThumbAsync(lookFor(c.id),600,800))).blob());
  g.clearRect(0,0,450,600);g.drawImage(img,0,0,450,600);
  await fetch('http://127.0.0.1:${PORT}/save?id='+c.id,{method:'POST',body:out.toDataURL('image/webp',0.9)});}
 return characters.length+' thumbnails sent';})()

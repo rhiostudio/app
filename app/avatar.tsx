@@ -10,10 +10,11 @@ import {useEffect,useRef,useState} from 'react';
 import {getCharacter,lookFor,motionNames,type Appearance,type Look} from '@/lib/characters';
 import type {Engine,Stage} from '@/lib/rhio3d/engine';
 
-/* The engine and three.js load once, only in the browser, only when a 3D view needs them. */
+/* The engine and three.js load once, only in the browser, only when a 3D view needs them. The model loader turns on
+   the modelled humans (files in public/kit, fetched when a character is shown). */
 let enginePromise:Promise<Engine>|null=null;
 export function loadEngine(){
- if(!enginePromise)enginePromise=Promise.all([import('three'),import('@/lib/rhio3d/engine')]).then(([THREE,m])=>m.createEngine(THREE))
+ if(!enginePromise)enginePromise=Promise.all([import('three'),import('@/lib/rhio3d/engine'),import('three/examples/jsm/loaders/GLTFLoader.js')]).then(([THREE,m,L])=>m.createEngine(THREE,{GLTFLoader:L.GLTFLoader}))
   .catch(e=>{enginePromise=null;throw e;});
  return enginePromise;
 }
@@ -42,7 +43,7 @@ export function useThumb(look:Look,skin:string,active=true){
  const [loaded,setLoaded]=useState<{key:string;src:string}|null>(null);
  useEffect(()=>{if(preset||!active||thumbCache.has(key))return;let alive=true;
   const cancel=whenIdle(()=>{thumbQueue=thumbQueue.then(async()=>{if(!alive)return;const R=await loadEngine();
-   if(!thumbCache.has(key))thumbCache.set(key,R.renderThumb(JSON.parse(key),440,560));
+   if(!thumbCache.has(key))thumbCache.set(key,await R.renderThumbAsync(JSON.parse(key),440,560));
    if(alive)setLoaded({key,src:thumbCache.get(key)!});await new Promise(r=>setTimeout(r,16));}).catch(()=>{});});
   return()=>{alive=false;cancel();};},[key,preset,active]);
  if(preset)return presetImage(skin);
@@ -80,8 +81,9 @@ function AvatarLive({skin='atlas',appearance,look,animation='Idle',paused=false,
   loadEngine().then(R=>{
    if(!alive||!canvas.current)return;
    const s=new R.Stage(canvas.current,{onEvent:(ev:string)=>window.dispatchEvent(new CustomEvent('rhio:stage',{detail:ev}))});const cur=latest.current;
-   s.setLook(JSON.parse(cur.lookKey));s.anim.play(cur.motion);s.anim.paused=cur.paused;s.anim.speed=cur.speed;s.start();
-   stage.current=s;(window as any).__rhioStage=s;clearTimeout(timer);setState('ready');
+   // the picture stays until the character is on stage (a modelled human loads its files first)
+   const shown=s.setLook(JSON.parse(cur.lookKey));s.anim.play(cur.motion);s.anim.paused=cur.paused;s.anim.speed=cur.speed;s.start();
+   stage.current=s;(window as any).__rhioStage=s;shown.then(()=>{if(alive&&stage.current===s){clearTimeout(timer);setState('ready');}});
   }).catch(()=>{if(alive)setState('error')});
   const onPower=(e:Event)=>{stage.current?.cast(String((e as CustomEvent).detail));};
   const onMotion=(e:Event)=>{const d=(e as CustomEvent).detail;stage.current?.anim.play(d.name,d.temp?{temp:true,dur:900}:undefined);};

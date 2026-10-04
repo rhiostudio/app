@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const src = f => readFileSync(join(root, 'lib/rhio3d/src', f), 'utf8');
-const engineFiles = ['e1-core.js', 'e2-human.js', 'e3-companion.js', 'e4-motion.js', 'e5-stage.js'];
+const engineFiles = ['e1-core.js', 'e2-human.js', 'e2b-model.js', 'e3-companion.js', 'e4-motion.js', 'e5-stage.js'];
 const dataFiles = ['data.js', 'skills.js', 'content.js']; // standalone page only
 // each source is an IIFE `(function (G) { ... })(window);` — rebind it to a local namespace object
 const rebind = code => code.replace(/\}\)\(window\);\s*$/, '})(G);');
@@ -38,9 +38,11 @@ import { installData } from './data.js';
 function installEngine(G) {
 ${engineFiles.map(f => rebind(src(f))).join('\n')}
 }
-/** Creates the browser engine (Stage, renderThumb, builders). Call only in the browser with the three namespace. */
-export function createEngine(THREE) {
-  const G = { THREE, RHIO: {} };
+/** Creates the browser engine (Stage, renderThumb, builders). Call only in the browser with the three namespace.
+    extras.GLTFLoader (three's loader class) turns on the modelled humans of public/kit; without it every character
+    is built from shapes. */
+export function createEngine(THREE, extras) {
+  const G = { THREE, RHIO: {}, X: extras || {} };
   installData(G); installEngine(G);
   return G.RHIO;
 }
