@@ -11,10 +11,12 @@ export const ANSWER_LANGUAGE='English' as const;
 /** What an agent may carry besides its instructions: an opening line, up to three questions to start from, and notes
     it answers from (lib/provider.ts adds them to every run). */
 export const GREETING_MAX=200,STARTERS_MAX=3,STARTER_MAX=80,KNOWLEDGE_MAX=4000;
-/** A mark of what an agent says and knows: its name, instructions, tone and notes. The agent check (lib/agent-check.ts)
-    stores it, and an agent counts as checked only while its current mark is still that one. */
-export function configMark(a:{name?:string;personality?:string;tone?:string;knowledge?:string}){
- const s=[a.name||'',a.personality||'',a.tone||'',a.knowledge||''].join('\u0001');let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return (h>>>0).toString(36)+'.'+s.length.toString(36);
+/** A mark of what an agent says and knows: its name, instructions, tone, notes and, once it has had sources
+    (lib/knowledge.ts), how often they changed (`rev` = agents.kb_rev). The agent check (lib/agent-check.ts) stores it,
+    and an agent counts as checked only while its current mark is still that one. An agent that never had a source
+    keeps the mark it had before sources existed. */
+export function configMark(a:{name?:string;personality?:string;tone?:string;knowledge?:string},rev?:number|null){
+ const s=[a.name||'',a.personality||'',a.tone||'',a.knowledge||'',...(rev?[`kb${rev}`]:[])].join('\u0001');let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return (h>>>0).toString(36)+'.'+s.length.toString(36);
 }
 /** Skills open right now. A skill left out stays visible but locked (no equip, runs refused by /api/runs).
     Since 30 Sep 2026 all of them are open (the wallet monitor joined on 4 Oct 2026) and each user gets a few tries per skill (SKILL_TRIAL_LIMIT, default 2,
@@ -41,7 +43,7 @@ const SKILLS=[
 export const skillCatalog=SKILLS.map(s=>({...s,planned:!!('planned' in s&&s.planned),locked:!('planned' in s&&s.planned)&&!isOpenSkill(s.id)}));
 export const openSkills=()=>skillCatalog.filter(s=>!s.planned&&!s.locked);
 export type MarketAgent={id:string;name:string;skin:Agent['skin'];look?:Agent['look'];appearance?:Agent['appearance'];motion?:Agent['motion'];skills:Agent['skills'];tone:string;language:string;tagline:string;price:number;/** the creator's price for one chat message */talkPrice:number;uses:number;publishedAt:string|null;/** "@handle" of a verified creator, else an anonymous id */creator:string;verified:boolean;mine:boolean;
- /** the agent's opening line and questions to start from (its creator wrote them) */greeting:string;starters:string[];/** it carries notes from its creator */knows:boolean;
+ /** the agent's opening line and questions to start from (its creator wrote them) */greeting:string;starters:string[];/** it carries notes or sources from its creator */knows:boolean;/** how many sources (lib/knowledge.ts) */sources?:number;
  /** the day it last passed the agent check with the instructions it has now, else null */checked:string|null;
  /** share of helpful marks from other accounts, once there are enough */rating:{percent:number;count:number}|null;
  /** only on the single-agent endpoint: answered runs among its last ones */health?:{ok:number;total:number}};

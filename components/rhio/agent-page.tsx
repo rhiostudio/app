@@ -70,7 +70,7 @@ export function AgentPage({id,auth,onSignIn,onSpent,onRun,onNavigate}:{id:string
      {agent.checked&&<span className="flex items-center gap-1.5 rounded-lg border border-lime bg-lime/10 px-2.5 py-1 text-[12.5px] font-medium" title="It passed the agent check with the instructions it has now: it answers, keeps its instructions private, gives no buy or sell advice and says it is an AI."><I id="scan" className="i size-3.5"/>Checked {new Date(agent.checked).toLocaleDateString(undefined,{day:'numeric',month:'short'})}</span>}
      {agent.rating&&<span className="rounded-lg border px-2.5 py-1 text-[12.5px]"><b className="font-medium">{agent.rating.percent}% helpful</b> <span className="text-muted-foreground">· {agent.rating.count} marks</span></span>}
      {agent.health&&agent.health.total>=5&&<span className="rounded-lg border px-2.5 py-1 text-[12.5px]"><b className="font-medium">Answered {agent.health.ok} of its last {agent.health.total}</b></span>}
-     {agent.knows&&<span className="rounded-lg border px-2.5 py-1 text-[12.5px] text-muted-foreground">Answers from its creator’s notes</span>}
+     {agent.knows&&<span className="rounded-lg border px-2.5 py-1 text-[12.5px] text-muted-foreground" title="Its creator gave it text to answer from. For each message it is given the passages that match, and the sources are named under the answer.">{agent.sources?`Answers from ${agent.sources} ${agent.sources===1?'source':'sources'} of its creator`:'Answers from its creator’s notes'}</span>}
     </div>}
     {agent&&<div className="grid gap-2">
      <span className="font-mono text-[10px] tracking-[.1em] text-muted-foreground uppercase">What it does</span>

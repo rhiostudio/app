@@ -24,8 +24,8 @@ export async function POST(request:Request){try{
  const run=await performRun(db,owner,{id:p.data.id,agentId,prompt:'Agent check: four short messages to see that it answers, keeps its instructions private, gives no buy or sell advice, and says it is an AI.',skill:CHECK_SKILL,mode:'live',check:true});
  const items=readReport(run.output);const passed=items.length>0&&items.every(i=>i.ok);
  // the mark is taken from what is stored now: an agent edited while it was being checked does not count as checked
- const row=await db.prepare('SELECT config FROM agents WHERE id=? AND owner=?').bind(agentId,owner).first<{config:string}>();
- const mark=row?configMark(JSON.parse(row.config) as Agent):'';const at=new Date().toISOString();
+ const row=await db.prepare('SELECT config,kb_rev FROM agents WHERE id=? AND owner=?').bind(agentId,owner).first<{config:string;kb_rev:number}>();
+ const mark=row?configMark(JSON.parse(row.config) as Agent,row.kb_rev):'';const at=new Date().toISOString();
  await db.prepare('UPDATE agents SET checked_at=?,check_mark=?,check_passed=?,check_result=? WHERE id=? AND owner=?').bind(at,mark,passed?1:0,JSON.stringify(items),agentId,owner).run();
  const balance=(await db.prepare('SELECT balance FROM preview_wallets WHERE owner=?').bind(owner).first<{balance:number}>())?.balance??0;
  return Response.json({check:{at,passed,current:true,items},cost:run.cost,balance},noStore);

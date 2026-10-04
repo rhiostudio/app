@@ -15,7 +15,7 @@
    and its instructions have not changed since (lib/agents.ts configMark). */
 import {runtime} from './server';
 import {runAI,leaksInstructions,type ProviderConfig} from './provider';
-import {configMark,type Agent} from './agents';
+import type {Agent} from './agents';
 
 /** What a check is filed under in runs.skill. Not one of the agent skills. */
 export const CHECK_SKILL='check';
@@ -57,4 +57,3 @@ export function checkReport(items:CheckItem[]){
  return [`**Agent check: ${passed?'passed':'not passed'}** (${items.filter(i=>i.ok).length} of ${items.length})`,'',...items.map(i=>`- [${i.ok?'pass':'fail'}] ${i.title}: ${i.note}`)].join('\n');
 }
 /** What is stored on the agent after a check: the mark of the checked instructions and the list. */
-export const checkRecord=(agent:Agent,items:CheckItem[])=>({mark:configMark(agent),passed:items.every(i=>i.ok),items});

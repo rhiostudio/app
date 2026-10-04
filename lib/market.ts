@@ -4,14 +4,14 @@ import {publicAgent} from '@/lib/economy';
 import {skillCatalog} from '@/lib/agents';
 import {RATING_COLUMNS} from '@/lib/ratings';
 
-type Row={id:string;owner:string;name:string;config:string;price:number;talk_price:number|null;uses:number;published_at:string|null;handle:string|null;checked_at:string|null;check_mark:string|null;check_passed:number|null;up:number;down:number};
+type Row={id:string;owner:string;name:string;config:string;price:number;talk_price:number|null;uses:number;published_at:string|null;handle:string|null;checked_at:string|null;check_mark:string|null;check_passed:number|null;up:number;down:number;kb_rev:number;sources:number};
 export type PublicAgent=ReturnType<typeof publicAgent>&{/** answered runs among its last fifty */health?:{ok:number;total:number}};
 export const AGENT_ID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** The agent when it is published and not archived, otherwise null (unknown, private and archived look the same). */
 export async function publishedAgent(db:D1Database,id:string,viewer?:string):Promise<PublicAgent|null>{
  if(!AGENT_ID.test(id))return null;
- const row=await db.prepare(`SELECT id,owner,name,config,price,talk_price,uses,published_at,checked_at,check_mark,check_passed,${RATING_COLUMNS},(SELECT handle FROM creators WHERE creators.owner=agents.owner AND creators.status='verified') AS handle FROM agents WHERE id=? AND published=1 AND archived=0`).bind(id).first<Row>();
+ const row=await db.prepare(`SELECT id,owner,name,config,price,talk_price,uses,published_at,checked_at,check_mark,check_passed,kb_rev,(SELECT COUNT(*) FROM knowledge_sources WHERE knowledge_sources.agent_id=agents.id) AS sources,${RATING_COLUMNS},(SELECT handle FROM creators WHERE creators.owner=agents.owner AND creators.status='verified') AS handle FROM agents WHERE id=? AND published=1 AND archived=0`).bind(id).first<Row>();
  if(!row)return null;
  // how it has been doing: answered runs among its last fifty (failed ones were refunded)
  const h=await db.prepare("SELECT COALESCE(SUM(CASE WHEN status='complete' THEN 1 ELSE 0 END),0) AS ok,COUNT(*) AS total FROM (SELECT status FROM runs WHERE agent_id=? AND status!='running' ORDER BY created DESC LIMIT 50)").bind(id).first<{ok:number;total:number}>();

@@ -17,6 +17,7 @@ type Info={live:boolean;cost:number;min:number;max:number};
 const STEPS:[string,string][]=[
  ['Paste your posts','Ten to thirty posts you wrote. Only pasted text is read: nothing is fetched from your accounts.'],
  ['Get your voice back','The Studio drafts the agent’s instructions in your style: how you talk, what you talk about, what you would never say.'],
+ ['Give it what you know','Paste your notes, an FAQ or an old thread. The agent answers from the passages that match a question and names the source under its answer.'],
  ['Pick a face and publish','Choose a character, dress it, read the draft and fix what is off. Then publish with a price per chat message.'],
  ['People talk to it','Anyone can open your agent’s page and talk to it. Each message pays you your chat price.'],
  ['Get the verified mark','Post a code from your X handle and send the link. A person on the team checks it, and your agents say “@you, verified creator”.'],
@@ -34,7 +35,7 @@ export function CreatorsPage({onNavigate}:{onNavigate:Go}){
     <h1 className="font-display text-[clamp(40px,7vw,84px)] leading-[.96] font-medium tracking-[-.05em]">An agent in your own voice</h1>
     <p className="max-w-[62ch] text-[17px] leading-relaxed text-muted-foreground">Paste posts you wrote and the Studio writes an agent that talks like you. Give it a face, publish it, and earn each time someone talks to it.</p>
    </div>
-   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">{STEPS.map(([t,x],i)=><div key={t} className="grid content-start gap-2 rounded-2xl border bg-card p-5">
+   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{STEPS.map(([t,x],i)=><div key={t} className="grid content-start gap-2 rounded-2xl border bg-card p-5">
     <span className="font-mono text-[11px] text-muted-foreground">0{i+1}</span><b className="font-display text-xl font-medium tracking-[-.02em]">{t}</b><p className="text-[14.5px] leading-relaxed text-muted-foreground">{x}</p></div>)}</div>
    <div className="grid items-center gap-5 rounded-2xl border border-lime bg-card p-6 md:grid-cols-[auto_minmax(0,1fr)]">
     <div className="flex -space-x-3">{(['echo','wren','juno'] as const).map(c=><Thumb key={c} id={c} className="size-20 rounded-xl border-2 border-card bg-t-lime object-[50%_18%]"/>)}</div>

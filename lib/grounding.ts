@@ -7,6 +7,13 @@ const MARK='<!--rhio-search-suggestions:';
 
 const fromB64=(s:string)=>{const bin=atob(s);return new TextDecoder().decode(Uint8Array.from(bin,c=>c.charCodeAt(0)));};
 
+/** Puts a note of the studio under the answer. The widget marker is only read at the very end of the output, so the
+    note goes in front of it. */
+export function withNote(output:string,note:string){
+ const at=output.lastIndexOf(MARK);
+ return at<0||!output.endsWith('-->')?`${output}\n\n${note}`:`${output.slice(0,at).trimEnd()}\n\n${note}\n\n${output.slice(at)}`;
+}
+
 /** Split a run output into the readable text and the widget HTML (empty when there is none or the marker is broken). */
 export function splitSearchWidget(output:string):{text:string;widget:string}{
  const at=output.lastIndexOf(MARK);

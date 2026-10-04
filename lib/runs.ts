@@ -21,6 +21,8 @@ import {talkContext,talkCost,TALK_SKILL} from './talk';
 import {voiceCost,VOICE_SKILL,VOICE_WRITER} from './voice';
 import {runCheck,checkReport,checkCost,CHECK_SKILL} from './agent-check';
 import {rhioFacts} from './rhio-facts';
+import {recall,lastAsked} from './knowledge';
+import {withNote} from './grounding';
 import {SAMPLE_COST,liveRunCost,aiDailyRuns,aiDailyFreeRuns,liveDailyPerUser,quotaKeys,quotaStep,ensureWallet,ledgerRow,split,tierFeePermille,skillTrialLimit,refillFree,heavyWindow,heavyKey,searchForFreeCredits,takeSearchSlot,returnSearchSlot} from './economy';
 /** Heavy skills on manual live runs count against the 5-hour window (lib/economy.ts heavyWindow). */
 const isHeavy=(mode:string,skill:string,scheduled:boolean)=>mode==='live'&&!scheduled&&heavyWindow().skills.includes(skill);
@@ -77,6 +79,11 @@ export async function performRun(db:D1Database,owner:string,data:RunInput,schedu
  const relay=!schedule&&!talk&&!voice&&data.relay?data.relay:null;const handed=relay?await handover(db,owner,relay):null;
  // a conversation: the last turns this account had with this agent in it go to the model as context
  const spoken=talk?await talkContext(db,owner,data.agentId,talk):null;
+ // what the agent knows: the passages of its creator's sources that bear on this message or task (lib/knowledge.ts).
+ // Reading them never stops a run: an agent without sources, or a question none of them covers, runs as before.
+ const known=async()=>{if(data.mode!=='live'||voice)return null;
+  try{return await recall(db,data.agentId,data.prompt,talk?await lastAsked(db,owner,data.agentId,talk):null);}
+  catch(e){console.error('RHIO knowledge: sources not read:',safeMessage((e as Error)?.message||e));return null;}};
  // an account that holds bought credits is on the paid tier: more heavy runs, and not limited by the free pool
  const holdsPaid=(w?.paid??0)>0;
  const statements=[
@@ -130,13 +137,17 @@ export async function performRun(db:D1Database,owner:string,data:RunInput,schedu
  // search after all. (The account counts, not the run: free credits are spent first, and someone who bought credits
  // must not lose the search on the runs their daily free credits happen to pay.)
  const search=opts.search!==false&&!talk&&data.mode==='live'&&data.skill==='research'&&searchesWeb(runtime())&&(holdsPaid||searchForFreeCredits())&&await takeSearchSlot(db,created);
+ // A run that searches the web answers from the web and is shown as the provider returned it (Google's terms for a
+ // grounded answer), so it is not given the sources.
+ const kb=search?null:await known();
  // guard: someone else's published agent keeps its instructions private from the person running it
  try{
   if(data.mode==='sample')output=sampleResult(agent,data.prompt,data.skill);
   else if(check)output=checkReport(await runCheck(runtime(),agent,data.id,free,rhioFacts()));
-  else{const r=await runAI(runtime(),voice?VOICE_WRITER:agent,data.skill,[data.prompt,spoken,handed?.facts,reading?.facts].filter(Boolean).join('\n\n'),data.id,{free,guard:!mine||!!opts.guard||!!talk,search,about:talk?rhioFacts():null});output=r.output;if(search&&!r.searched)await returnSearchSlot(db,created).catch(()=>null);}
-  if(reading)output=`${output}\n\n${reading.note}`;
-  if(handed)output=`${output}\n\n${handed.note}`;
+  else{const r=await runAI(runtime(),voice?VOICE_WRITER:agent,data.skill,[data.prompt,spoken,kb?.facts,handed?.facts,reading?.facts].filter(Boolean).join('\n\n'),data.id,{free,guard:!mine||!!opts.guard||!!talk,search,about:talk?rhioFacts():null});output=r.output;if(search&&!r.searched)await returnSearchSlot(db,created).catch(()=>null);}
+  if(kb)output=kb.finish(output);
+  if(reading)output=withNote(output,reading.note);
+  if(handed)output=withNote(output,handed.note);
  }
  catch(e){
   if(search&&e instanceof AIError&&!e.billed)await returnSearchSlot(db,created).catch(()=>null);
