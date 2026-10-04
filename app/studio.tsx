@@ -43,6 +43,7 @@ const SchedulesPage=lazy(()=>import('@/components/app/schedules').then(m=>({defa
 const AgentSchedules=lazy(()=>import('@/components/app/schedules').then(m=>({default:m.AgentSchedules})));
 const RewardsPage=lazy(()=>import('@/components/app/rewards').then(m=>({default:m.RewardsPage})));
 const VoiceBox=lazy(()=>import('@/components/app/voice').then(m=>({default:m.VoiceBox})));
+const VerifiedPage=lazy(()=>import('@/components/rhio/verified-page').then(m=>({default:m.VerifiedPage})));
 const PlazaPage=lazy(()=>import('@/components/rhio/plaza-page').then(m=>({default:m.PlazaPage})));
 const CreatorsPage=lazy(()=>import('@/components/rhio/creators-page').then(m=>({default:m.CreatorsPage})));
 const TeamsPage=lazy(()=>import('@/components/app/teams').then(m=>({default:m.TeamsPage})));
@@ -411,6 +412,7 @@ export default function Studio(){
     {view==='whales'&&<WhalesPage onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
     {view==='invite'&&route.doc&&<InvitePage key={route.doc} code={route.doc} auth={auth} onNavigate={(v,doc)=>navigate(v,doc)} onSignIn={()=>setSignin(true)}/>}
     {view==='referral'&&<ReferralPage onNavigate={(v,doc)=>navigate(v,doc)}/>}
+    {view==='verified'&&<VerifiedPage onNavigate={(v,doc)=>navigate(v,doc)}/>}
     {view==='plaza'&&<PlazaPage auth={auth} onSignIn={()=>setSignin(true)} onSpent={refresh} onNavigate={(v,doc)=>navigate(v,doc)}/>}
     {view==='creators'&&<CreatorsPage onNavigate={(v,doc)=>navigate(v,doc)}/>}
     {view==='teamup'&&<TeamsInfoPage onNavigate={(v,doc)=>navigate(v,doc)}/>}

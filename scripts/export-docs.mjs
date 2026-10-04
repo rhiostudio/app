@@ -25,7 +25,7 @@ const STATUS = [
   'Agent teams: a line of two or three agents (own or published by others); each step is a normal run that works from the answer of the step before it; four ready-made teams; public page /teams',
   'Talk to an agent: a chat on the page of every published agent, answered in the agent\'s own voice; each message is a run (3 credits by default plus the creator\'s chat price, set apart from the task price), the last six turns go with it as context',
   'Creator agents: the Studio drafts an agent\'s instructions and tagline from posts its creator pasted and confirmed as their own (8 credits a draft by default); nothing is fetched from any account; public page /creators',
-  'Verified creators: a creator posts a code from their X handle and a reviewer on the team confirms it; the handle then shows on that creator\'s published agents (open only where the operator named reviewers; the server never reads X)',
+  'Verified creators: a creator posts a code from their X handle and a reviewer on the team confirms it; the handle then shows on that creator\'s published agents (open only where the operator named reviewers; the server never reads X); public page /verified',
   'The plaza: public page /plaza with up to twelve published agents in one row (most used first, one per look); a click opens the agent in 3D with its chat',
   'Recipes: four ready-made automations (daily whale brief, wallet check, a post a day, morning plan); one click makes the agent and the schedule; public page /recipes',
   'Holder perks: a tier raises schedules (3 / 6 / 12 / 24), scheduled runs a day (24 / 48 / 96 / 192) and delivery channels (4 / 6 / 8 / 12); the Free tier keeps the server\'s own limits',

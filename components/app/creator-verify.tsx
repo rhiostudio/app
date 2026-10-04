@@ -52,7 +52,7 @@ export function CreatorVerify({auth}:{auth:boolean}){
      <p className="text-[13.5px] text-muted-foreground">Your request for <b className="text-foreground">@{m.handle}</b> waits for a person on the team to check <a className="underline underline-offset-4" href={m.proof||'#'} target="_blank" rel="noreferrer noopener">your post</a>. Keep the post up until it is confirmed.</p>
      <button type="button" className="justify-self-start text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground" onClick={()=>act({action:'withdraw'})}>Withdraw the request</button>
     </>}
-   <p className="text-[12px] text-muted-foreground">Nothing is read from your X account: you post a code, we look at that one post. A handle is verified for one account only.</p>
+   <p className="text-[12px] text-muted-foreground">Nothing is read from your X account: you post a code, we look at that one post. A handle is verified for one account only. <a href="/verified" className="underline underline-offset-4 hover:text-foreground">How it works</a></p>
   </section>
   {d.admin&&<section className="grid gap-3 rounded-xl border border-lime bg-card p-5">
    <div className="flex flex-wrap items-baseline justify-between gap-2"><b className="text-[15px] font-semibold">Creator requests to review</b><span className="font-mono text-[11px] text-muted-foreground">{d.review.length} waiting</span></div>

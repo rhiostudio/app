@@ -117,6 +117,50 @@ async function render(request:Request){
    {width:W,height:H,headers:{'Cache-Control':'public, max-age=3600'}},
   );
  }
+ if(key==='verified'){
+  // In the website's style: the post that carries the code, and the deck card it leads to, with the handle on it.
+  const who=await asset(`${origin}/characters/card/deck-juno.png`,'image/png');
+  const INK='#1f201e',BG='#171816',TEXT='#f3f4ef',MUTED='#a0a59c',LINE='rgba(255,255,255,0.14)';
+  return new ImageResponse(
+   <div style={{width:W,height:H,display:'flex',position:'relative',backgroundColor:BG,color:TEXT,fontFamily:'sans-serif'}}>
+    <div style={{display:'flex',flexDirection:'column',justifyContent:'space-between',width:600,height:H,padding:'54px 0 52px 64px'}}>
+     <div style={{display:'flex',alignItems:'center',gap:18}}>
+      {logo?<img src={logo} width={146} height={44}/>:<div style={{display:'flex',fontSize:24,letterSpacing:6,color:'#c8ff24'}}>RHIO</div>}
+      <div style={{display:'flex',alignItems:'center',gap:10,fontSize:16,letterSpacing:3.5,color:MUTED}}><div style={{display:'flex',width:9,height:9,borderRadius:9,backgroundColor:'#c8ff24'}}/>{c.kicker}</div>
+     </div>
+     <div style={{display:'flex',flexDirection:'column',fontSize:66,lineHeight:1.05,letterSpacing:-2.8}}>
+      <div style={{display:'flex',color:MUTED}}>Know who</div>
+      <div style={{display:'flex',color:MUTED}}>you’re really</div>
+      <div style={{display:'flex',color:TEXT}}>talking to.</div>
+     </div>
+     <div style={{display:'flex',flexDirection:'column',gap:14}}>
+      <div style={{display:'flex',gap:10}}>
+       {['A CODE ON X','CHECKED BY A PERSON','ONE HANDLE'].map(l=><div key={l} style={{display:'flex',alignItems:'center',flexShrink:0,height:40,padding:'0 16px',borderRadius:999,border:`1px solid ${LINE}`,fontSize:14,letterSpacing:2,whiteSpace:'nowrap',color:TEXT}}>{l}</div>)}
+      </div>
+      <div style={{display:'flex',fontSize:15,letterSpacing:2.6,color:MUTED}}>RHIO.STUDIO/VERIFIED</div>
+     </div>
+    </div>
+    <div style={{display:'flex',flexDirection:'column',gap:8,position:'absolute',left:604,top:214,width:258,padding:'16px 18px',borderRadius:18,backgroundColor:TEXT,color:INK,transform:'rotate(-3deg)',boxShadow:'0 18px 40px rgba(0,0,0,0.4)'}}>
+     <div style={{display:'flex',alignItems:'center',gap:8,fontSize:12,letterSpacing:1.6,color:'#5d6259'}}><div style={{display:'flex',width:16,height:16,borderRadius:16,backgroundColor:INK}}/>@YOU ON X</div>
+     <div style={{display:'flex',fontSize:19,lineHeight:1.28}}>Verifying my creator agent on RHIO:</div>
+     <div style={{display:'flex',alignSelf:'flex-start',padding:'5px 10px',borderRadius:8,backgroundColor:INK,color:'#c8ff24',fontSize:17,letterSpacing:1.5}}>rhio-7KQ2M9XA</div>
+    </div>
+    <div style={{display:'flex',flexDirection:'column',justifyContent:'space-between',position:'absolute',left:892,top:128,width:268,height:366,padding:20,borderRadius:22,backgroundColor:'#c8ff24',color:INK,transform:'rotate(4deg)',boxShadow:'0 24px 60px rgba(0,0,0,0.45)'}}>
+     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:14,letterSpacing:2.2}}>
+      <div style={{display:'flex'}}>#01</div>
+      <div style={{display:'flex',alignItems:'center',gap:6,padding:'4px 10px',borderRadius:9,backgroundColor:INK,color:'#c8ff24'}}>
+       <svg width="15" height="15" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#c8ff24" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>@YOU</div>
+     </div>
+     {who?<img src={who} width={195} height={260} style={{position:'absolute',left:36,top:44}}/>:null}
+     <div style={{display:'flex',fontSize:25,lineHeight:1.1,letterSpacing:-0.8}}>Verified creator</div>
+    </div>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'center',position:'absolute',left:836,top:286,width:76,height:76,borderRadius:76,backgroundColor:INK,border:`5px solid ${BG}`}}>
+     <svg width="36" height="36" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6" stroke="#c8ff24" strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
+    </div>
+   </div>,
+   {width:W,height:H,headers:{'Cache-Control':'public, max-age=3600'}},
+  );
+ }
  if(key==='plaza'){
   // In the website's style, like the page: agents on cards of the deck, one of them picked.
   const [a1,a2,a3,a4,a5]=await Promise.all(['team-atlas','team-nova','deck-juno','deck-echo','deck-lumi'].map(n=>asset(`${origin}/characters/card/${n}.png`,'image/png')));
