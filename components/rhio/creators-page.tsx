@@ -19,6 +19,7 @@ const STEPS:[string,string][]=[
  ['Get your voice back','The Studio drafts the agent’s instructions in your style: how you talk, what you talk about, what you would never say.'],
  ['Pick a face and publish','Choose a character, dress it, read the draft and fix what is off. Then publish with a price per chat message.'],
  ['People talk to it','Anyone can open your agent’s page and talk to it. Each message pays you your chat price.'],
+ ['Get the verified mark','Post a code from your X handle and send the link. A person on the team checks it, and your agents say “@you, verified creator”.'],
 ];
 
 export function CreatorsPage({onNavigate}:{onNavigate:Go}){
@@ -33,7 +34,7 @@ export function CreatorsPage({onNavigate}:{onNavigate:Go}){
     <h1 className="font-display text-[clamp(40px,7vw,84px)] leading-[.96] font-medium tracking-[-.05em]">An agent in your own voice</h1>
     <p className="max-w-[62ch] text-[17px] leading-relaxed text-muted-foreground">Paste posts you wrote and the Studio writes an agent that talks like you. Give it a face, publish it, and earn each time someone talks to it.</p>
    </div>
-   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{STEPS.map(([t,x],i)=><div key={t} className="grid content-start gap-2 rounded-2xl border bg-card p-5">
+   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">{STEPS.map(([t,x],i)=><div key={t} className="grid content-start gap-2 rounded-2xl border bg-card p-5">
     <span className="font-mono text-[11px] text-muted-foreground">0{i+1}</span><b className="font-display text-xl font-medium tracking-[-.02em]">{t}</b><p className="text-[14.5px] leading-relaxed text-muted-foreground">{x}</p></div>)}</div>
    <div className="grid items-center gap-5 rounded-2xl border border-lime bg-card p-6 md:grid-cols-[auto_minmax(0,1fr)]">
     <div className="flex -space-x-3">{(['echo','wren','juno'] as const).map(c=><Thumb key={c} id={c} className="size-20 rounded-xl border-2 border-card bg-t-lime object-[50%_18%]"/>)}</div>
@@ -42,11 +43,12 @@ export function CreatorsPage({onNavigate}:{onNavigate:Go}){
    </div>
    <div className="flex flex-wrap gap-2">
     <Button size="lg" asChild><a href="/dashboard/studio?voice=1">Write my agent<I id="arrow"/></a></Button>
+    <Button size="lg" variant="outline" onClick={()=>onNavigate('profile')}>Get verified</Button>
     <Button size="lg" variant="outline" onClick={()=>onNavigate('discover')}>Talk to an agent</Button>
     <Button size="lg" variant="outline" onClick={()=>copyText(link,toast.success,toast.error)}><I id="copy"/>Copy link</Button>
     <Button size="lg" variant="outline" asChild><a href={post} target="_blank" rel="noreferrer noopener"><FaXTwitter aria-hidden="true"/>Post on X</a></Button>
    </div>
-   <p className="max-w-[80ch] text-[12.5px] text-muted-foreground">{info?(info.live?`A draft costs ${info.cost} credits and needs at least ${info.min} characters of posts. `:'AI is not connected on this server, so drafts cannot be made here. '):''}What you earn are credits: they pay for runs here, and claiming earnings to a wallet is not switched on. Your instructions are never shown to the people who talk to your agent. A creator is not verified yet: a verified mark for creators comes in a later step.</p>
+   <p className="max-w-[80ch] text-[12.5px] text-muted-foreground">{info?(info.live?`A draft costs ${info.cost} credits and needs at least ${info.min} characters of posts. `:'AI is not connected on this server, so drafts cannot be made here. '):''}What you earn are credits: they pay for runs here, and claiming earnings to a wallet is not switched on. Your instructions are never shown to the people who talk to your agent. A creator who posted a code from their X handle and was confirmed by the team shows as a verified creator; everyone else shows an anonymous creator name.</p>
   </section>
   <SiteFooter onNavigate={onNavigate}/>
  </>;

@@ -3,14 +3,14 @@
 import {publicAgent} from '@/lib/economy';
 import {skillCatalog} from '@/lib/agents';
 
-type Row={id:string;owner:string;name:string;config:string;price:number;talk_price:number|null;uses:number;published_at:string|null};
+type Row={id:string;owner:string;name:string;config:string;price:number;talk_price:number|null;uses:number;published_at:string|null;handle:string|null};
 export type PublicAgent=ReturnType<typeof publicAgent>;
 export const AGENT_ID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** The agent when it is published and not archived, otherwise null (unknown, private and archived look the same). */
 export async function publishedAgent(db:D1Database,id:string,viewer?:string):Promise<PublicAgent|null>{
  if(!AGENT_ID.test(id))return null;
- const row=await db.prepare('SELECT id,owner,name,config,price,talk_price,uses,published_at FROM agents WHERE id=? AND published=1 AND archived=0').bind(id).first<Row>();
+ const row=await db.prepare(`SELECT id,owner,name,config,price,talk_price,uses,published_at,(SELECT handle FROM creators WHERE creators.owner=agents.owner AND creators.status='verified') AS handle FROM agents WHERE id=? AND published=1 AND archived=0`).bind(id).first<Row>();
  return row?publicAgent(row,viewer):null;
 }
 

@@ -28,6 +28,7 @@ export const PRODUCT:NavLink[]=[
  {id:'studio',title:'Studio',icon:'cube',desc:'Build, dress and equip an agent',tone:'lime'},
  {id:'skills',title:'Skills',icon:'layers',desc:'Ten open skills and six stage powers',tone:'iris'},
  {id:'discover',title:'Discover',icon:'store',desc:'Agents other creators published',tone:'coral'},
+ {id:'plaza',title:'Plaza',icon:'users',desc:'The published agents in one place: click one and talk to it',tone:'lime'},
  {id:'discover',title:'Templates',icon:'list',desc:'Start from a ready-made agent',tone:'amber',doc:'templates'},
 ];
 export const WORKSPACE:NavLink[]=[

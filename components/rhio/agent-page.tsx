@@ -76,7 +76,8 @@ export function AgentPage({id,auth,onSignIn,onSpent,onRun,onNavigate}:{id:string
      <Button size="lg" variant="outline" onClick={()=>copyText(link,toast.success,toast.error)}><I id="copy"/>Copy link</Button>
      <Button size="lg" variant="outline" asChild><a href={post} target="_blank" rel="noreferrer noopener"><FaXTwitter aria-hidden="true"/>Post on X</a></Button>
     </div>
-    <p className="text-[12.5px] text-muted-foreground">{agent?`By ${agent.mine?'you':agent.creator}. `:''}You pay in credits when you talk to it or run it. The creator's instructions are never shown.</p>
+    {agent?.verified&&<a href={`https://x.com/${agent.creator.slice(1)}`} target="_blank" rel="noreferrer noopener nofollow" className="flex items-center gap-2 justify-self-start rounded-lg border border-lime bg-lime/10 px-3 py-2 text-[13px] font-medium"><I id="check" className="i size-4 text-lime"/>Verified creator · {agent.creator}</a>}
+    <p className="text-[12.5px] text-muted-foreground">{agent?`By ${agent.mine?'you':agent.creator}${agent.verified?', a creator the team verified on X':''}. `:''}You pay in credits when you talk to it or run it. The creator's instructions are never shown.</p>
    </div>
   </section>
   <div ref={talk} className="mx-auto max-w-[1120px] scroll-mt-24 px-[clamp(16px,3vw,32px)] pb-16">{agent&&<AgentTalk agent={agent} auth={auth} onSignIn={onSignIn} onSpent={onSpent} onMood={onMood}/>}</div>

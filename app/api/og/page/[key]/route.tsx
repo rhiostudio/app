@@ -15,12 +15,14 @@ import {referralConfig,referralProgram} from '@/lib/referrals';
 import {getCharacter} from '@/lib/characters';
 
 const W=1200,H=630;
+/** Pictures that could not be loaded since the server started: a card rendered without one of them is not kept. */
+let missing=0;
 async function asset(url:string,type:string){
  try{
-  const r=await fetch(url);if(!r.ok)return '';
+  const r=await fetch(url);if(!r.ok){missing++;return '';}
   const b=new Uint8Array(await r.arrayBuffer());let s='';for(let i=0;i<b.length;i+=0x8000)s+=String.fromCharCode(...b.subarray(i,i+0x8000));
   return `data:${type};base64,${btoa(s)}`;
- }catch{return '';}
+ }catch{missing++;return '';}
 }
 const fixed=(raw:string,dec:number,digits:number)=>Number(formatUnits(BigInt(raw),dec)).toLocaleString('en-US',{minimumFractionDigits:digits,maximumFractionDigits:digits});
 
@@ -35,7 +37,7 @@ async function rewardNumbers(){
    [`${sym} price`,o.price?`$${Number(o.price.usd).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`:'waiting'],['Earning now',`${o.recorder?.earners??0} holders`]] as [string,string][]};
 }
 
-export async function GET(request:Request){
+async function render(request:Request){
  const origin=appOrigin(request);
  const key=new URL(request.url).pathname.split('/').filter(Boolean).pop()||'';
  if(!isPageCard(key))return Response.redirect(`${origin}/og.png`,302);
@@ -111,6 +113,43 @@ export async function GET(request:Request){
     <div style={{display:'flex',alignItems:'center',justifyContent:'center',position:'absolute',left:858,top:286,width:76,height:76,borderRadius:76,backgroundColor:INK,border:`5px solid ${BG}`}}>
      <svg width="36" height="36" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6" stroke="#c8ff24" strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
     </div>
+   </div>,
+   {width:W,height:H,headers:{'Cache-Control':'public, max-age=3600'}},
+  );
+ }
+ if(key==='plaza'){
+  // In the website's style, like the page: agents on cards of the deck, one of them picked.
+  const [a1,a2,a3,a4,a5]=await Promise.all(['team-atlas','team-nova','deck-juno','deck-echo','deck-lumi'].map(n=>asset(`${origin}/characters/card/${n}.png`,'image/png')));
+  const INK='#1f201e',BG='#171816',TEXT='#f3f4ef',MUTED='#a0a59c',LINE='rgba(255,255,255,0.14)';
+  const deck=[{n:'#01',tag:'FOUNDER',title:'Captain Juno',bg:'#c8ff24',fg:INK,img:a3,left:606,top:60,turn:-3,picked:false},{n:'#02',tag:'OPERATOR',title:'The Researcher',bg:'#5b5bf6',fg:'#ffffff',img:a1,left:800,top:92,turn:2,picked:true},{n:'#03',tag:'CREATIVE',title:'Post Writer',bg:'#ff6a3d',fg:INK,img:a2,left:992,top:60,turn:-2,picked:false},
+   {n:'#04',tag:'CREATOR',title:'Your agent',bg:'#58b8ff',fg:INK,img:a4,left:702,top:338,turn:3,picked:false},{n:'#05',tag:'ORACLE',title:'Reluctant Oracle',bg:'#ffc53d',fg:INK,img:a5,left:898,top:350,turn:-3,picked:false}];
+  return new ImageResponse(
+   <div style={{width:W,height:H,display:'flex',position:'relative',backgroundColor:BG,color:TEXT,fontFamily:'sans-serif'}}>
+    <div style={{display:'flex',flexDirection:'column',justifyContent:'space-between',width:600,height:H,padding:'54px 0 52px 64px'}}>
+     <div style={{display:'flex',alignItems:'center',gap:18}}>
+      {logo?<img src={logo} width={146} height={44}/>:<div style={{display:'flex',fontSize:24,letterSpacing:6,color:'#c8ff24'}}>RHIO</div>}
+      <div style={{display:'flex',alignItems:'center',gap:10,fontSize:16,letterSpacing:3.5,color:MUTED}}><div style={{display:'flex',width:9,height:9,borderRadius:9,backgroundColor:'#c8ff24'}}/>{c.kicker}</div>
+     </div>
+     <div style={{display:'flex',flexDirection:'column',fontSize:72,lineHeight:1.04,letterSpacing:-3}}>
+      <div style={{display:'flex',color:MUTED}}>Walk in.</div>
+      <div style={{display:'flex',color:TEXT}}>Pick who</div>
+      <div style={{display:'flex',color:TEXT}}>to talk to.</div>
+     </div>
+     <div style={{display:'flex',flexDirection:'column',gap:14}}>
+      <div style={{display:'flex',gap:10}}>
+       {['EVERY AGENT','CLICK TO TALK','ITS OWN VOICE'].map(l=><div key={l} style={{display:'flex',alignItems:'center',flexShrink:0,height:40,padding:'0 16px',borderRadius:999,border:`1px solid ${LINE}`,fontSize:14,letterSpacing:2,whiteSpace:'nowrap',color:TEXT}}>{l}</div>)}
+      </div>
+      <div style={{display:'flex',fontSize:15,letterSpacing:2.6,color:MUTED}}>RHIO.STUDIO/PLAZA</div>
+     </div>
+    </div>
+    {deck.map(d=><div key={d.n} style={{display:'flex',flexDirection:'column',justifyContent:'space-between',position:'absolute',left:d.left,top:d.top,width:184,height:250,padding:14,borderRadius:18,backgroundColor:d.bg,color:d.fg,transform:`rotate(${d.turn}deg)`,boxShadow:d.picked?`0 0 0 4px ${BG}, 0 0 0 7px ${TEXT}, 0 24px 60px rgba(0,0,0,0.45)`:'0 24px 60px rgba(0,0,0,0.45)'}}>
+     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:11,letterSpacing:1.8}}>
+      <div style={{display:'flex'}}>{d.n}</div>
+      <div style={{display:'flex',padding:'3px 8px',borderRadius:7,border:`1px solid ${d.fg==='#ffffff'?'rgba(255,255,255,0.35)':'rgba(31,32,30,0.3)'}`}}>{d.tag}</div>
+     </div>
+     {d.img?<img src={d.img} width={132} height={176} style={{position:'absolute',left:26,top:32}}/>:null}
+     <div style={{display:'flex',fontSize:19,lineHeight:1.1,letterSpacing:-0.6}}>{d.title}</div>
+    </div>)}
    </div>,
    {width:W,height:H,headers:{'Cache-Control':'public, max-age=3600'}},
   );
@@ -239,4 +278,21 @@ export async function GET(request:Request){
   </div>,
   {width:W,height:H,headers:{'Cache-Control':`public, max-age=${live?600:86400}`}},
  );
+}
+
+/* A card takes a few seconds to draw, and a link crawler (X, Telegram) may not wait that long. So each card is drawn
+   once and kept in memory for as long as its own Cache-Control says (at most an hour; the cards with live numbers
+   say ten minutes): the picture's address (page and ?v=) is the key. A card drawn while one of its pictures failed
+   to load is served but not kept, so a broken card never sticks. */
+const KEPT=new Map<string,{until:number;body:ArrayBuffer;cache:string}>();
+const png=(body:ArrayBuffer,cache:string)=>new Response(body,{headers:{'Content-Type':'image/png','Cache-Control':cache}});
+export async function GET(request:Request){
+ const u=new URL(request.url);const id=`${u.pathname}?${(u.searchParams.get('v')||'').slice(0,40)}`;
+ const hit=KEPT.get(id);if(hit&&hit.until>Date.now())return png(hit.body.slice(0),hit.cache);
+ const before=missing;const r=await render(request);
+ if(r.status!==200||!(r.headers.get('content-type')||'').startsWith('image/png'))return r;
+ const body=await r.arrayBuffer();const cache=r.headers.get('cache-control')||'public, max-age=600';
+ const seconds=Math.min(Number(/max-age=(\d+)/.exec(cache)?.[1]||600),3600);
+ if(missing===before){if(KEPT.size>=32)KEPT.clear();KEPT.set(id,{until:Date.now()+seconds*1000,body:body.slice(0),cache});}
+ return png(body,cache);
 }

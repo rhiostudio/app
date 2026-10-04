@@ -43,6 +43,7 @@ const SchedulesPage=lazy(()=>import('@/components/app/schedules').then(m=>({defa
 const AgentSchedules=lazy(()=>import('@/components/app/schedules').then(m=>({default:m.AgentSchedules})));
 const RewardsPage=lazy(()=>import('@/components/app/rewards').then(m=>({default:m.RewardsPage})));
 const VoiceBox=lazy(()=>import('@/components/app/voice').then(m=>({default:m.VoiceBox})));
+const PlazaPage=lazy(()=>import('@/components/rhio/plaza-page').then(m=>({default:m.PlazaPage})));
 const CreatorsPage=lazy(()=>import('@/components/rhio/creators-page').then(m=>({default:m.CreatorsPage})));
 const TeamsPage=lazy(()=>import('@/components/app/teams').then(m=>({default:m.TeamsPage})));
 const TeamsInfoPage=lazy(()=>import('@/components/rhio/teams-page').then(m=>({default:m.TeamsInfoPage})));
@@ -308,7 +309,7 @@ export default function Studio(){
      <Select value={sort} onValueChange={v=>setSort(v as typeof sort)}><SelectTrigger className="w-[190px]"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="popular">Most used</SelectItem><SelectItem value="cheap">Lowest price</SelectItem><SelectItem value="new">Newest</SelectItem></SelectContent></Select>
     </div>
     {visibleMarket===null?<TileSkeletons/>:visibleMarket.length===0?<EmptyState title={query?'No matches':'No published agents yet'} text={query?(mode==='title'?'No agent names match. Try Search everything.':'Nothing matches your search.'):'Publish one of your agents from My agents and it shows up here for everyone.'} chars={['cole','nova','rook']} action={!query?<Button variant="outline" onClick={()=>navigate('agents')}>Go to My agents</Button>:undefined}/>:
-    <Grid>{visibleMarket.map((a,k)=><AgentTile key={a.id} a={a} idx={k+2} creator={a.mine?'Your agent':a.creator} price={a.price} status={a.mine?'mine':'live'}
+    <Grid>{visibleMarket.map((a,k)=><AgentTile key={a.id} a={a} idx={k+2} creator={a.mine?'Your agent':a.verified?`${a.creator} · verified`:a.creator} price={a.price} status={a.mine?'mine':'live'}
      actions={[['Open its page',()=>router.push(agentPath(a.id))],['Copy link',()=>copyText(location.origin+agentPath(a.id),toast.success,toast.error)]]}
      footer={<><span className="text-xs text-muted-foreground">{a.uses} run{a.uses===1?'':'s'} · {a.tone}</span><Button size="sm" variant="outline" className="ml-auto" onClick={()=>router.push(agentPath(a.id))}>Talk</Button><Button size="sm" onClick={()=>{if(!requireAuth())return;setMarketAgent(a);}}>Run a task<I id="arrow"/></Button></>}/>)}</Grid>}
     <div className="mt-2 flex items-end justify-between gap-3"><div className="grid gap-1"><h2 className="font-display text-xl font-medium tracking-[-.02em]">Starter templates</h2><p className="text-sm text-muted-foreground">Editable starting points. Published agents run as-is; their instructions are not shown.</p></div></div>
@@ -410,6 +411,7 @@ export default function Studio(){
     {view==='whales'&&<WhalesPage onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
     {view==='invite'&&route.doc&&<InvitePage key={route.doc} code={route.doc} auth={auth} onNavigate={(v,doc)=>navigate(v,doc)} onSignIn={()=>setSignin(true)}/>}
     {view==='referral'&&<ReferralPage onNavigate={(v,doc)=>navigate(v,doc)}/>}
+    {view==='plaza'&&<PlazaPage auth={auth} onSignIn={()=>setSignin(true)} onSpent={refresh} onNavigate={(v,doc)=>navigate(v,doc)}/>}
     {view==='creators'&&<CreatorsPage onNavigate={(v,doc)=>navigate(v,doc)}/>}
     {view==='teamup'&&<TeamsInfoPage onNavigate={(v,doc)=>navigate(v,doc)}/>}
     {view==='recipes'&&<RecipesPage onNavigate={(v,doc)=>navigate(v,doc)}/>}

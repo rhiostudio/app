@@ -5,10 +5,11 @@
                  /tiers (what each holder tier needs and gives)  /recipes (ready-made automations)
                  /r/<code> (an invite link)  /invite (what inviting a friend gives)
                  /teams (agents that hand their work to the next one)  /creators (an agent in your own voice)
+                 /plaza (the published agents in one place; click one to talk)
    Dashboard:    /dashboard  /dashboard/{studio,agents,teams,discover,skills,schedules,quests,history,credits,wallet,rewards,profile}
                  /dashboard/docs[/slug]  /dashboard/whitepaper[/slug]  /dashboard/roadmap
    Signed-in only (proxy.ts redirects to /login?next=...): see PROTECTED_PATHS. */
-export type View='home'|'login'|'notfound'|'agent'|'shared'|'whales'|'tiers'|'recipes'|'invite'|'referral'|'teamup'|'creators'|'overview'|'profile'|'rewards'|'wallet'|'studio'|'agents'|'teams'|'discover'|'skills'|'schedules'|'quests'|'activity'|'credits'|'docs'|'paper'|'roadmap';
+export type View='home'|'login'|'notfound'|'agent'|'shared'|'whales'|'tiers'|'recipes'|'invite'|'referral'|'teamup'|'creators'|'plaza'|'overview'|'profile'|'rewards'|'wallet'|'studio'|'agents'|'teams'|'discover'|'skills'|'schedules'|'quests'|'activity'|'credits'|'docs'|'paper'|'roadmap';
 export type Area='site'|'dash';
 export type Route={view:View;area:Area;doc?:string};
 
@@ -40,6 +41,7 @@ export function pathFor(view:View,doc?:string,area:Area='dash'):string{
  if(view==='referral')return '/invite';
  if(view==='teamup')return '/teams';
  if(view==='creators')return '/creators';
+ if(view==='plaza')return '/plaza';
  if(view==='shared')return doc?`/s/${doc}`:'/';
  if(view==='home'||view==='login'||view==='notfound')return view==='login'?'/login':'/';
  const docs=view==='docs'||view==='paper';
@@ -61,6 +63,7 @@ export function parsePath(pathname:string):Route{
  if(a==='invite'&&!b)return {view:'referral',area:'site'};
  if(a==='teams'&&!b)return {view:'teamup',area:'site'};
  if(a==='creators'&&!b)return {view:'creators',area:'site'};
+ if(a==='plaza'&&!b)return {view:'plaza',area:'site'};
  if(a==='r'&&b&&!c&&INVITE_PATH_CODE.test(b.toUpperCase()))return {view:'invite',area:'site',doc:b.toUpperCase()};
  if(a==='s'&&b&&!c&&SHARE_PATH_ID.test(b))return {view:'shared',area:'site',doc:b};
  if(a==='a'&&b&&!c&&AGENT_PATH_ID.test(b))return {view:'agent',area:'site',doc:b.toLowerCase()};

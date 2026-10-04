@@ -8,6 +8,7 @@ import {api,I,copyText} from '@/app/ui';
 import {ToneIcon,type View} from '@/components/rhio/navbar';
 import {DashPage,EmptyState,PageHeader,StatusBadge} from './parts';
 import {HoldingsCard} from './holdings';
+import {CreatorVerify} from './creator-verify';
 
 export function ProfilePage({auth,label,wallet,balance,earned,feeBps,navigate,onSignIn,onSignOut}:{auth:boolean;label:string;wallet:string;balance:number|null;earned:number;feeBps:number;navigate:(v:View)=>void;onSignIn:()=>void;onSignOut:()=>void}){
  const [explorer,setExplorer]=useState('');
@@ -40,6 +41,7 @@ export function ProfilePage({auth,label,wallet,balance,earned,feeBps,navigate,on
      <span className="text-[11.5px] text-muted-foreground">Platform fee {feeBps/100}%{feeBps===0?' · beta':''}. Credits pay for runs; earned credits can be claimed on the Wallet page when claims are on.</span>
     </section>
     <div className="grid grid-cols-3 gap-2">{([['credits','coins','Credits'],['wallet','wallet','Wallet'],['activity','clock','History']] as const).map(([v,ic,t])=><Button key={v} variant="outline" className="h-auto flex-col gap-1.5 py-3 text-[12.5px] [&_svg]:size-4" onClick={()=>navigate(v)}><I id={ic}/>{t}</Button>)}</div>
+    <CreatorVerify auth={auth}/>
     <section className="flex items-start gap-3 rounded-xl border p-4 text-[12.5px] text-muted-foreground"><ToneIcon icon="shield" tone="sky" className="size-8"/><span>RHIO never asks for your recovery phrase and never moves funds for you. Every transaction is signed in your own wallet.</span></section>
    </div>
    <HoldingsCard auth={auth} onWallet={()=>navigate('wallet')} compact/>

@@ -119,6 +119,7 @@ container. Kalau perlu memicunya sendiri (Coolify → Terminal), perintahnya:
 
 ## 4b-2. Jadwal agent dan NVDA reward
 - **Jadwal agent** aktif otomatis. Batasnya bisa diatur lewat env:
+  - `CREATOR_ADMINS`: alamat wallet (pisahkan dengan koma) yang boleh mengonfirmasi handle X kreator di halaman Profile; kosong = verifikasi kreator ditutup;
   - `VOICE_COST`: kredit per draft persona dari post kreator sendiri (Studio → Persona), default 8;
   - `TALK_COST`: kredit per pesan chat dengan agent di halamannya, default 3 (harga kreator ditambahkan di atasnya);
   - `SCHEDULE_RUN_COST`: kredit per run, default 5;
