@@ -155,12 +155,14 @@ export async function readMany(c:ChainConfig,reads:ContractRead[],blockNumber:bi
 export const creditsFor=(raw:bigint,c:ChainConfig)=>c.token?Number(raw*BigInt(c.creditsPerToken)/10n**BigInt(c.token.decimals)):0;
 export const rawFor=(credits:number,c:ChainConfig)=>c.token?BigInt(credits)*10n**BigInt(c.token.decimals)/BigInt(c.creditsPerToken):0n;
 
-/* ---------------------------------------------------------------- holder tiers (draft values) */
+/* ---------------------------------------------------------------- holder tiers
+   Thresholds in whole RHIO (client, 4 Oct 2026: 1.5M / 5M / 10M; before: 10K / 100K / 1M). 1,500,000 is also the default
+   holder reward unit. `slots` is an older draft for agent slots and is not applied anywhere. */
 export const TIERS=[
  {id:'free',name:'Free',min:0n,feePermille:1000,mult:0,slots:10},
- {id:'holder',name:'Holder',min:10_000n,feePermille:700,mult:1,slots:25},
- {id:'builder',name:'Builder',min:100_000n,feePermille:500,mult:3,slots:50},
- {id:'studio',name:'Studio',min:1_000_000n,feePermille:300,mult:10,slots:0},
+ {id:'holder',name:'Holder',min:1_500_000n,feePermille:700,mult:1,slots:25},
+ {id:'builder',name:'Builder',min:5_000_000n,feePermille:500,mult:3,slots:50},
+ {id:'studio',name:'Studio',min:10_000_000n,feePermille:300,mult:10,slots:0},
 ] as const;
 export type Tier=typeof TIERS[number];
 /** Tier for a raw RHIO balance (18 decimals). */
