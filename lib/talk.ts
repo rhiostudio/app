@@ -25,7 +25,7 @@ export function talkCost(){const raw=(runtime() as {TALK_COST?:string}).TALK_COS
 /** How a message runs and what it costs on this server (the creator's price comes on top). */
 export const talkInfo=()=>{const live=aiReady();return {mode:live?'live' as const:'sample' as const,message:live?talkCost():SAMPLE_COST,max:TALK_MESSAGE_MAX};};
 
-type Turn={id:string;prompt:string;output:string;status:string;cost:number;created:string};
+type Turn={id:string;prompt:string;output:string;status:string;cost:number;created:string;rating:number|null};
 const clip=(s:string,n:number)=>{const t=s.replace(/\s+/g,' ').trim();return t.length>n?`${t.slice(0,n)}…`:t;};
 
 /** The earlier turns of this conversation for the model, oldest first; null when it is the first message. */
@@ -36,9 +36,9 @@ export async function talkContext(db:D1Database,owner:string,agentId:string,thre
   ...rows.flatMap(r=>[`User: ${clip(r.prompt,ASKED_MAX)}`,`You: ${clip(splitSearchWidget(r.output).text,ANSWER_MAX)}`]),'>>>'].join('\n');
 }
 
-export type TalkMessage={id:string;asked:string;answer:string;ok:boolean;cost:number;created:string};
+export type TalkMessage={id:string;asked:string;answer:string;ok:boolean;cost:number;created:string;/** the owner's own mark of the answer (lib/ratings.ts) */rating:number|null};
 /** The account's own messages of a conversation, oldest first (the page reopening it). */
 export async function talkThread(db:D1Database,owner:string,agentId:string,thread:string):Promise<TalkMessage[]>{
- const rows=(await db.prepare("SELECT id,prompt,output,status,cost,created FROM runs WHERE owner=? AND agent_id=? AND talk=? AND status!='running' ORDER BY created DESC LIMIT ?").bind(owner,agentId,thread,RESTORE).all<Turn>()).results.reverse();
- return rows.map(r=>({id:r.id,asked:r.prompt,answer:r.status==='complete'?r.output:'',ok:r.status==='complete',cost:r.status==='complete'?r.cost:0,created:r.created}));
+ const rows=(await db.prepare("SELECT id,prompt,output,status,cost,created,(SELECT value FROM run_ratings rr WHERE rr.run_id=runs.id) AS rating FROM runs WHERE owner=? AND agent_id=? AND talk=? AND status!='running' ORDER BY created DESC LIMIT ?").bind(owner,agentId,thread,RESTORE).all<Turn>()).results.reverse();
+ return rows.map(r=>({id:r.id,asked:r.prompt,answer:r.status==='complete'?r.output:'',ok:r.status==='complete',cost:r.status==='complete'?r.cost:0,created:r.created,rating:r.rating??null}));
 }

@@ -1,12 +1,15 @@
 'use client';
 /* The chat on a published agent's page (/a/<id>): talk to the agent in its own voice. Every message is a normal paid
    run (POST /api/talk, lib/talk.ts): it costs a few credits plus the creator's price, lands in History, and the last
-   turns of the conversation go with it as context. "Share" puts the conversation so far (the last answered message
+   turns of the conversation go with it as context. Before the first message the agent's own greeting and questions to start
+   from are shown (its creator wrote them; they cost nothing). Each answer can be marked helpful or not (POST /api/rate,
+   lib/ratings.ts). "Share" puts the conversation so far (the last answered message
    and up to five turns before it) on a public page, /s/<id> (lib/share.ts), and "Stop sharing" takes it down. The conversation's id is kept in this browser, so coming back to
    the page reopens it; "New conversation" starts a fresh one. Signed out, the box asks to connect a wallet. */
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {toast} from 'sonner';
 import {FaXTwitter} from 'react-icons/fa6';
+import {ThumbsDown,ThumbsUp} from 'lucide-react';
 import {api,copyText,I,TextOut} from '@/app/ui';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
@@ -17,7 +20,7 @@ import type {MarketAgent} from '@/lib/agents';
 import type {CharacterId} from '@/lib/characters';
 
 type Info={signedIn:boolean;mode:'live'|'sample';message:number;max:number;balance:number|null};
-type Line={id:string;asked:string;answer:string;ok:boolean;cost:number;error?:string;pending?:boolean};
+type Line={id:string;asked:string;answer:string;ok:boolean;cost:number;error?:string;pending?:boolean;/** the visitor's own mark: 1 helpful, -1 not */rating?:number|null};
 const key=(agent:string)=>`rhio-talk:${agent}`;
 const stored=(agent:string)=>{try{const v=localStorage.getItem(key(agent));return v&&/^[0-9a-f-]{36}$/i.test(v)?v:null;}catch{return null;}};
 const keep=(agent:string,thread:string)=>{try{localStorage.setItem(key(agent),thread);}catch{/* the conversation still works for this visit */}};
@@ -37,8 +40,8 @@ export function AgentTalk({agent,auth,onSignIn,onSpent,onMood}:{agent:MarketAgen
 
  const each=(info?.message??0)+(agent.mine?0:agent.talkPrice);
  const short=info?.balance!==null&&info?.balance!==undefined&&info.balance<each;
- async function send(){
-  const message=text.trim();if(!message||busy||!info)return;
+ async function send(preset?:string){
+  const message=(preset??text).trim();if(!message||busy||!info)return;
   if(!auth){onSignIn();return;}
   const id=crypto.randomUUID();setBusy(true);setText('');setLines(l=>[...l,{id,asked:message,answer:'',ok:false,cost:0,pending:true}]);onMood?.('think');
   try{
@@ -47,6 +50,12 @@ export function AgentTalk({agent,auth,onSignIn,onSpent,onMood}:{agent:MarketAgen
    setLines(l=>l.map(x=>x.id===id?{id,asked:message,answer:r.answer,ok:true,cost:r.cost}:x));setInfo(i=>i&&{...i,balance:r.balance});onMood?.('answer');onSpent();
   }catch(e:any){setLines(l=>l.map(x=>x.id===id?{id,asked:message,answer:'',ok:false,cost:0,error:e.message}:x));onMood?.('idle');}
   finally{setBusy(false);}
+ }
+ /** Marks an answer helpful or not; the same button again takes the mark back. */
+ async function rate(l:Line,value:number){
+  const next=l.rating===value?0:value;setLines(ls=>ls.map(x=>x.id===l.id?{...x,rating:next||null}:x));
+  try{await api('/api/rate',{method:'POST',body:JSON.stringify({runId:l.id,value:next})});}
+  catch(e:any){setLines(ls=>ls.map(x=>x.id===l.id?{...x,rating:l.rating??null}:x));toast.error(e.message);}
  }
  function fresh(){thread.current=crypto.randomUUID();try{localStorage.removeItem(key(agent.id));}catch{/* nothing kept */}setLines([]);setShared(null);toast.success('New conversation');}
  const answered=lines.filter(l=>l.ok);const last=answered[answered.length-1];
@@ -71,7 +80,14 @@ export function AgentTalk({agent,auth,onSignIn,onSpent,onMood}:{agent:MarketAgen
    {lines.length>0&&<div className="flex flex-wrap gap-1">{last&&!shared&&<Button size="sm" variant="ghost" disabled={busy||sharing} onClick={share}><I id="share"/>{sharing?'Sharing…':'Share'}</Button>}<Button size="sm" variant="ghost" disabled={busy} onClick={fresh}><I id="reset"/>New conversation</Button></div>}
   </div>
   <div className="grid max-h-[460px] min-h-28 content-start gap-3 overflow-y-auto rounded-xl border bg-background p-3" aria-live="polite">
-   {!lines.length&&<p className="self-center p-3 text-center text-[13.5px] text-muted-foreground">Say hello, or ask {agent.name} what it thinks about something. It answers in its own voice{info?.mode==='sample'?'; AI is not connected here, so answers are labelled workflow samples':''}.</p>}
+   {!lines.length&&<div className="grid gap-3">
+    {agent.greeting?<div className="flex max-w-[92%] items-start gap-2 justify-self-start"><Thumb id={agent.skin as CharacterId} className="size-7 shrink-0 rounded-md bg-t-lime object-[50%_18%]"/>
+      <p className="rounded-2xl rounded-bl-md border bg-card px-3.5 py-2 text-[14px] break-words whitespace-pre-wrap">{agent.greeting}</p></div>
+     :<p className="p-3 text-center text-[13.5px] text-muted-foreground">Say hello, or ask {agent.name} what it thinks about something. It answers in its own voice.</p>}
+    {agent.starters.length>0&&<div className="flex flex-wrap gap-1.5">{agent.starters.map(q=><button key={q} type="button" disabled={busy||!info||(auth&&short)} onClick={()=>send(q)}
+     className="rounded-full border bg-card px-3 py-1.5 text-left text-[13px] transition-colors hover:border-foreground/40 disabled:opacity-50">{q}</button>)}</div>}
+    {info?.mode==='sample'&&<p className="text-[12px] text-muted-foreground">AI is not connected here, so answers are labelled workflow samples.</p>}
+   </div>}
    {lines.map(l=><div key={l.id} className="grid gap-2">
     <p className="max-w-[85%] justify-self-end rounded-2xl rounded-br-md bg-lime px-3.5 py-2 text-[14px] break-words whitespace-pre-wrap text-ink">{l.asked}</p>
     <div className="flex max-w-[92%] items-start gap-2 justify-self-start">
@@ -82,6 +98,10 @@ export function AgentTalk({agent,auth,onSignIn,onSpent,onMood}:{agent:MarketAgen
        :l.ok?<TextOut text={l.answer}/>:<span className="text-[13.5px] text-muted-foreground">This message was not answered; its credits were returned.</span>}
      </div>
     </div>
+    {l.ok&&<div className="ml-9 flex items-center gap-1 text-muted-foreground">
+     <button type="button" aria-label="Helpful" aria-pressed={l.rating===1} onClick={()=>rate(l,1)} className={cn('grid size-7 place-items-center rounded-md transition-colors hover:bg-secondary hover:text-foreground',l.rating===1&&'bg-lime/20 text-foreground')}><ThumbsUp className="size-3.5" aria-hidden="true"/></button>
+     <button type="button" aria-label="Not helpful" aria-pressed={l.rating===-1} onClick={()=>rate(l,-1)} className={cn('grid size-7 place-items-center rounded-md transition-colors hover:bg-secondary hover:text-foreground',l.rating===-1&&'bg-t-coral text-coral')}><ThumbsDown className="size-3.5" aria-hidden="true"/></button>
+    </div>}
    </div>)}
    <div ref={end}/>
   </div>
@@ -97,7 +117,7 @@ export function AgentTalk({agent,auth,onSignIn,onSpent,onMood}:{agent:MarketAgen
    <Textarea value={text} onChange={e=>setText(e.target.value)} maxLength={info?.max??2000} disabled={busy} aria-label={`Message to ${agent.name}`} placeholder={auth?`Message ${agent.name}…`:'Connect a wallet to talk'} className="min-h-16"
     onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();send();}}}/>
    <div className="flex flex-wrap items-center gap-3">
-    {auth?<Button disabled={busy||!text.trim()||!info||short} onClick={send}><I id="arrow"/>{busy?'Waiting…':'Send'}</Button>
+    {auth?<Button disabled={busy||!text.trim()||!info||short} onClick={()=>send()}><I id="arrow"/>{busy?'Waiting…':'Send'}</Button>
      :<Button onClick={onSignIn}><I id="wallet"/>Connect wallet to talk</Button>}
     <span className="text-xs text-muted-foreground">{short?`A message costs ${each} credits and you have ${info?.balance}.`:auth&&info?.balance!==null&&info?.balance!==undefined?`You have ${info.balance} credits. Enter sends, Shift+Enter makes a new line.`:'Each message is a run, paid in credits.'}</span>
    </div>

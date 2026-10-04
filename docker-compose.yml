@@ -46,6 +46,8 @@ services:
       TALK_COST: ${TALK_COST:-3}
       # credits for one draft of an agent's instructions from its creator's own posts (Studio, lib/voice.ts)
       VOICE_COST: ${VOICE_COST:-8}
+      # credits for one agent check before publishing (four AI calls, lib/agent-check.ts)
+      CHECK_COST: ${CHECK_COST:-8}
       # wallet addresses (comma-separated) of the accounts that may confirm a creator's X handle; empty = verification closed
       CREATOR_ADMINS: ${CREATOR_ADMINS:-}
       LIVE_DAILY_PER_USER: ${LIVE_DAILY_PER_USER:-50}

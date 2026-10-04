@@ -2,7 +2,8 @@
    Credits are an internal unit. They have no monetary value in the preview. */
 import {runtime} from './server';
 import {tierById} from './chain';
-import {DEFAULT_TRIAL_LIMIT,ANSWER_LANGUAGE} from './agents';
+import {DEFAULT_TRIAL_LIMIT,ANSWER_LANGUAGE,configMark} from './agents';
+import {scoreOf} from './ratings';
 import {searchesWeb,type ProviderConfig} from './provider';
 export const SAMPLE_COST=5;            // workflow sample run, paid to the platform
 const envInt=(name:string,fallback:number,max:number)=>{const raw=(runtime() as Record<string,unknown>)[name];const v=Number(raw);return typeof raw==='string'&&raw.trim()!==''&&Number.isFinite(v)?Math.min(Math.max(Math.round(v),0),max):fallback;};
@@ -133,8 +134,12 @@ export async function ensureWallet(db:D1Database,owner:string){
  if(r.meta.changes&&grant>0)await ledgerRow(db,owner,grant,'grant','Starting preview credits').run();
 }
 /** Public shape of a published agent: no instructions, no owner identity. */
-export function publicAgent(row:{id:string;name:string;config:string;price:number;talk_price?:number|null;uses:number;published_at:string|null;owner:string;/** the creator's verified X handle (lib/creators.ts), when the query selected it */handle?:string|null},viewer?:string){
+export function publicAgent(row:{id:string;name:string;config:string;price:number;talk_price?:number|null;uses:number;published_at:string|null;owner:string;/** the creator's verified X handle (lib/creators.ts), when the query selected it */handle?:string|null;
+ /** the last agent check and the helpful / not helpful marks of other accounts, when the query selected them */checked_at?:string|null;check_mark?:string|null;check_passed?:number|null;up?:number|null;down?:number|null},viewer?:string){
  const c=JSON.parse(row.config);
- return {id:row.id,name:row.name,skin:c.skin,look:c.look,appearance:c.appearance,motion:c.motion,skills:c.skills,tone:c.tone,language:ANSWER_LANGUAGE,tagline:c.tagline||'',price:row.price,/* per chat message; the task price when the creator set none */talkPrice:row.talk_price??row.price,uses:row.uses,publishedAt:row.published_at,/* a handle is shown only when a reviewer confirmed it; otherwise an anonymous id */creator:row.handle?`@${row.handle}`:'creator-'+hash(row.owner),verified:!!row.handle,mine:viewer===row.owner};
+ return {id:row.id,name:row.name,skin:c.skin,look:c.look,appearance:c.appearance,motion:c.motion,skills:c.skills,tone:c.tone,language:ANSWER_LANGUAGE,tagline:c.tagline||'',price:row.price,/* per chat message; the task price when the creator set none */talkPrice:row.talk_price??row.price,uses:row.uses,publishedAt:row.published_at,/* a handle is shown only when a reviewer confirmed it; otherwise an anonymous id */creator:row.handle?`@${row.handle}`:'creator-'+hash(row.owner),verified:!!row.handle,mine:viewer===row.owner,
+  greeting:typeof c.greeting==='string'?c.greeting:'',starters:Array.isArray(c.starters)?c.starters.filter((s:unknown)=>typeof s==='string'&&s).slice(0,3):[],knows:!!c.knowledge,
+  // checked = it passed, and it still says and knows what was checked
+  checked:row.checked_at&&row.check_passed&&row.check_mark===configMark(c)?row.checked_at:null,rating:scoreOf(Number(row.up||0),Number(row.down||0))};
 }
 function hash(s:string){let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return (h>>>0).toString(36).slice(0,6);}
