@@ -42,6 +42,8 @@ const WalletPage=lazy(()=>import('@/components/app/wallet').then(m=>({default:m.
 const SchedulesPage=lazy(()=>import('@/components/app/schedules').then(m=>({default:m.SchedulesPage})));
 const AgentSchedules=lazy(()=>import('@/components/app/schedules').then(m=>({default:m.AgentSchedules})));
 const RewardsPage=lazy(()=>import('@/components/app/rewards').then(m=>({default:m.RewardsPage})));
+const TeamsPage=lazy(()=>import('@/components/app/teams').then(m=>({default:m.TeamsPage})));
+const TeamsInfoPage=lazy(()=>import('@/components/rhio/teams-page').then(m=>({default:m.TeamsInfoPage})));
 const QuestsPage=lazy(()=>import('@/components/app/quests').then(m=>({default:m.QuestsPage})));
 const AccountPanel=lazy(()=>import('@/components/app/account').then(m=>({default:m.AccountPanel})));
 const SignIn=lazy(()=>import('@/components/rhio/sign-in').then(m=>({default:m.SignIn})));
@@ -273,6 +275,7 @@ export default function Studio(){
    {view==='profile'&&<ProfilePage auth={auth} label={email} wallet={wallet} balance={balance} earned={earned} feeBps={feeBps} navigate={(v:View)=>navigate(v)} onSignIn={()=>setSignin(true)} onSignOut={signOut}/>}
    {view==='wallet'&&<WalletPage auth={auth} onSignIn={()=>setSignin(true)} onChanged={refresh}/>}
    {view==='schedules'&&<SchedulesPage auth={auth} agents={agents} balance={balance} onSignIn={()=>setSignin(true)} onOpenHistory={()=>navigate('activity')} onAgents={refresh}/>}
+   {view==='teams'&&<TeamsPage auth={auth} agents={agents} balance={balance} onSignIn={()=>setSignin(true)} onOpenHistory={()=>navigate('activity')} onChanged={refresh}/>}
    {view==='quests'&&<QuestsPage auth={auth} onSignIn={()=>setSignin(true)} onGo={v=>navigate(v)} onClaimed={refresh}/>}
    {view==='rewards'&&<RewardsPage wallet={wallet||undefined} auth={auth} onSignIn={()=>setSignin(true)} onPaper={()=>navigate('paper','token')}/>}
 
@@ -343,7 +346,7 @@ export default function Studio(){
      <div className="overflow-hidden rounded-xl border max-md:hidden"><Table>
       <TableHeader className="bg-secondary/60"><TableRow className="hover:bg-transparent">{['Agent','Task','Mode','Status','Cost','When'].map(h=><TableHead key={h} className="h-10 font-mono text-[10.5px] tracking-[.08em] text-muted-foreground uppercase">{h}</TableHead>)}</TableRow></TableHeader>
       <TableBody className="stagger">{shownRuns.map(r=><TableRow key={r.id} onClick={()=>setRunDetail(r)} className="cursor-pointer">
-       <TableCell className="font-medium">{r.agent_name}{r.schedule_id&&<span className="ml-1.5 inline-flex items-center gap-1 rounded bg-t-mint px-1.5 py-px align-middle font-mono text-[9.5px] font-semibold text-[#15845a] uppercase dark:text-mint"><I id="clock" className="i size-2.5"/>Scheduled</span>}</TableCell>
+       <TableCell className="font-medium">{r.agent_name}{!!r.step&&<span className="ml-1.5 inline-flex items-center gap-1 rounded bg-t-iris px-1.5 py-px align-middle font-mono text-[9.5px] font-semibold text-iris uppercase"><I id="link" className="i size-2.5"/>Team · {r.step}</span>}{r.schedule_id&&<span className="ml-1.5 inline-flex items-center gap-1 rounded bg-t-mint px-1.5 py-px align-middle font-mono text-[9.5px] font-semibold text-[#15845a] uppercase dark:text-mint"><I id="clock" className="i size-2.5"/>Scheduled</span>}</TableCell>
        <TableCell className="max-w-[360px] truncate text-muted-foreground">{r.prompt}</TableCell>
        <TableCell><StatusBadge kind={r.mode==='sample'?'sample':'live_ai'}>{r.mode==='sample'?'Sample':'AI'}</StatusBadge></TableCell>
        <TableCell><StatusBadge kind={r.status}/></TableCell>
@@ -402,6 +405,7 @@ export default function Studio(){
     {view==='whales'&&<WhalesPage onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
     {view==='invite'&&route.doc&&<InvitePage key={route.doc} code={route.doc} auth={auth} onNavigate={(v,doc)=>navigate(v,doc)} onSignIn={()=>setSignin(true)}/>}
     {view==='referral'&&<ReferralPage onNavigate={(v,doc)=>navigate(v,doc)}/>}
+    {view==='teamup'&&<TeamsInfoPage onNavigate={(v,doc)=>navigate(v,doc)}/>}
     {view==='recipes'&&<RecipesPage onNavigate={(v,doc)=>navigate(v,doc)}/>}
     {view==='tiers'&&<TiersPage onNavigate={(v,doc)=>navigate(v,doc,v==='paper'?'site':undefined)}/>}
     {view==='shared'&&route.doc&&<SharePage key={route.doc} id={route.doc} onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}

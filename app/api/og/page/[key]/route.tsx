@@ -73,6 +73,30 @@ export async function GET(request:Request){
    {width:W,height:H,headers:{'Cache-Control':'public, max-age=600'}},
   );
  }
+ if(key==='teams'){
+  // two agents on the left with the hand-over between them, the text on the right
+  const pair=await asset(`${origin}/characters/card/pair-team.jpg`,'image/jpeg');
+  return new ImageResponse(
+   <div style={{width:W,height:H,display:'flex',position:'relative',backgroundColor:'#0b110d',color:'#f4f6f1',fontFamily:'sans-serif'}}>
+    {pair?<img src={pair} width={600} height={H} style={{position:'absolute',left:-20,top:0}}/>:null}
+    <div style={{display:'flex',alignItems:'center',justifyContent:'center',position:'absolute',left:232,top:258,width:96,height:96,borderRadius:96,backgroundColor:'#c8ff24',border:'6px solid #0b110d'}}>
+     <svg width="52" height="52" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6" stroke="#0b110d" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg></div>
+    <div style={{display:'flex',flexDirection:'column',justifyContent:'space-between',position:'absolute',left:590,top:0,width:610,height:H,padding:'52px 56px 52px 0'}}>
+     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+      <div style={{display:'flex',fontSize:18,letterSpacing:4,color:'#8a968c'}}>{c.kicker}</div>
+      {logo?<img src={logo} width={146} height={44}/>:<div style={{display:'flex',fontSize:24,letterSpacing:6,color:'#c8ff24'}}>RHIO</div>}
+     </div>
+     <div style={{display:'flex',flexDirection:'column'}}>
+      {['One agent','hands its work','to the next.'].map((l,i)=><div key={l} style={{display:'flex',fontSize:70,lineHeight:1.06,letterSpacing:-2.5,color:i===2?'#c8ff24':'#f4f6f1'}}>{l}</div>)}
+     </div>
+     <div style={{display:'flex',flexDirection:'column',gap:10}}>
+      {['Research, then write','Your agents, or published ones','Every step lands in your History'].map(l=><div key={l} style={{display:'flex',alignItems:'center',gap:14,fontSize:25,color:'#d9e4d6'}}><div style={{display:'flex',width:10,height:10,borderRadius:10,backgroundColor:'#c8ff24'}}/>{l}</div>)}
+     </div>
+    </div>
+   </div>,
+   {width:W,height:H,headers:{'Cache-Control':'public, max-age=3600'}},
+  );
+ }
  if(c.layout==='left')return new ImageResponse(
   <div style={{width:W,height:H,display:'flex',position:'relative',backgroundColor:'#0b110d',color:'#f4f6f1',fontFamily:'sans-serif'}}>
    {img?<img src={img} width={480} height={H} style={{position:'absolute',left:-40,top:0}}/>:null}

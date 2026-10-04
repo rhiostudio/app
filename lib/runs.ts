@@ -16,6 +16,7 @@ import {runAI,AIError,searchesWeb} from './provider';
 import {isOpenSkill,skillCatalog,type Agent,type SkillId} from './agents';
 import {monitorTarget,readWallet,saveReading} from './monitor';
 import {whaleReading} from './whales';
+import {handover,type Relay} from './teams';
 import {SAMPLE_COST,liveRunCost,aiDailyRuns,aiDailyFreeRuns,liveDailyPerUser,quotaKeys,quotaStep,ensureWallet,ledgerRow,split,tierFeePermille,skillTrialLimit,refillFree,heavyWindow,heavyKey,searchForFreeCredits,takeSearchSlot,returnSearchSlot} from './economy';
 /** Heavy skills on manual live runs count against the 5-hour window (lib/economy.ts heavyWindow). */
 const isHeavy=(mode:string,skill:string,scheduled:boolean)=>mode==='live'&&!scheduled&&heavyWindow().skills.includes(skill);
@@ -23,9 +24,10 @@ const isHeavy=(mode:string,skill:string,scheduled:boolean)=>mode==='live'&&!sche
 const TIMED_OUT='The task took too long and was cancelled. Any credits were returned.';
 
 /** `expectedPrice`: the creator price the buyer saw. When the creator changed it meanwhile, the run is refused. */
-export type RunInput={id:string;agentId:string;prompt:string;skill:SkillId;mode:'sample'|'live';expectedPrice?:number};
+export type RunInput={id:string;agentId:string;prompt:string;skill:SkillId;mode:'sample'|'live';expectedPrice?:number;
+ /** a step of a team run (lib/teams.ts): the run works from the answer of the step before it */relay?:Relay};
 type AgentRow={owner:string;config:string;name:string;published:number;price:number;archived:number};
-export type RunRow={id:string;agent_id:string;agent_name:string;prompt:string;output:string;mode:string;cost:number;status:string;created:string;skill:string;schedule_id?:string|null};
+export type RunRow={id:string;agent_id:string;agent_name:string;prompt:string;output:string;mode:string;cost:number;status:string;created:string;skill:string;schedule_id?:string|null;relay?:string|null;step?:number|null};
 
 /** `opts` (runs started for the owner from outside the Studio, lib/notify.ts): `guard` keeps the agent's instructions
     unshown even on the owner's own agent, `search:false` answers without web search, `label` names the run in the ledger. */
@@ -55,10 +57,13 @@ export async function performRun(db:D1Database,owner:string,data:RunInput,schedu
  const wallet=data.skill==='monitor'?await readWallet(db,owner,await monitorTarget(db,owner,data.prompt)):null;
  // Whale watch works the same way with the server's record of the RHIO token (lib/whales.ts): no record, no charge.
  const reading=wallet||(data.skill==='whales'?await whaleReading(db):null);
+ // A step of a team run works from the answer of the step before it. Checked here, before anything is charged: a
+ // step whose predecessor did not complete (or belongs to another account or team run) costs nothing.
+ const relay=!schedule&&data.relay?data.relay:null;const handed=relay?await handover(db,owner,relay):null;
  // an account that holds bought credits is on the paid tier: more heavy runs, and not limited by the free pool
  const holdsPaid=(w?.paid??0)>0;
  const statements=[
-  db.prepare('INSERT INTO runs (id,owner,agent_id,agent_name,prompt,output,mode,cost,status,created,skill,schedule_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').bind(data.id,owner,data.agentId,record.name,data.prompt,'',data.mode,cost,'running',created,data.skill,schedule?.id??null),
+  db.prepare('INSERT INTO runs (id,owner,agent_id,agent_name,prompt,output,mode,cost,status,created,skill,schedule_id,relay,step) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(data.id,owner,data.agentId,record.name,data.prompt,'',data.mode,cost,'running',created,data.skill,schedule?.id??null,relay?.id??null,relay?.step??null),
   // free credits are spent first; the part taken from bought credits (paid) is fixed here, from the balance at this
   // moment inside the batch, so parallel runs cannot misstate it (drizzle/0014)
   db.prepare('UPDATE runs SET paid_cost=(SELECT CAST(MIN(?,MAX(0,?-(balance-paid))) AS INTEGER) FROM preview_wallets WHERE owner=?) WHERE id=? AND owner=?').bind(cost,cost,owner,data.id,owner),
@@ -68,7 +73,7 @@ export async function performRun(db:D1Database,owner:string,data:RunInput,schedu
   // the CHECK on the balance aborts the whole batch when it would go below zero: two parallel runs can never overdraw
   db.prepare('UPDATE preview_wallets SET balance=balance-?,paid=paid-(SELECT paid_cost FROM runs WHERE id=? AND owner=?) WHERE owner=?').bind(cost,data.id,owner,owner),
  ];
- if(cost>0)statements.push(ledgerRow(db,owner,-cost,'run',schedule?`Scheduled run · ${record.name}`:mine?`${opts.label||(data.mode==='sample'?'Workflow sample':'Live run')} · ${record.name}`:`Ran ${record.name} (${price} to creator${base?`, ${base} sample`:''})`,data.id,created));
+ if(cost>0)statements.push(ledgerRow(db,owner,-cost,'run',schedule?`Scheduled run · ${record.name}`:mine?`${opts.label||(relay?`Team run, step ${relay.step}`:data.mode==='sample'?'Workflow sample':'Live run')} · ${record.name}`:`Ran ${record.name} (${price} to creator${base?`, ${base} sample`:''})`,data.id,created));
  // every run by someone else counts as a use, free agents included (Discover sorts by it)
  if(!mine){if(price>0)await ensureWallet(db,record.owner);statements.push(db.prepare('UPDATE agents SET uses=uses+1 WHERE id=?').bind(data.agentId));}
  // one try used; at the limit the counter becomes -1, the CHECK fails and the whole batch rolls back (no race)
@@ -111,8 +116,9 @@ export async function performRun(db:D1Database,owner:string,data:RunInput,schedu
  // guard: someone else's published agent keeps its instructions private from the person running it
  try{
   if(data.mode==='sample')output=sampleResult(agent,data.prompt,data.skill);
-  else{const r=await runAI(runtime(),agent,data.skill,reading?`${data.prompt}\n\n${reading.facts}`:data.prompt,data.id,{free,guard:!mine||!!opts.guard,search});output=r.output;if(search&&!r.searched)await returnSearchSlot(db,created).catch(()=>null);}
+  else{const r=await runAI(runtime(),agent,data.skill,[data.prompt,handed?.facts,reading?.facts].filter(Boolean).join('\n\n'),data.id,{free,guard:!mine||!!opts.guard,search});output=r.output;if(search&&!r.searched)await returnSearchSlot(db,created).catch(()=>null);}
   if(reading)output=`${output}\n\n${reading.note}`;
+  if(handed)output=`${output}\n\n${handed.note}`;
  }
  catch(e){
   if(search&&e instanceof AIError&&!e.billed)await returnSearchSlot(db,created).catch(()=>null);
@@ -135,7 +141,7 @@ export async function performRun(db:D1Database,owner:string,data:RunInput,schedu
  if(!completed.meta.changes)throw new HttpError(504,TIMED_OUT);
  // the reading becomes "the last check" only once its report exists
  if(wallet)await saveReading(db,owner,wallet).catch(e=>console.error('RHIO wallet monitor: reading not saved:',safeMessage((e as Error)?.message||e)));
- return {id:data.id,agent_id:data.agentId,agent_name:record.name,prompt:data.prompt,output,mode:data.mode,cost,status:'complete',created,skill:data.skill,schedule_id:schedule?.id??null};
+ return {id:data.id,agent_id:data.agentId,agent_name:record.name,prompt:data.prompt,output,mode:data.mode,cost,status:'complete',created,skill:data.skill,schedule_id:schedule?.id??null,relay:relay?.id??null,step:relay?.step??null};
 }
 
 type Reserved={id:string;owner:string;agentId:string;note:string;cost:number;skill:string;mode:string;created:string;scheduleId:string|null;foreign:boolean;trial:boolean;pooled:boolean};

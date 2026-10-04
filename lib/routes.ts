@@ -4,14 +4,15 @@
                  /whales (the RHIO token's biggest transfers and holders)  /s/<id> (one shared answer)
                  /tiers (what each holder tier needs and gives)  /recipes (ready-made automations)
                  /r/<code> (an invite link)  /invite (what inviting a friend gives)
-   Dashboard:    /dashboard  /dashboard/{studio,agents,discover,skills,schedules,quests,history,credits,wallet,rewards,profile}
+                 /teams (agents that hand their work to the next one)
+   Dashboard:    /dashboard  /dashboard/{studio,agents,teams,discover,skills,schedules,quests,history,credits,wallet,rewards,profile}
                  /dashboard/docs[/slug]  /dashboard/whitepaper[/slug]  /dashboard/roadmap
    Signed-in only (proxy.ts redirects to /login?next=...): see PROTECTED_PATHS. */
-export type View='home'|'login'|'notfound'|'agent'|'shared'|'whales'|'tiers'|'recipes'|'invite'|'referral'|'overview'|'profile'|'rewards'|'wallet'|'studio'|'agents'|'discover'|'skills'|'schedules'|'quests'|'activity'|'credits'|'docs'|'paper'|'roadmap';
+export type View='home'|'login'|'notfound'|'agent'|'shared'|'whales'|'tiers'|'recipes'|'invite'|'referral'|'teamup'|'overview'|'profile'|'rewards'|'wallet'|'studio'|'agents'|'teams'|'discover'|'skills'|'schedules'|'quests'|'activity'|'credits'|'docs'|'paper'|'roadmap';
 export type Area='site'|'dash';
 export type Route={view:View;area:Area;doc?:string};
 
-const DASH:Partial<Record<View,string>>={overview:'',studio:'studio',agents:'agents',discover:'discover',skills:'skills',schedules:'schedules',quests:'quests',activity:'history',
+const DASH:Partial<Record<View,string>>={overview:'',studio:'studio',agents:'agents',teams:'teams',discover:'discover',skills:'skills',schedules:'schedules',quests:'quests',activity:'history',
  credits:'credits',wallet:'wallet',rewards:'rewards',profile:'profile',docs:'docs',paper:'whitepaper',roadmap:'roadmap'};
 const DASH_BY_SEGMENT=Object.fromEntries(Object.entries(DASH).map(([v,s])=>[s,v as View])) as Record<string,View>;
 /** Views that exist on the public site too (with a different, editorial layout). */
@@ -37,6 +38,7 @@ export function pathFor(view:View,doc?:string,area:Area='dash'):string{
  if(view==='recipes')return '/recipes';
  if(view==='invite')return doc?`/r/${doc}`:'/';
  if(view==='referral')return '/invite';
+ if(view==='teamup')return '/teams';
  if(view==='shared')return doc?`/s/${doc}`:'/';
  if(view==='home'||view==='login'||view==='notfound')return view==='login'?'/login':'/';
  const docs=view==='docs'||view==='paper';
@@ -56,6 +58,7 @@ export function parsePath(pathname:string):Route{
  if(a==='tiers'&&!b)return {view:'tiers',area:'site'};
  if(a==='recipes'&&!b)return {view:'recipes',area:'site'};
  if(a==='invite'&&!b)return {view:'referral',area:'site'};
+ if(a==='teams'&&!b)return {view:'teamup',area:'site'};
  if(a==='r'&&b&&!c&&INVITE_PATH_CODE.test(b.toUpperCase()))return {view:'invite',area:'site',doc:b.toUpperCase()};
  if(a==='s'&&b&&!c&&SHARE_PATH_ID.test(b))return {view:'shared',area:'site',doc:b};
  if(a==='a'&&b&&!c&&AGENT_PATH_ID.test(b))return {view:'agent',area:'site',doc:b.toLowerCase()};
@@ -69,4 +72,4 @@ export function parsePath(pathname:string):Route{
 }
 
 /** Legacy hash links (#studio, #agents, ...) from before routes existed. */
-export const LEGACY_HASH:Record<string,View>={studio:'studio',agents:'agents',discover:'discover',skills:'skills',schedules:'schedules',quests:'quests',activity:'activity',credits:'credits',wallet:'wallet',rewards:'rewards',docs:'docs',paper:'paper',roadmap:'roadmap'};
+export const LEGACY_HASH:Record<string,View>={studio:'studio',agents:'agents',teams:'teams',discover:'discover',skills:'skills',schedules:'schedules',quests:'quests',activity:'activity',credits:'credits',wallet:'wallet',rewards:'rewards',docs:'docs',paper:'paper',roadmap:'roadmap'};

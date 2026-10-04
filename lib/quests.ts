@@ -30,6 +30,8 @@ export const QUESTS:Quest[]=[
   check:(db,o)=>has(db,'SELECT 1 AS x FROM agents WHERE owner=? LIMIT 1',o)},
  {id:'run',title:'Put it to work',text:'Run one of its skills and get a result.',go:'studio',icon:'play',
   check:(db,o)=>has(db,"SELECT 1 AS x FROM runs WHERE owner=? AND status='complete' LIMIT 1",o)},
+ {id:'team',title:'Make two agents work together',text:'Line up two agents on the Teams page and run them: the second one works from the answer of the first.',go:'teams',icon:'link',
+  check:(db,o)=>has(db,"SELECT 1 AS x FROM runs WHERE owner=? AND status='complete' AND relay IS NOT NULL AND step>=2 LIMIT 1",o)},
  {id:'schedule',title:'Let it work on its own',text:'Put a skill on a schedule so the agent runs it without you.',go:'schedules',icon:'clock',
   check:(db,o)=>has(db,'SELECT 1 AS x FROM schedules WHERE owner=? LIMIT 1',o)},
  {id:'deliver',title:'Get the report where you are',text:'Connect a Discord channel or a Telegram chat under Schedules → Delivery.',go:'schedules',icon:'share',
