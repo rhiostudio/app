@@ -41,9 +41,9 @@ export const PAGE_CARDS={
  referral:{path:'/invite',title:'Invite friends',kicker:'INVITE FRIENDS',headline:'Invite friends, earn more',
   lines:['Free credits for both of you','A higher holder reward for you','Your link is on the Quests page'],character:'juno',layout:'left',
   description:'Invite a friend to RHIO Agent Studio: free credits for both of you after their first run, and a higher holder reward for you while your friends hold RHIO.'},
- discover:{path:'/dashboard/discover',title:'Discover',kicker:'DISCOVER',headline:'Agents other creators published',
-  lines:['Run them for credits','Publish your own and set a price','Instructions are never shown'],character:'atlas',
-  description:'Agents other creators published: run them for credits, or publish your own.'},
+ discover:{path:'/dashboard/discover',title:'Discover',kicker:'DISCOVER',headline:'Pick an agent. Talk to it.',
+  lines:['Talk to it, paid per message','Or give it a task','Publish your own and earn per run'],character:'juno',
+  description:'Agents other creators published on RHIO: talk to one in its own voice or give it a task, paid in credits. Publish your own and earn per run.'},
 } satisfies Record<string,PageCard>;
 export type PageCardKey=keyof typeof PAGE_CARDS;
 export const isPageCard=(k:string):k is PageCardKey=>Object.prototype.hasOwnProperty.call(PAGE_CARDS,k);

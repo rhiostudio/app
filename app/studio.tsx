@@ -297,7 +297,7 @@ export default function Studio(){
    </DashPage>}
 
    {view==='discover'&&<DashPage>
-    <PageHeader icon="store" tone="coral" title="Discover" text="Agents published by other creators. Pay per run in credits; the creator keeps the price minus the platform fee."/>
+    <PageHeader icon="store" tone="coral" title="Discover" text="Agents published by other creators. Talk to one or give it a task, paid in credits; the creator keeps the price minus the platform fee."/>
     <div className="flex flex-wrap items-start justify-between gap-3">
      <SearchBox value={query} onChange={setQuery} mode={mode} onMode={setMode} count={visibleMarket?.length} placeholder="Search published agents" label="Search published agents" className="w-full max-w-md"/>
      <Select value={sort} onValueChange={v=>setSort(v as typeof sort)}><SelectTrigger className="w-[190px]"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="popular">Most used</SelectItem><SelectItem value="cheap">Lowest price</SelectItem><SelectItem value="new">Newest</SelectItem></SelectContent></Select>
@@ -305,7 +305,7 @@ export default function Studio(){
     {visibleMarket===null?<TileSkeletons/>:visibleMarket.length===0?<EmptyState title={query?'No matches':'No published agents yet'} text={query?(mode==='title'?'No agent names match. Try Search everything.':'Nothing matches your search.'):'Publish one of your agents from My agents and it shows up here for everyone.'} chars={['cole','nova','rook']} action={!query?<Button variant="outline" onClick={()=>navigate('agents')}>Go to My agents</Button>:undefined}/>:
     <Grid>{visibleMarket.map((a,k)=><AgentTile key={a.id} a={a} idx={k+2} creator={a.mine?'Your agent':a.creator} price={a.price} status={a.mine?'mine':'live'}
      actions={[['Open its page',()=>router.push(agentPath(a.id))],['Copy link',()=>copyText(location.origin+agentPath(a.id),toast.success,toast.error)]]}
-     footer={<><span className="text-xs text-muted-foreground">{a.uses} run{a.uses===1?'':'s'} · {a.tone}</span><Button size="sm" className="ml-auto" onClick={()=>{if(!requireAuth())return;setMarketAgent(a);}}>Run a task<I id="arrow"/></Button></>}/>)}</Grid>}
+     footer={<><span className="text-xs text-muted-foreground">{a.uses} run{a.uses===1?'':'s'} · {a.tone}</span><Button size="sm" variant="outline" className="ml-auto" onClick={()=>router.push(agentPath(a.id))}>Talk</Button><Button size="sm" onClick={()=>{if(!requireAuth())return;setMarketAgent(a);}}>Run a task<I id="arrow"/></Button></>}/>)}</Grid>}
     <div className="mt-2 flex items-end justify-between gap-3"><div className="grid gap-1"><h2 className="font-display text-xl font-medium tracking-[-.02em]">Starter templates</h2><p className="text-sm text-muted-foreground">Editable starting points. Published agents run as-is; their instructions are not shown.</p></div></div>
     <div className="stagger grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{TEMPLATES.map((t,k)=><button key={t.name} onClick={()=>applyTemplate(t)} className={cn('lift group grid gap-3 rounded-xl border p-4 text-left',['bg-t-iris','bg-t-mint','bg-t-amber','bg-t-coral'][k%4])}>
      <div className="flex items-center gap-3"><Thumb id={t.skin as CharacterId} className="size-11 rounded-md bg-background object-[50%_18%]"/><div className="grid"><b className="text-[15px] font-semibold">{t.name}</b><span className="font-mono text-[10px] tracking-[.06em] text-muted-foreground uppercase">{getCharacter(t.skin).name} · {t.skills.length} skills</span></div></div>
@@ -346,7 +346,7 @@ export default function Studio(){
      <div className="overflow-hidden rounded-xl border max-md:hidden"><Table>
       <TableHeader className="bg-secondary/60"><TableRow className="hover:bg-transparent">{['Agent','Task','Mode','Status','Cost','When'].map(h=><TableHead key={h} className="h-10 font-mono text-[10.5px] tracking-[.08em] text-muted-foreground uppercase">{h}</TableHead>)}</TableRow></TableHeader>
       <TableBody className="stagger">{shownRuns.map(r=><TableRow key={r.id} onClick={()=>setRunDetail(r)} className="cursor-pointer">
-       <TableCell className="font-medium">{r.agent_name}{!!r.step&&<span className="ml-1.5 inline-flex items-center gap-1 rounded bg-t-iris px-1.5 py-px align-middle font-mono text-[9.5px] font-semibold text-iris uppercase"><I id="link" className="i size-2.5"/>Team · {r.step}</span>}{r.schedule_id&&<span className="ml-1.5 inline-flex items-center gap-1 rounded bg-t-mint px-1.5 py-px align-middle font-mono text-[9.5px] font-semibold text-[#15845a] uppercase dark:text-mint"><I id="clock" className="i size-2.5"/>Scheduled</span>}</TableCell>
+       <TableCell className="font-medium">{r.agent_name}{!!r.step&&<span className="ml-1.5 inline-flex items-center gap-1 rounded bg-t-iris px-1.5 py-px align-middle font-mono text-[9.5px] font-semibold text-iris uppercase"><I id="link" className="i size-2.5"/>Team · {r.step}</span>}{!!r.talk&&<span className="ml-1.5 inline-flex items-center gap-1 rounded bg-t-sky px-1.5 py-px align-middle font-mono text-[9.5px] font-semibold text-[#1f7fcf] uppercase dark:text-sky"><I id="users" className="i size-2.5"/>Chat</span>}{r.schedule_id&&<span className="ml-1.5 inline-flex items-center gap-1 rounded bg-t-mint px-1.5 py-px align-middle font-mono text-[9.5px] font-semibold text-[#15845a] uppercase dark:text-mint"><I id="clock" className="i size-2.5"/>Scheduled</span>}</TableCell>
        <TableCell className="max-w-[360px] truncate text-muted-foreground">{r.prompt}</TableCell>
        <TableCell><StatusBadge kind={r.mode==='sample'?'sample':'live_ai'}>{r.mode==='sample'?'Sample':'AI'}</StatusBadge></TableCell>
        <TableCell><StatusBadge kind={r.status}/></TableCell>
@@ -401,7 +401,7 @@ export default function Studio(){
     {(view==='docs'||view==='paper')&&<PublicDocs kind={view as DocKind} page={docPage} onPage={(k,id)=>navigate(k,id,'site')} onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
     {view==='roadmap'&&<PublicRoadmap onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
     {view==='login'&&<LoginPage auth={auth} onDone={()=>{refresh();const n=new URLSearchParams(location.search).get('next');router.replace(n&&n.startsWith('/dashboard')?n:'/dashboard');}} onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
-    {view==='agent'&&route.doc&&<AgentPage id={route.doc} onRun={a=>{if(!requireAuth())return;setMarketAgent(a);}} onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
+    {view==='agent'&&route.doc&&<AgentPage id={route.doc} auth={auth} onSignIn={()=>setSignin(true)} onSpent={refresh} onRun={a=>{if(!requireAuth())return;setMarketAgent(a);}} onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
     {view==='whales'&&<WhalesPage onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
     {view==='invite'&&route.doc&&<InvitePage key={route.doc} code={route.doc} auth={auth} onNavigate={(v,doc)=>navigate(v,doc)} onSignIn={()=>setSignin(true)}/>}
     {view==='referral'&&<ReferralPage onNavigate={(v,doc)=>navigate(v,doc)}/>}

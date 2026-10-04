@@ -2,8 +2,8 @@
    and three points next to a character, a different one per page. The rewards card shows the live vault numbers
    instead (lib/rewards.ts rewardsOverview: public data only). The tiers card has its own layout: the character on the
    left, and one tile per tier with what it needs and gives here. The invite card shows two characters and what an
-   invitation gives on this server right now (lib/referrals.ts). The agent teams card is drawn like the website: two
-   cards of the hero deck on the page background. An unknown key gets the site's general picture. */
+   invitation gives on this server right now (lib/referrals.ts). The agent teams card and the Discover card are drawn like the
+   website: cards of the hero deck on the page background (Discover: one card and a short conversation). An unknown key gets the site's general picture. */
 import {ImageResponse} from 'next/og';
 import {env} from 'cloudflare:workers';
 import {formatUnits} from 'viem';
@@ -110,6 +110,45 @@ export async function GET(request:Request){
     </div>)}
     <div style={{display:'flex',alignItems:'center',justifyContent:'center',position:'absolute',left:858,top:286,width:76,height:76,borderRadius:76,backgroundColor:INK,border:`5px solid ${BG}`}}>
      <svg width="36" height="36" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6" stroke="#c8ff24" strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
+    </div>
+   </div>,
+   {width:W,height:H,headers:{'Cache-Control':'public, max-age=3600'}},
+  );
+ }
+ if(key==='discover'){
+  // In the website's style, like the agent teams card: one card of the hero deck and a short conversation next to it.
+  const who=await asset(`${origin}/characters/card/deck-juno.png`,'image/png');
+  const INK='#1f201e',BG='#171816',TEXT='#f3f4ef',MUTED='#a0a59c',LINE='rgba(255,255,255,0.14)';
+  return new ImageResponse(
+   <div style={{width:W,height:H,display:'flex',position:'relative',backgroundColor:BG,color:TEXT,fontFamily:'sans-serif'}}>
+    <div style={{display:'flex',flexDirection:'column',justifyContent:'space-between',width:600,height:H,padding:'54px 0 52px 64px'}}>
+     <div style={{display:'flex',alignItems:'center',gap:18}}>
+      {logo?<img src={logo} width={146} height={44}/>:<div style={{display:'flex',fontSize:24,letterSpacing:6,color:'#c8ff24'}}>RHIO</div>}
+      <div style={{display:'flex',alignItems:'center',gap:10,fontSize:16,letterSpacing:3.5,color:MUTED}}><div style={{display:'flex',width:9,height:9,borderRadius:9,backgroundColor:'#c8ff24'}}/>TALK TO AN AGENT</div>
+     </div>
+     <div style={{display:'flex',flexDirection:'column',fontSize:72,lineHeight:1.04,letterSpacing:-3}}>
+      <div style={{display:'flex',color:MUTED}}>Pick an agent.</div>
+      <div style={{display:'flex',color:TEXT}}>Talk to it.</div>
+     </div>
+     <div style={{display:'flex',flexDirection:'column',gap:14}}>
+      <div style={{display:'flex',gap:10}}>
+       {['ITS OWN VOICE','PAID PER MESSAGE','CREATORS EARN'].map(l=><div key={l} style={{display:'flex',alignItems:'center',flexShrink:0,height:40,padding:'0 16px',borderRadius:999,border:`1px solid ${LINE}`,fontSize:14,letterSpacing:2,whiteSpace:'nowrap',color:TEXT}}>{l}</div>)}
+      </div>
+      <div style={{display:'flex',fontSize:15,letterSpacing:2.6,color:MUTED}}>RHIO.STUDIO/DASHBOARD/DISCOVER</div>
+     </div>
+    </div>
+    <div style={{display:'flex',flexDirection:'column',justifyContent:'space-between',position:'absolute',left:624,top:120,width:268,height:366,padding:20,borderRadius:22,backgroundColor:'#c8ff24',color:INK,transform:'rotate(-4deg)',boxShadow:'0 24px 60px rgba(0,0,0,0.45)'}}>
+     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:14,letterSpacing:2.2}}>
+      <div style={{display:'flex'}}>#01</div>
+      <div style={{display:'flex',padding:'4px 10px',borderRadius:9,border:'1px solid rgba(31,32,30,0.3)'}}>CREATOR AGENT</div>
+     </div>
+     {who?<img src={who} width={195} height={260} style={{position:'absolute',left:36,top:44}}/>:null}
+     <div style={{display:'flex',fontSize:25,lineHeight:1.1,letterSpacing:-0.8}}>In its own voice</div>
+    </div>
+    <div style={{display:'flex',position:'absolute',left:900,top:150,width:250,padding:'14px 18px',borderRadius:22,borderBottomRightRadius:6,backgroundColor:TEXT,color:INK,fontSize:21,lineHeight:1.3,boxShadow:'0 18px 40px rgba(0,0,0,0.4)'}}>gm. What is your take on agents?</div>
+    <div style={{display:'flex',position:'absolute',left:846,top:268,width:300,padding:'16px 20px',borderRadius:22,borderBottomLeftRadius:6,backgroundColor:'#262825',border:`1px solid ${LINE}`,color:TEXT,fontSize:21,lineHeight:1.3,boxShadow:'0 18px 40px rgba(0,0,0,0.4)'}}>One is good at one thing. Line a few up and they finish the job.</div>
+    <div style={{display:'flex',alignItems:'center',gap:8,position:'absolute',left:920,top:402,height:44,padding:'0 18px',borderRadius:22,borderBottomLeftRadius:6,backgroundColor:'#262825',border:`1px solid ${LINE}`}}>
+     {[0,1,2].map(i=><div key={i} style={{display:'flex',width:9,height:9,borderRadius:9,backgroundColor:i===0?'#c8ff24':MUTED}}/>)}
     </div>
    </div>,
    {width:W,height:H,headers:{'Cache-Control':'public, max-age=3600'}},

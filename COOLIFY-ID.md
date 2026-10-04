@@ -119,6 +119,7 @@ container. Kalau perlu memicunya sendiri (Coolify → Terminal), perintahnya:
 
 ## 4b-2. Jadwal agent dan NVDA reward
 - **Jadwal agent** aktif otomatis. Batasnya bisa diatur lewat env:
+  - `TALK_COST`: kredit per pesan chat dengan agent di halamannya, default 3 (harga kreator ditambahkan di atasnya);
   - `SCHEDULE_RUN_COST`: kredit per run, default 5;
   - `SCHEDULE_MAX`: jumlah jadwal per akun, default 3;
   - `SCHEDULE_DAILY_RUNS`: run terjadwal per akun per hari, default 24.

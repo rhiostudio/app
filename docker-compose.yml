@@ -42,6 +42,8 @@ services:
       # usage limits: credits per live AI run, live AI runs per account per UTC day, and for the whole studio per UTC
       # day (schedules included). Both daily limits are atomic (drizzle/0013) and cannot be switched off.
       LIVE_RUN_COST: ${LIVE_RUN_COST:-5}
+      # credits for one chat message with an agent (its page, lib/talk.ts); a creator's price comes on top
+      TALK_COST: ${TALK_COST:-3}
       LIVE_DAILY_PER_USER: ${LIVE_DAILY_PER_USER:-50}
       AI_DAILY_RUNS: ${AI_DAILY_RUNS:-2000}
       # part of AI_DAILY_RUNS that accounts WITHOUT bought credits may use together (empty = 70%), so free sign-ups can
