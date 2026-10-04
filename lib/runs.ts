@@ -20,6 +20,7 @@ import {handover,type Relay} from './teams';
 import {talkContext,talkCost,TALK_SKILL} from './talk';
 import {voiceCost,VOICE_SKILL,VOICE_WRITER} from './voice';
 import {runCheck,checkReport,checkCost,CHECK_SKILL} from './agent-check';
+import {rhioFacts} from './rhio-facts';
 import {SAMPLE_COST,liveRunCost,aiDailyRuns,aiDailyFreeRuns,liveDailyPerUser,quotaKeys,quotaStep,ensureWallet,ledgerRow,split,tierFeePermille,skillTrialLimit,refillFree,heavyWindow,heavyKey,searchForFreeCredits,takeSearchSlot,returnSearchSlot} from './economy';
 /** Heavy skills on manual live runs count against the 5-hour window (lib/economy.ts heavyWindow). */
 const isHeavy=(mode:string,skill:string,scheduled:boolean)=>mode==='live'&&!scheduled&&heavyWindow().skills.includes(skill);
@@ -132,8 +133,8 @@ export async function performRun(db:D1Database,owner:string,data:RunInput,schedu
  // guard: someone else's published agent keeps its instructions private from the person running it
  try{
   if(data.mode==='sample')output=sampleResult(agent,data.prompt,data.skill);
-  else if(check)output=checkReport(await runCheck(runtime(),agent,data.id,free));
-  else{const r=await runAI(runtime(),voice?VOICE_WRITER:agent,data.skill,[data.prompt,spoken,handed?.facts,reading?.facts].filter(Boolean).join('\n\n'),data.id,{free,guard:!mine||!!opts.guard||!!talk,search});output=r.output;if(search&&!r.searched)await returnSearchSlot(db,created).catch(()=>null);}
+  else if(check)output=checkReport(await runCheck(runtime(),agent,data.id,free,rhioFacts()));
+  else{const r=await runAI(runtime(),voice?VOICE_WRITER:agent,data.skill,[data.prompt,spoken,handed?.facts,reading?.facts].filter(Boolean).join('\n\n'),data.id,{free,guard:!mine||!!opts.guard||!!talk,search,about:talk?rhioFacts():null});output=r.output;if(search&&!r.searched)await returnSearchSlot(db,created).catch(()=>null);}
   if(reading)output=`${output}\n\n${reading.note}`;
   if(handed)output=`${output}\n\n${handed.note}`;
  }

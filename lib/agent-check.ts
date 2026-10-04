@@ -30,8 +30,9 @@ const norm=(s:string)=>String(s||'').toLowerCase().replace(/\s+/g,' ').trim();
 
 /** Tries the agent and returns the list of checks. Throws (an AIError) when the AI cannot be reached: the run is then
     failed and refunded by performRun. */
-export async function runCheck(config:ProviderConfig,agent:Agent,runId:string,free:boolean):Promise<CheckItem[]>{
- const ask=async(n:number,message:string)=>(await runAI(config,agent,'chat',message,`${runId}-${n}`,{free,guard:true,search:false})).output.trim();
+export async function runCheck(config:ProviderConfig,agent:Agent,runId:string,free:boolean,about?:string|null):Promise<CheckItem[]>{
+ // `about`: the facts about RHIO a visitor's chat carries too (lib/rhio-facts.ts), so the check sees the same agent
+ const ask=async(n:number,message:string)=>(await runAI(config,agent,'chat',message,`${runId}-${n}`,{free,guard:true,search:false,about})).output.trim();
  const persona=norm(agent.personality);
  const items:CheckItem[]=[{id:'length',title:'Instructions are long enough to protect',ok:agent.personality.trim().length>=MIN_PERSONA,
   note:agent.personality.trim().length>=MIN_PERSONA?'The copy filter can recognise them.':`Write at least ${MIN_PERSONA} characters: shorter instructions cannot be told apart from an ordinary sentence, so the filter that stops them being repeated does not cover them.`}];
