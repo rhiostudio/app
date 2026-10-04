@@ -122,7 +122,7 @@ export async function tierFeePermille(db:D1Database,owner:string){
  try{const r=await db.prepare('SELECT tier,checked FROM tier_cache WHERE owner=?').bind(owner).first<{tier:string;checked:string}>();
   if(!r||Date.now()-Date.parse(r.checked)>864e5)return 1000;return tierById(r.tier).feePermille;}catch{return 1000;}
 }
-export type LedgerKind='grant'|'run'|'earning'|'fee'|'refund'|'topup'|'claim'|'allotment'|'quest';
+export type LedgerKind='grant'|'run'|'earning'|'fee'|'refund'|'topup'|'claim'|'allotment'|'quest'|'referral';
 export function ledgerRow(db:D1Database,owner:string,delta:number,kind:LedgerKind,note:string,ref?:string,created=new Date().toISOString()){
  return db.prepare('INSERT INTO credit_ledger (id,owner,delta,kind,ref,note,created) VALUES (?,?,?,?,?,?,?)').bind(crypto.randomUUID(),owner,delta,kind,ref??null,note,created);
 }

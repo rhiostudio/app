@@ -77,6 +77,10 @@ services:
       # quests: free credits per finished quest, once per account (0 = no credits); QUESTS_ENABLED=false hides the page's list
       QUESTS_ENABLED: ${QUESTS_ENABLED:-true}
       QUEST_CREDITS: ${QUEST_CREDITS:-5}
+      # invitations: free credits for each side once the invited account completed a run; rewarded invitations per account
+      REFERRALS_ENABLED: ${REFERRALS_ENABLED:-true}
+      REFERRAL_CREDITS: ${REFERRAL_CREDITS:-10}
+      REFERRAL_MAX: ${REFERRAL_MAX:-20}
       # daily SQLite backups kept under /data/backups (0 = off)
       RHIO_BACKUP_DAYS: ${RHIO_BACKUP_DAYS:-7}
       # Robinhood Chain (all optional; every chain feature stays OFF while its addresses are empty)

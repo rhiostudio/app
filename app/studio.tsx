@@ -51,6 +51,7 @@ const PublicDocs=lazy(()=>import('./public-docs').then(m=>({default:m.PublicDocs
 const PublicRoadmap=lazy(()=>import('./public-docs').then(m=>({default:m.PublicRoadmap})));
 const AgentPage=lazy(()=>import('@/components/rhio/agent-page').then(m=>({default:m.AgentPage})));
 const WhalesPage=lazy(()=>import('@/components/rhio/whales-page').then(m=>({default:m.WhalesPage})));
+const InvitePage=lazy(()=>import('@/components/rhio/invite-page').then(m=>({default:m.InvitePage})));
 const RecipesPage=lazy(()=>import('@/components/rhio/recipes-page').then(m=>({default:m.RecipesPage})));
 const TiersPage=lazy(()=>import('@/components/rhio/tiers-page').then(m=>({default:m.TiersPage})));
 const SharePage=lazy(()=>import('@/components/rhio/share-page').then(m=>({default:m.SharePage})));
@@ -129,6 +130,11 @@ export default function Studio(){
  // Account gate (lib/auth-gate.ts): this component owns the session state and the sign-in panel. Every action that
  // saves, runs, publishes, shares or imports starts with requireAuth(); api() applies the same gate to every write.
  useEffect(()=>{setAuthenticated(auth);},[auth]);
+ // an invite link opened before sign-in (components/rhio/invite-page.tsx keeps its code): hand it to the server once
+ // the visitor is signed in. The code is dropped when it was accepted or can never be (4xx), kept on a network error.
+ useEffect(()=>{if(!auth)return;let code='';try{code=localStorage.getItem('rhio-ref')||'';}catch{return;}if(!code)return;
+  api('/api/referrals',{method:'POST',body:JSON.stringify({code})}).then(d=>{try{localStorage.removeItem('rhio-ref');}catch{/* nothing to drop */}if(d.credits>0)toast.success('Invite accepted',{description:`You and your friend each get ${d.credits} free credits after your first run.`});})
+   .catch((e:any)=>{if(e?.status>=400&&e?.status<500){try{localStorage.removeItem('rhio-ref');}catch{/* nothing to drop */}}});},[auth]);
  useEffect(()=>{const open=(e:Event)=>{if((e as CustomEvent<{expired?:boolean}>).detail?.expired)setAuth(false);setSignin(true);};
   window.addEventListener(SIGNIN_EVENT,open);return()=>window.removeEventListener(SIGNIN_EVENT,open);},[]);
  async function save(){if(!requireAuth())return null;const parsed=(await agentSchema()).safeParse(draft);if(!parsed.success){toast.error(await agentIssue(parsed.error));return null;}setBusy(true);const wasArchived=!!agents.find(a=>a.id===draft.id)?.archived;try{const saved=await api('/api/agents',{method:'POST',body:JSON.stringify(parsed.data)});setDraft(saved);await refresh();toast.success(wasArchived?`Saved and restored “${saved.name}”`:`Saved “${saved.name}”`);playMotion('Salute');return saved as Agent;}catch(e:any){toast.error(e.message);if(e.status===401){setAuth(false);setSignin(true);}return null;}finally{setBusy(false)}}
@@ -393,6 +399,7 @@ export default function Studio(){
     {view==='login'&&<LoginPage auth={auth} onDone={()=>{refresh();const n=new URLSearchParams(location.search).get('next');router.replace(n&&n.startsWith('/dashboard')?n:'/dashboard');}} onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
     {view==='agent'&&route.doc&&<AgentPage id={route.doc} onRun={a=>{if(!requireAuth())return;setMarketAgent(a);}} onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
     {view==='whales'&&<WhalesPage onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
+    {view==='invite'&&route.doc&&<InvitePage key={route.doc} code={route.doc} auth={auth} onNavigate={(v,doc)=>navigate(v,doc)} onSignIn={()=>setSignin(true)}/>}
     {view==='recipes'&&<RecipesPage onNavigate={(v,doc)=>navigate(v,doc)}/>}
     {view==='tiers'&&<TiersPage onNavigate={(v,doc)=>navigate(v,doc,v==='paper'?'site':undefined)}/>}
     {view==='shared'&&route.doc&&<SharePage key={route.doc} id={route.doc} onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}

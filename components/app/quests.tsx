@@ -3,14 +3,35 @@
    few free credits once per account. Data: /api/quests (lib/quests.ts). Signed out, the list is shown without progress. */
 import {useCallback,useEffect,useState} from 'react';
 import {toast} from 'sonner';
+import {FaXTwitter} from 'react-icons/fa6';
 import {Button} from '@/components/ui/button';
-import {api,I} from '@/app/ui';
+import {Input} from '@/components/ui/input';
+import {api,copyText,I} from '@/app/ui';
 import {cn} from '@/lib/utils';
 import type {View} from '@/lib/routes';
 import {DashPage,EmptyState,Kpi,KpiRow,PageHeader,StatusBadge} from './parts';
 
 type Quest={id:string;title:string;text:string;go:string;icon:string;credits:number;done:boolean;claimed:boolean};
 type Data={signedIn:boolean;enabled:boolean;credits:number;earned:number;quests:Quest[]};
+
+type Invite={enabled:boolean;code?:string;credits?:number;max?:number;invited?:number;active?:number;earned?:number;invitedBy?:'waiting'|'paid'|null};
+/** The account's invite link and how its invitations are doing (/api/referrals, lib/referrals.ts). */
+function InviteCard({auth}:{auth:boolean}){
+ const [d,setD]=useState<Invite|null>(null);
+ useEffect(()=>{if(!auth)return;let alive=true;api('/api/referrals').then(x=>{if(alive)setD(x);}).catch(()=>null);return()=>{alive=false;};},[auth]);
+ if(!auth||!d||!d.enabled||!d.code)return null;
+ const link=`${location.origin}/r/${d.code}`;const credits=d.credits||0;
+ const post=`https://x.com/intent/post?text=${encodeURIComponent(credits>0?`Build an AI agent with a face on RHIO. Use my invite and we both get ${credits} free credits after your first run:`:'Build an AI agent with a face on RHIO:')}&url=${encodeURIComponent(link)}`;
+ return <section className="grid gap-3 rounded-xl border bg-card p-5">
+  <div className="flex flex-wrap items-baseline justify-between gap-2"><b className="text-[15px] font-semibold">Invite a friend</b>
+   <span className="text-[12.5px] text-muted-foreground tabular-nums">{d.invited||0} invited · {d.active||0} ran a task · {d.earned||0} credits earned</span></div>
+  <p className="text-[13px] text-muted-foreground">{credits>0?<>When a friend signs in through your link with a new account and completes their first run, you each get <b className="text-foreground">{credits} free credits</b>. Up to {d.max} invitations are rewarded.</>:'Share your link. This server records invitations but gives no credits for them.'}</p>
+  <div className="flex gap-2"><Input readOnly value={link} aria-label="Your invite link" onFocus={e=>e.currentTarget.select()} className="h-9 font-mono text-[12px]"/>
+   <Button variant="outline" className="h-9" onClick={()=>copyText(link,toast.success,toast.error)}><I id="copy"/>Copy</Button>
+   <Button className="h-9" asChild><a href={post} target="_blank" rel="noreferrer noopener"><FaXTwitter aria-hidden="true"/>Post on X</a></Button></div>
+  {d.invitedBy&&<p className="text-xs text-muted-foreground">{d.invitedBy==='paid'?'You were invited by a friend: your welcome bonus has been added.':'You were invited by a friend: your welcome bonus arrives after your first completed run.'}</p>}
+ </section>;
+}
 
 export function QuestsPage({auth,onSignIn,onGo,onClaimed}:{auth:boolean;onSignIn:()=>void;onGo:(v:View)=>void;onClaimed:()=>void}){
  const [data,setData]=useState<Data|null>(null);const [busy,setBusy]=useState('');
@@ -49,6 +70,7 @@ export function QuestsPage({auth,onSignIn,onGo,onClaimed}:{auth:boolean;onSignIn
    </div>
   </li>)}</ol>
   {!data&&<p className="text-sm text-muted-foreground">Loading quests…</p>}
+  <InviteCard auth={auth}/>
   <p className="max-w-[80ch] text-xs text-muted-foreground">Quest credits are free credits, like the ones a new account starts with: they pay for runs and are spent before bought credits. They are never part of claimable earnings and cannot be withdrawn. New quests are added over time.</p>
  </DashPage>;
 }

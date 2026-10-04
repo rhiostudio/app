@@ -1,7 +1,8 @@
 /* Link-preview picture of one page (1200x630 PNG), used by pageMetadata() (lib/page-cards.ts): the page's own headline
    and three points next to a character, a different one per page. The rewards card shows the live vault numbers
    instead (lib/rewards.ts rewardsOverview: public data only). The tiers card has its own layout: the character on the
-   left, and one tile per tier with what it needs and gives here. An unknown key gets the site's general picture. */
+   left, and one tile per tier with what it needs and gives here. The invite card shows two characters and what an
+   invitation gives on this server right now (lib/referrals.ts). An unknown key gets the site's general picture. */
 import {ImageResponse} from 'next/og';
 import {env} from 'cloudflare:workers';
 import {formatUnits} from 'viem';
@@ -9,6 +10,7 @@ import {appOrigin} from '@/lib/server';
 import {PAGE_CARDS,isPageCard,type PageCard} from '@/lib/page-cards';
 import {rewardsOverview} from '@/lib/rewards';
 import {tierRows} from '@/lib/schedules';
+import {referralConfig} from '@/lib/referrals';
 import {getCharacter} from '@/lib/characters';
 
 const W=1200,H=630;
@@ -41,6 +43,31 @@ export async function GET(request:Request){
  const [img,logo]=await Promise.all([asset(`${origin}/characters/card/${getCharacter(c.character).id}.jpg`,'image/jpeg'),asset(`${origin}/brands/rhio-logo-lime.png`,'image/png')]);
  const headline=live?.headline||c.headline;
  const tiers=key==='tiers'?tierRows():null;
+ if(key==='invite'){
+  // the same picture for every invite link: it says what an invitation gives, never who sent it
+  const ref=referralConfig();const credits=ref.enabled?ref.credits:0;
+  const pair=await asset(`${origin}/characters/card/pair-invite.jpg`,'image/jpeg');
+  const head=credits>0?['You are invited.','You both get',`${credits} free credits.`]:['You are invited.','Build an AI agent','with a face.'];
+  const points=credits>0?['Sign in with a new account','Run your first task',`${credits} free credits for you and your friend`]:c.lines;
+  return new ImageResponse(
+   <div style={{width:W,height:H,display:'flex',position:'relative',backgroundColor:'#0b110d',color:'#f4f6f1',fontFamily:'sans-serif'}}>
+    {pair?<img src={pair} width={640} height={H} style={{position:'absolute',right:-30,top:0}}/>:null}
+    <div style={{display:'flex',flexDirection:'column',justifyContent:'space-between',width:640,height:H,padding:'52px 0 48px 60px'}}>
+     <div style={{display:'flex',alignItems:'center',gap:14}}>
+      {logo?<img src={logo} width={160} height={48}/>:<div style={{display:'flex',fontSize:26,letterSpacing:6,color:'#c8ff24'}}>RHIO</div>}
+      <div style={{display:'flex',fontSize:17,letterSpacing:4,color:'#8a968c',marginLeft:4}}>{c.kicker}</div>
+     </div>
+     <div style={{display:'flex',flexDirection:'column'}}>
+      {head.map((l,i)=><div key={l} style={{display:'flex',fontSize:68,lineHeight:1.1,letterSpacing:-2.5,color:i===2?'#c8ff24':'#f4f6f1'}}>{l}</div>)}
+     </div>
+     <div style={{display:'flex',flexDirection:'column',gap:10}}>
+      {points.map(l=><div key={l} style={{display:'flex',alignItems:'center',gap:14,fontSize:25,color:'#d9e4d6'}}><div style={{display:'flex',width:10,height:10,borderRadius:10,backgroundColor:'#c8ff24'}}/>{l}</div>)}
+     </div>
+    </div>
+   </div>,
+   {width:W,height:H,headers:{'Cache-Control':'public, max-age=600'}},
+  );
+ }
  if(c.layout==='left')return new ImageResponse(
   <div style={{width:W,height:H,display:'flex',position:'relative',backgroundColor:'#0b110d',color:'#f4f6f1',fontFamily:'sans-serif'}}>
    {img?<img src={img} width={480} height={H} style={{position:'absolute',left:-40,top:0}}/>:null}
