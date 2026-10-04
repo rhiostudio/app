@@ -2,7 +2,8 @@
    and three points next to a character, a different one per page. The rewards card shows the live vault numbers
    instead (lib/rewards.ts rewardsOverview: public data only). The tiers card has its own layout: the character on the
    left, and one tile per tier with what it needs and gives here. The invite card shows two characters and what an
-   invitation gives on this server right now (lib/referrals.ts). An unknown key gets the site's general picture. */
+   invitation gives on this server right now (lib/referrals.ts). The agent teams card is drawn like the website: two
+   cards of the hero deck on the page background. An unknown key gets the site's general picture. */
 import {ImageResponse} from 'next/og';
 import {env} from 'cloudflare:workers';
 import {formatUnits} from 'viem';
@@ -74,24 +75,41 @@ export async function GET(request:Request){
   );
  }
  if(key==='teams'){
-  // two agents on the left with the hand-over between them, the text on the right
-  const pair=await asset(`${origin}/characters/card/pair-team.jpg`,'image/jpeg');
+  // In the website's own style: the page background, a two-tone headline, mono labels, and two
+  // cards of the hero deck (a lime one and an iris one), the first agent handing over to the second.
+  const [one,two]=await Promise.all([asset(`${origin}/characters/card/team-atlas.png`,'image/png'),asset(`${origin}/characters/card/team-nova.png`,'image/png')]);
+  const INK='#1f201e',BG='#171816',TEXT='#f3f4ef',MUTED='#a0a59c',LINE='rgba(255,255,255,0.14)';
+  const deck=[{n:'#01',tag:'RESEARCHER',title:'Answers the task',bg:'#c8ff24',fg:INK,img:one,left:628,top:112,turn:-4},
+   {n:'#02',tag:'WRITER',title:'Works from that answer',bg:'#5b5bf6',fg:'#ffffff',img:two,left:886,top:150,turn:4}];
   return new ImageResponse(
-   <div style={{width:W,height:H,display:'flex',position:'relative',backgroundColor:'#0b110d',color:'#f4f6f1',fontFamily:'sans-serif'}}>
-    {pair?<img src={pair} width={600} height={H} style={{position:'absolute',left:-20,top:0}}/>:null}
-    <div style={{display:'flex',alignItems:'center',justifyContent:'center',position:'absolute',left:232,top:258,width:96,height:96,borderRadius:96,backgroundColor:'#c8ff24',border:'6px solid #0b110d'}}>
-     <svg width="52" height="52" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6" stroke="#0b110d" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg></div>
-    <div style={{display:'flex',flexDirection:'column',justifyContent:'space-between',position:'absolute',left:590,top:0,width:610,height:H,padding:'52px 56px 52px 0'}}>
-     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-      <div style={{display:'flex',fontSize:18,letterSpacing:4,color:'#8a968c'}}>{c.kicker}</div>
+   <div style={{width:W,height:H,display:'flex',position:'relative',backgroundColor:BG,color:TEXT,fontFamily:'sans-serif'}}>
+    <div style={{display:'flex',flexDirection:'column',justifyContent:'space-between',width:600,height:H,padding:'54px 0 52px 64px'}}>
+     <div style={{display:'flex',alignItems:'center',gap:18}}>
       {logo?<img src={logo} width={146} height={44}/>:<div style={{display:'flex',fontSize:24,letterSpacing:6,color:'#c8ff24'}}>RHIO</div>}
+      <div style={{display:'flex',alignItems:'center',gap:10,fontSize:16,letterSpacing:3.5,color:MUTED}}><div style={{display:'flex',width:9,height:9,borderRadius:9,backgroundColor:'#c8ff24'}}/>{c.kicker}</div>
      </div>
-     <div style={{display:'flex',flexDirection:'column'}}>
-      {['One agent','hands its work','to the next.'].map((l,i)=><div key={l} style={{display:'flex',fontSize:70,lineHeight:1.06,letterSpacing:-2.5,color:i===2?'#c8ff24':'#f4f6f1'}}>{l}</div>)}
+     <div style={{display:'flex',flexDirection:'column',fontSize:72,lineHeight:1.04,letterSpacing:-3}}>
+      <div style={{display:'flex',color:MUTED}}>One agent</div>
+      <div style={{display:'flex',color:MUTED}}>hands its work</div>
+      <div style={{display:'flex',color:TEXT}}>to the next.</div>
      </div>
-     <div style={{display:'flex',flexDirection:'column',gap:10}}>
-      {['Research, then write','Your agents, or published ones','Every step lands in your History'].map(l=><div key={l} style={{display:'flex',alignItems:'center',gap:14,fontSize:25,color:'#d9e4d6'}}><div style={{display:'flex',width:10,height:10,borderRadius:10,backgroundColor:'#c8ff24'}}/>{l}</div>)}
+     <div style={{display:'flex',flexDirection:'column',gap:14}}>
+      <div style={{display:'flex',gap:10}}>
+       {['YOUR AGENTS','HIRED AGENTS','2 TO 3 STEPS'].map(l=><div key={l} style={{display:'flex',alignItems:'center',flexShrink:0,height:40,padding:'0 16px',borderRadius:999,border:`1px solid ${LINE}`,fontSize:14,letterSpacing:2,whiteSpace:'nowrap',color:TEXT}}>{l}</div>)}
+      </div>
+      <div style={{display:'flex',fontSize:15,letterSpacing:2.6,color:MUTED}}>RHIO.STUDIO/TEAMS</div>
      </div>
+    </div>
+    {deck.map(d=><div key={d.n} style={{display:'flex',flexDirection:'column',justifyContent:'space-between',position:'absolute',left:d.left,top:d.top,width:268,height:366,padding:20,borderRadius:22,backgroundColor:d.bg,color:d.fg,transform:`rotate(${d.turn}deg)`,boxShadow:'0 24px 60px rgba(0,0,0,0.45)'}}>
+     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:14,letterSpacing:2.2}}>
+      <div style={{display:'flex'}}>{d.n}</div>
+      <div style={{display:'flex',padding:'4px 10px',borderRadius:9,border:`1px solid ${d.fg==='#ffffff'?'rgba(255,255,255,0.35)':'rgba(31,32,30,0.3)'}`}}>{d.tag}</div>
+     </div>
+     {d.img?<img src={d.img} width={195} height={260} style={{position:'absolute',left:36,top:44}}/>:null}
+     <div style={{display:'flex',fontSize:25,lineHeight:1.1,letterSpacing:-0.8}}>{d.title}</div>
+    </div>)}
+    <div style={{display:'flex',alignItems:'center',justifyContent:'center',position:'absolute',left:858,top:286,width:76,height:76,borderRadius:76,backgroundColor:INK,border:`5px solid ${BG}`}}>
+     <svg width="36" height="36" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6" stroke="#c8ff24" strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
     </div>
    </div>,
    {width:W,height:H,headers:{'Cache-Control':'public, max-age=3600'}},
