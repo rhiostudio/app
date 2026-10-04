@@ -2,10 +2,11 @@
    reads the pathname to decide what to render, so state such as the agent draft survives navigation.
    Public site:  /  /docs[/slug]  /whitepaper[/slug]  /roadmap  /login  /a/<agent id> (one published agent)
                  /whales (the RHIO token's biggest transfers and holders)  /s/<id> (one shared answer)
+                 /tiers (what each holder tier needs and gives)
    Dashboard:    /dashboard  /dashboard/{studio,agents,discover,skills,schedules,quests,history,credits,wallet,rewards,profile}
                  /dashboard/docs[/slug]  /dashboard/whitepaper[/slug]  /dashboard/roadmap
    Signed-in only (proxy.ts redirects to /login?next=...): see PROTECTED_PATHS. */
-export type View='home'|'login'|'notfound'|'agent'|'shared'|'whales'|'overview'|'profile'|'rewards'|'wallet'|'studio'|'agents'|'discover'|'skills'|'schedules'|'quests'|'activity'|'credits'|'docs'|'paper'|'roadmap';
+export type View='home'|'login'|'notfound'|'agent'|'shared'|'whales'|'tiers'|'overview'|'profile'|'rewards'|'wallet'|'studio'|'agents'|'discover'|'skills'|'schedules'|'quests'|'activity'|'credits'|'docs'|'paper'|'roadmap';
 export type Area='site'|'dash';
 export type Route={view:View;area:Area;doc?:string};
 
@@ -29,6 +30,7 @@ const SHARE_PATH_ID=/^[A-Za-z0-9_-]{16}$/;
 export function pathFor(view:View,doc?:string,area:Area='dash'):string{
  if(view==='agent')return doc?agentPath(doc):'/dashboard/discover';
  if(view==='whales')return '/whales';
+ if(view==='tiers')return '/tiers';
  if(view==='shared')return doc?`/s/${doc}`:'/';
  if(view==='home'||view==='login'||view==='notfound')return view==='login'?'/login':'/';
  const docs=view==='docs'||view==='paper';
@@ -45,6 +47,7 @@ export function parsePath(pathname:string):Route{
  if((a==='docs'||a==='whitepaper')&&!c)return {view:a==='docs'?'docs':'paper',area:'site',doc:b};
  if(a==='roadmap'&&!b)return {view:'roadmap',area:'site'};
  if(a==='whales'&&!b)return {view:'whales',area:'site'};
+ if(a==='tiers'&&!b)return {view:'tiers',area:'site'};
  if(a==='s'&&b&&!c&&SHARE_PATH_ID.test(b))return {view:'shared',area:'site',doc:b};
  if(a==='a'&&b&&!c&&AGENT_PATH_ID.test(b))return {view:'agent',area:'site',doc:b.toLowerCase()};
  if(a==='dashboard'){

@@ -1,12 +1,14 @@
 /* Link-preview picture of one page (1200x630 PNG), used by pageMetadata() (lib/page-cards.ts): the page's own headline
    and three points next to a character, a different one per page. The rewards card shows the live vault numbers
-   instead (lib/rewards.ts rewardsOverview: public data only). An unknown key gets the site's general picture. */
+   instead (lib/rewards.ts rewardsOverview: public data only). The tiers card has its own layout: the character on the
+   left, and one tile per tier with what it needs and gives here. An unknown key gets the site's general picture. */
 import {ImageResponse} from 'next/og';
 import {env} from 'cloudflare:workers';
 import {formatUnits} from 'viem';
 import {appOrigin} from '@/lib/server';
-import {PAGE_CARDS,isPageCard} from '@/lib/page-cards';
+import {PAGE_CARDS,isPageCard,type PageCard} from '@/lib/page-cards';
 import {rewardsOverview} from '@/lib/rewards';
+import {tierRows} from '@/lib/schedules';
 import {getCharacter} from '@/lib/characters';
 
 const W=1200,H=630;
@@ -34,10 +36,34 @@ export async function GET(request:Request){
  const origin=appOrigin(request);
  const key=new URL(request.url).pathname.split('/').filter(Boolean).pop()||'';
  if(!isPageCard(key))return Response.redirect(`${origin}/og.png`,302);
- const c=PAGE_CARDS[key];
+ const c:PageCard=PAGE_CARDS[key];
  const live=key==='rewards'?await rewardNumbers():null;
  const [img,logo]=await Promise.all([asset(`${origin}/characters/card/${getCharacter(c.character).id}.jpg`,'image/jpeg'),asset(`${origin}/brands/rhio-logo-lime.png`,'image/png')]);
  const headline=live?.headline||c.headline;
+ const tiers=key==='tiers'?tierRows():null;
+ if(c.layout==='left')return new ImageResponse(
+  <div style={{width:W,height:H,display:'flex',position:'relative',backgroundColor:'#0b110d',color:'#f4f6f1',fontFamily:'sans-serif'}}>
+   {img?<img src={img} width={480} height={H} style={{position:'absolute',left:-40,top:0}}/>:null}
+   <div style={{display:'flex',flexDirection:'column',justifyContent:'space-between',position:'absolute',left:420,top:0,width:780,height:H,padding:'52px 60px 52px 0'}}>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+     <div style={{display:'flex',fontSize:18,letterSpacing:4,color:'#8a968c'}}>{c.kicker}</div>
+     {logo?<img src={logo} width={146} height={44}/>:<div style={{display:'flex',fontSize:24,letterSpacing:6,color:'#c8ff24'}}>RHIO</div>}
+    </div>
+    <div style={{display:'flex',fontSize:70,lineHeight:1.02,letterSpacing:-2.5}}>{c.headline}</div>
+    {tiers?<div style={{display:'flex',flexWrap:'wrap',gap:12}}>
+      {tiers.map(t=><div key={t.id} style={{display:'flex',flexDirection:'column',gap:6,width:354,padding:'14px 18px',borderRadius:16,border:t.id==='studio'?'1px solid #c8ff24':'1px solid #2e4033',backgroundColor:t.id==='studio'?'#141f0c':'#0f1711'}}>
+       <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between'}}><div style={{display:'flex',fontSize:27,color:t.id==='studio'?'#c8ff24':'#f4f6f1'}}>{t.name}</div>
+        <div style={{display:'flex',fontSize:16,color:'#8a968c'}}>{t.min==='0'?'no RHIO needed':`${Number(t.min).toLocaleString('en-US')}+ RHIO`}</div></div>
+       <div style={{display:'flex',flexDirection:'column',fontSize:18,lineHeight:1.35,color:'#b9c3ba'}}><div style={{display:'flex'}}>{`${t.schedules} schedules · ${t.channels} channels`}</div><div style={{display:'flex'}}>{`${t.dailyRuns} scheduled runs a day`}</div></div>
+      </div>)}
+     </div>
+     :<div style={{display:'flex',flexDirection:'column',gap:12}}>
+      {c.lines.map(l=><div key={l} style={{display:'flex',alignItems:'center',gap:14,fontSize:28,color:'#d9e4d6'}}><div style={{display:'flex',width:10,height:10,borderRadius:10,backgroundColor:'#c8ff24'}}/>{l}</div>)}
+     </div>}
+   </div>
+  </div>,
+  {width:W,height:H,headers:{'Cache-Control':'public, max-age=3600'}},
+ );
  return new ImageResponse(
   <div style={{width:W,height:H,display:'flex',position:'relative',backgroundColor:'#0b110d',color:'#f4f6f1',fontFamily:'sans-serif'}}>
    <div style={{display:'flex',flexDirection:'column',justifyContent:'space-between',width:720,height:H,padding:'56px 0 56px 64px'}}>

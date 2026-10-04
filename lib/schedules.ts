@@ -5,6 +5,7 @@
      SCHEDULE_RUN_COST     minimum credits per scheduled run, default 5; a live run costs the skill's price when higher
      SCHEDULE_MAX          schedules per account, default 3
      SCHEDULE_DAILY_RUNS   scheduled runs per account per UTC day, default 24
+   SCHEDULE_MAX and SCHEDULE_DAILY_RUNS are what a Free account gets; a holder tier multiplies them (lib/tiers.ts).
      SCHEDULER_TOKEN       bearer token for POST /api/schedules/tick (the Docker entrypoint generates one per start)
    Slots: start_minute (UTC minute of day) + k x (1440 / per_day). A missed slot (server down) is skipped, never replayed
    in a burst. Out of credits or a removed agent/skill pauses the schedule with a readable status.
@@ -15,7 +16,9 @@ import {aiReady,HttpError} from './server';
 import {isOpenSkill,type Agent,type SkillId} from './agents';
 import {performRun} from './runs';
 import {liveRunCost} from './economy';
-import {deliverRun,deliverNotice} from './notify';
+import {deliverRun,deliverNotice,notifyConfig} from './notify';
+import {limitsFor,perkTable} from './tiers';
+import {chainConfig,TIERS} from './chain';
 /** Credits for one scheduled run: the skill's live price (lib/economy.ts), never below SCHEDULE_RUN_COST. */
 export const scheduledRunCost=(runCost:number,skill:string,mode:'live'|'sample')=>mode==='live'?Math.max(runCost,liveRunCost(skill)):runCost;
 
@@ -27,6 +30,18 @@ export const PER_DAY=[1,2,3,4,6,8,12,24] as const;
 export function scheduleConfig(){
  const e=E();
  return {enabled:e.SCHEDULES_ENABLED!=='false',runCost:int(e.SCHEDULE_RUN_COST,5,0,10000),max:int(e.SCHEDULE_MAX,3,0,100),dailyCap:int(e.SCHEDULE_DAILY_RUNS,24,1,1000),perDay:[...PER_DAY]};
+}
+
+const base=()=>{const c=scheduleConfig();return {schedules:c.max,dailyRuns:c.dailyCap,channels:notifyConfig().max};};
+/** This account's limits: the server's own (SCHEDULE_MAX, SCHEDULE_DAILY_RUNS, NOTIFY_MAX) raised by its holder tier. */
+export const accountLimits=(db:D1Database,owner:string)=>limitsFor(db,owner,base());
+/** Every tier's limits on this server (null while there is no token). */
+export const tierPerks=()=>perkTable(base());
+export type TierRow={id:string;name:string;min:string;monthlyCredits:number;schedules:number;dailyRuns:number;channels:number};
+/** The tiers as the public page and its link preview show them: what each needs and gives here (null without a token). */
+export function tierRows():TierRow[]|null{
+ const perks=tierPerks();if(!perks)return null;const credits=chainConfig().tierBase;
+ return perks.map(p=>({id:p.id,name:p.name,min:p.min,monthlyCredits:(TIERS.find(t=>t.id===p.id)?.mult??0)*credits,schedules:p.schedules,dailyRuns:p.dailyRuns,channels:p.channels}));
 }
 
 /** First slot strictly after `after`. */
@@ -66,7 +81,7 @@ export async function runDue(db:D1Database,{limit=10,budgetMs=50000,now=new Date
  const cfg=scheduleConfig();if(!cfg.enabled)return {ran:0,skipped:0,paused:0,due:0};
  const started=Date.now();
  const due=await db.prepare('SELECT * FROM schedules WHERE active=1 AND next_run<=? ORDER BY next_run LIMIT ?').bind(now.toISOString(),limit).all<ScheduleRow>();
- let ran=0,skipped=0,paused=0;
+ let ran=0,skipped=0,paused=0;const caps=new Map<string,number>();
  for(const s of due.results){
   if(Date.now()-started>budgetMs)break;
   // claim this slot: only the ticker that moves next_run forward runs it
@@ -74,7 +89,9 @@ export async function runDue(db:D1Database,{limit=10,budgetMs=50000,now=new Date
   const claim=await db.prepare('UPDATE schedules SET next_run=?,updated=? WHERE id=? AND next_run=? AND active=1').bind(next,now.toISOString(),s.id,s.next_run).run();
   if(!claim.meta.changes)continue;
   const set=(status:string,extra='',...args:unknown[])=>db.prepare(`UPDATE schedules SET last_status=?,updated=?${extra} WHERE id=?`).bind(status,new Date().toISOString(),...args,s.id).run();
-  if(await usedToday(db,s.owner)>=cfg.dailyCap){await set(`Skipped: daily limit of ${cfg.dailyCap} scheduled runs reached`);skipped++;continue;}
+  // the daily limit is the account's own: the server's, raised by its holder tier (read once per tick and owner)
+  let cap=caps.get(s.owner);if(cap===undefined){cap=(await accountLimits(db,s.owner)).dailyRuns;caps.set(s.owner,cap);}
+  if(await usedToday(db,s.owner)>=cap){await set(`Skipped: daily limit of ${cap} scheduled runs reached`);skipped++;continue;}
   const stopped=async(why:string)=>{await set(`Paused: ${why}`,',active=0');paused++;if(s.notify)await deliverNotice(db,s.owner,s.notify,'',`A schedule was paused: ${why}`);};
   try{await checkTarget(db,s.owner,s.agent_id,s.skill);}catch(e){await stopped((e as Error).message);continue;}
   const mode=s.mode==='sample'||!aiReady()?'sample':'live';

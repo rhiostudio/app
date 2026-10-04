@@ -21,6 +21,7 @@ import {HttpError,safeMessage} from './server';
 import {splitSearchWidget} from './grounding';
 import {skillCatalog,type SkillId} from './agents';
 import {performRun} from './runs';
+import {limitsFor} from './tiers';
 
 type Env={TELEGRAM_BOT_TOKEN?:string;NOTIFY_DISCORD?:string;NOTIFY_MAX?:string;NOTIFY_TEST_BASE?:string;APP_ORIGIN?:string};
 const E=()=>env as unknown as Env;
@@ -36,6 +37,8 @@ export function notifyConfig(){
  return {discord:E().NOTIFY_DISCORD!=='false',telegram:!!botToken(),max:Number.isFinite(max)&&max>=1?Math.min(Math.round(max),20):4};
 }
 
+/** Channels this account may keep: NOTIFY_MAX, raised by its holder tier (lib/tiers.ts). */
+export const channelLimit=async(db:D1Database,owner:string)=>(await limitsFor(db,owner,{schedules:0,dailyRuns:0,channels:notifyConfig().max})).channels;
 export type Channel={id:string;kind:'discord'|'telegram';label:string;ok:boolean;lastSent:string|null;lastError:string|null;
  /** the agent that answers questions in this Telegram chat, and today's count */chat:{agentId:string;skill:string;daily:number;used:number}|null};
 type Row={id:string;owner:string;kind:string;target:string;label:string;fails:number;dead:number;last_error:string|null;last_sent:string|null;
@@ -62,10 +65,10 @@ async function saveChannel(db:D1Database,owner:string,kind:Channel['kind'],targe
  if(known){await db.prepare('UPDATE notify_channels SET label=?,fails=0,dead=0,last_error=NULL WHERE id=?').bind(label,known.id).run();return known.id;}
  const id=crypto.randomUUID();
  const r=await db.prepare('INSERT OR IGNORE INTO notify_channels (id,owner,kind,target,label,created) SELECT ?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM notify_channels WHERE owner=?)<?')
-  .bind(id,owner,kind,target,label,new Date().toISOString(),owner,notifyConfig().max).run();
+  .bind(id,owner,kind,target,label,new Date().toISOString(),owner,await channelLimit(db,owner)).run();
  return r.meta.changes?id:null;
 }
-const full=()=>new HttpError(409,`You can keep up to ${notifyConfig().max} channels. Remove one first.`);
+const full=(max:number)=>new HttpError(409,`You can keep up to ${max} channels. Remove one first.`);
 
 /* ---- Discord ---- */
 const HOOK=/^https:\/\/(?:(?:canary|ptb)\.)?discord(?:app)?\.com\/api\/(?:v\d{1,2}\/)?webhooks\/(\d{15,22})\/([A-Za-z0-9_-]{40,120})\/?$/;
@@ -83,7 +86,7 @@ export async function addDiscord(db:D1Database,owner:string,url:string){
   if(!r.ok)throw new HttpError(502,'Discord did not accept the request right now. Try again in a moment.');
   name=clean(((await r.json().catch(()=>({}))) as {name?:string}).name);
  }catch(e){if(e instanceof HttpError)throw e;throw new HttpError(502,'Discord could not be reached right now. Try again in a moment.');}
- const id=await saveChannel(db,owner,'discord',target,`Discord · ${name||'webhook'}`);if(!id)throw full();
+ const id=await saveChannel(db,owner,'discord',target,`Discord · ${name||'webhook'}`);if(!id)throw full(await channelLimit(db,owner));
  return id;
 }
 
@@ -108,7 +111,8 @@ const links=(name:string,code:string)=>({link:`https://t.me/${name}?start=${code
 /** A one-time code for this account; the chat that sends it to the bot becomes a channel. */
 export async function startTelegram(db:D1Database,owner:string){
  if(!notifyConfig().telegram)throw new HttpError(503,'Telegram delivery is not set up on this server.');
- if(((await db.prepare('SELECT COUNT(*) AS n FROM notify_channels WHERE owner=?').bind(owner).first<{n:number}>())?.n??0)>=notifyConfig().max)throw full();
+ const max=await channelLimit(db,owner);
+ if(((await db.prepare('SELECT COUNT(*) AS n FROM notify_channels WHERE owner=?').bind(owner).first<{n:number}>())?.n??0)>=max)throw full(max);
  const name=await botName(db);
  const code=btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(18)))).replace(/\+/g,'-').replace(/\//g,'_');
  const expires=Date.now()+LINK_MS;

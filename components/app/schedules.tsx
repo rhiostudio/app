@@ -22,7 +22,8 @@ export type Schedule={id:string;agent_id:string;agent_name:string|null;skin:stri
  next_run:string;last_run:string|null;last_status:string|null;last_run_id:string|null;runs:number;created:string;notify?:string|null};
 export type Channel={id:string;kind:'discord'|'telegram';label:string;ok:boolean;lastSent:string|null;lastError:string|null;chat?:{agentId:string;skill:string;daily:number;used:number}|null};
 export type Delivery={discord:boolean;telegram:boolean;max:number};
-export type Limits={enabled:boolean;runCost:number;max:number;dailyCap:number;perDay:number[];usedToday:number;mode:'live'|'sample';skillCosts?:Record<string,number>};
+export type Limits={enabled:boolean;runCost:number;max:number;dailyCap:number;perDay:number[];usedToday:number;mode:'live'|'sample';skillCosts?:Record<string,number>;
+ /** the account's holder tier and every tier's limits (where the token is set) */tier?:string;tierName?:string;perks?:{id:string;name:string;min:string;schedules:number;dailyRuns:number;channels:number}[]|null};
 /** Credits for one scheduled run of this skill (the server's price list, else the flat schedule cost). */
 const runCostOf=(l:Limits|null|undefined,skill:string)=>l?.skillCosts?.[skill]??l?.runCost??5;
 type Data={schedules:Schedule[];limits:Limits;channels?:Channel[];delivery?:Delivery};
@@ -109,6 +110,22 @@ export function ScheduleCard({s,onChange,compact,channels=[]}:{s:Schedule;onChan
    {channels.length?<label className="flex items-center gap-2 text-[12px] text-muted-foreground">Send to<SendTo value={channels.some(c=>c.id===s.notify)?s.notify!:null} channels={channels} disabled={busy} onChange={v=>call('PATCH',{id:s.id,notify:v})}/></label>:<span/>}
    <Button size="sm" variant="ghost" disabled={busy} onClick={()=>{if(confirm('Delete this schedule? Past runs stay in History.'))call('DELETE',{id:s.id});}}><I id="archive"/>Delete</Button></div>
  </div>;
+}
+
+/** Limits by holder tier, the account's own tier marked. Shown only where the RHIO token is set. */
+function TierPerks({limits,onRefresh}:{limits:Limits;onRefresh:()=>void}){
+ const [busy,setBusy]=useState(false);
+ if(!limits.perks)return null;
+ const refresh=async()=>{setBusy(true);try{await api('/api/tier');}catch{/* the page still shows the last known tier */}onRefresh();setBusy(false);};
+ return <section className="grid gap-3 rounded-xl border bg-card p-5">
+  <div className="flex flex-wrap items-baseline justify-between gap-2"><b className="text-[15px] font-semibold">Holder perks</b>
+   <span className="text-[12.5px] text-muted-foreground">Your tier: <b className="text-foreground">{limits.tierName||'Free'}</b> · <button type="button" disabled={busy} onClick={refresh} className="underline underline-offset-4 hover:text-foreground">{busy?'Checking…':'Check again'}</button></span></div>
+  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">{limits.perks.map(p=><div key={p.id} className={cn('grid gap-1 rounded-lg border p-3',p.id===limits.tier&&'border-lime bg-lime/10')}>
+   <span className="flex items-baseline justify-between gap-2"><b className="text-sm font-semibold">{p.name}</b><span className="font-mono text-[10.5px] text-muted-foreground">{p.min==='0'?'no RHIO needed':`${Number(p.min).toLocaleString('en-US')}+ RHIO`}</span></span>
+   <span className="text-[12.5px] text-muted-foreground tabular-nums">{p.schedules} schedules · {p.dailyRuns} runs a day · {p.channels} channels</span>
+  </div>)}</div>
+  <p className="text-xs text-muted-foreground">Limits grow with the RHIO your linked wallets hold; the server reads the balance from the chain and checks it again every few hours. Runs cost the same credits on every tier. <a href="/tiers" className="underline underline-offset-4 hover:text-foreground">All tiers</a></p>
+ </section>;
 }
 
 /** One channel's icon. */
@@ -225,6 +242,7 @@ export function SchedulesPage({auth,agents,balance,onSignIn,onOpenHistory}:{auth
   </section>}
   {list.length>0&&<div className="stagger grid gap-3 lg:grid-cols-2">{list.map(s=><ScheduleCard key={s.id} s={s} onChange={setData} channels={channels}/>)}</div>}
   <DeliveryPanel onChange={load} agents={agents}/>
+  {L&&<TierPerks limits={L} onRefresh={load}/>}
   <p className="text-xs text-muted-foreground">Times use your device clock. A slot missed while the server was down is skipped, not repeated. When credits run out, or the agent or skill is removed, the schedule pauses and shows why.</p>
  </DashPage>;
 }

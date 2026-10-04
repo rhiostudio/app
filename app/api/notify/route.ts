@@ -6,7 +6,7 @@ import {context,failure,body,HttpError} from '@/lib/server';
 import {skillIds} from '@/lib/agents';
 import {checkTarget} from '@/lib/schedules';
 import {liveRunCost} from '@/lib/economy';
-import {addDiscord,channelsOf,notifyConfig,pendingTelegram,pollTelegram,readerFresh,removeChannel,setChat,startTelegram,testChannel} from '@/lib/notify';
+import {addDiscord,channelLimit,channelsOf,notifyConfig,pendingTelegram,pollTelegram,readerFresh,removeChannel,setChat,startTelegram,testChannel} from '@/lib/notify';
 
 const post=z.discriminatedUnion('action',[
  z.object({action:z.literal('discord'),url:z.string().trim().min(20).max(400)}),
@@ -21,7 +21,7 @@ async function view(db:D1Database,owner:string){
  // while the owner waits for their chat to appear, the page asks every few seconds: read the bot's messages now
  // (in the container a reader does this all the time; the page only reads where there is none)
  if(pending&&!await readerFresh(db).catch(()=>false)){await pollTelegram(db).catch(()=>null);pending=await pendingTelegram(db,owner).catch(()=>null);}
- return {config:notifyConfig(),channels:await channelsOf(db,owner),pending,chatCosts:Object.fromEntries(skillIds.map(k=>[k,liveRunCost(k)]))};
+ return {config:{...notifyConfig(),max:await channelLimit(db,owner)},channels:await channelsOf(db,owner),pending,chatCosts:Object.fromEntries(skillIds.map(k=>[k,liveRunCost(k)]))};
 }
 
 export async function GET(request:Request){try{const {db,owner}=await context(request);return Response.json(await view(db,owner),{headers:{'Cache-Control':'no-store'}});}catch(e){return failure(e)}}

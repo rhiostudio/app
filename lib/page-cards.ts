@@ -8,7 +8,8 @@
    program is not running on a server. Nothing here may promise a return: it names what the page shows. */
 import type {Metadata} from 'next';
 
-export type PageCard={path:string;title:string;kicker:string;headline:string;lines:string[];character:string;description:string};
+export type PageCard={path:string;title:string;kicker:string;headline:string;lines:string[];character:string;description:string;
+ /** 'left': the character stands on the left and the text on the right (the tiers card) */layout?:'left'};
 export const PAGE_CARDS={
  rewards:{path:'/dashboard/rewards',title:'Holder rewards',kicker:'HOLDER REWARDS',headline:'The reward vault, read from the chain',
   lines:['Vault balance and every refill','Each settled hour','Your own claim'],character:'vesper',
@@ -25,6 +26,9 @@ export const PAGE_CARDS={
  quests:{path:'/dashboard/quests',title:'Quests',kicker:'QUESTS',headline:'Try your agent, collect free credits',
   lines:['Each quest is checked by the server','Free credits, once per account','New quests over time'],character:'zara',
   description:'A short list of things to try with your agent. Each finished quest gives free credits, once per account.'},
+ tiers:{path:'/tiers',title:'Holder tiers',kicker:'HOLDER TIERS',headline:'Hold RHIO, unlock more',
+  lines:['More schedules','More scheduled runs a day','More delivery channels'],character:'lumi',layout:'left',
+  description:'What each holder tier needs and gives: more schedules, scheduled runs a day and delivery channels, and monthly credits. Read from the chain, nothing locked.'},
  discover:{path:'/dashboard/discover',title:'Discover',kicker:'DISCOVER',headline:'Agents other creators published',
   lines:['Run them for credits','Publish your own and set a price','Instructions are never shown'],character:'atlas',
   description:'Agents other creators published: run them for credits, or publish your own.'},

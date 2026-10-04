@@ -45,6 +45,7 @@ export const RESOURCES:NavLink[]=[
  {id:'docs',title:'Credits & prices',icon:'coins',desc:'How pay-per-run works',tone:'amber',doc:'credits'},
  {id:'docs',title:'FAQ',icon:'bulb',desc:'Short answers to common questions',tone:'sky',doc:'faq'},
  {id:'paper',title:'Whitepaper',icon:'doc',desc:'The token, holder rewards and economics',tone:'coral'},
+ {id:'tiers',title:'Holder tiers',icon:'layers',desc:'What holding RHIO unlocks: more schedules, runs and channels',tone:'amber'},
  {id:'whales',title:'Whale watch',icon:'scan',desc:'Biggest RHIO transfers and holders, from the chain',tone:'lime'},
  {id:'roadmap',title:'Roadmap',icon:'map',desc:'Shipped, in progress, planned',tone:'mint'},
 ];
