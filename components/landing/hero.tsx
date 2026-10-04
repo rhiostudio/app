@@ -19,7 +19,7 @@ const DECK:Card[]=[
  {k:'Persona',t:'A mind that travels with every task',bg:'bg-iris',fg:'text-white',id:'mira'},
  {k:'Skills',t:'Skills that do real work, more unlocking',bg:'bg-[#262825]',fg:'text-white',id:'scout'},
  {k:'Outfits',t:'Dress every piece, in any color',bg:'bg-coral',fg:'text-ink',id:'nova'},
- {k:'Stage',t:'20 motions and 6 powers',bg:'bg-sky',fg:'text-ink',id:'volt'},
+ {k:'Stage',t:'26 motions and 6 powers',bg:'bg-sky',fg:'text-ink',id:'volt'},
  {k:'Discover',t:'Publish it and earn per run',bg:'bg-amber',fg:'text-ink',id:'cole'},
  {k:'Rewards',t:'NVDA rewards for holders, open',bg:'bg-mint',fg:'text-ink',id:'lumi'},
 ];

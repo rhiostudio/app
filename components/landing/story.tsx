@@ -46,7 +46,7 @@ export function Flow({onNavigate}:{onNavigate:(v:'agents'|'roadmap')=>void}){
 export function Statement(){
  const ref=useScrollProgress<HTMLElement>();
  const words=['Alive','in','your','browser.'];const total=words.join('').length;let n=0;
- const points:[string,string,string][]=[['Blinks and breathes','Idle life on every character: breathing, blinking, glances at your cursor.','bg-lime'],['Spring physics','Hair, coats, capes and antennas swing with every move.','bg-iris'],['20 motions','Gestures, moods and moves, cross-faded into each other.','bg-coral'],['6 powers','Orb, shield, blink, levitate, scan and hype, on keys 1 to 6.','bg-sky']];
+ const points:[string,string,string][]=[['Blinks and breathes','Idle life on every character: breathing, blinking, glances at your cursor.','bg-lime'],['Spring physics','Hair, coats, capes and antennas swing with every move.','bg-iris'],['26 motions','Gestures, moods, moves and emotes, cross-faded into each other.','bg-coral'],['6 powers','Orb, shield, blink, levitate, scan and hype, on keys 1 to 6.','bg-sky']];
  return <section ref={ref} aria-label="Alive in your browser" className="tone-flip relative h-[260vh] [--p:0] motion-reduce:h-auto">
   <div className="sticky top-[var(--top)] grid h-[calc(100svh-var(--top))] content-center justify-items-center gap-10 overflow-hidden px-4 motion-reduce:static motion-reduce:h-auto motion-reduce:py-24">
    <Eyebrow tone="lime">The engine</Eyebrow>

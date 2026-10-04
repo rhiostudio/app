@@ -5,7 +5,7 @@ export type {Look};
 /* 25 original characters. The first 12 ids are unchanged so older saved agents still open. */
 export const skinIds=['atlas','nova','orbit','kira','dash','byte','echo','terra','volt','vesper','rook','mira','juno','cole','lumi','otto','wren','zara','felix','ines','taro','noor','scout','maker','guardian'] as const;
 export type CharacterId=typeof skinIds[number];
-export const motionNames=['Idle','Wave','Nod','Shrug','Think','Point','Clap','Cheer','Laugh','Bow','Salute','Stretch','Typing','Walk','Run','Jump','Spin','Dance','Disco','Victory'] as const;
+export const motionNames=['Idle','Wave','Nod','Shrug','Think','Point','Clap','Cheer','Laugh','Bow','Salute','Stretch','Typing','Walk','Run','Jump','Spin','Dance','Disco','Victory','Flex','Heart','Dab','Facepalm','Kick','Backflip'] as const;
 export type Motion=typeof motionNames[number];
 /** Looping motions become the agent's default stance; the others play once. */
 export const loopMotions:readonly Motion[]=['Idle','Think','Typing','Walk','Run','Dance','Disco'];

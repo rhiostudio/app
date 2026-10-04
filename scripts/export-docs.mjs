@@ -16,7 +16,7 @@ const date = C.version.split('·')[1]?.trim() || '';
 /* Feature status by what the code actually does. Keep in sync with Docs "What is RHIO". */
 const STATUS = [
  ['Live on rhio.studio', 'live', [
-  '25 characters (22 modelled humans dressed in the browser, an android and 3 bots built from code), outfit editor, 20 motions, 6 powers (three.js)',
+  '25 characters (22 modelled humans dressed in the browser, an android and 3 bots built from code), outfit editor, 26 motions, 6 powers (three.js)',
   'Agent builder: persona, tone, answer language, up to 4 of 9 skills',
   'Wallet monitor skill: reads an address on Robinhood Chain (balances, change since the last check, RHIO transfers), read-only',
   'All 9 skills open on a server-side AI provider; runs cost credits, and the operator can cap tries per skill (a failed run gives the try back)',
