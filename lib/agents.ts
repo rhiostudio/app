@@ -2,7 +2,7 @@
    schemas live in ./agent-schema (loaded by the server, and lazily by the studio when saving/importing). */
 import type {Agent} from './agent-schema';
 export type {Agent};
-export const skillIds=['research','write','document','summarize','translate','brainstorm','code','planner','monitor'] as const;
+export const skillIds=['research','write','document','summarize','translate','brainstorm','code','planner','monitor','whales'] as const;
 export type SkillId=typeof skillIds[number];
 export const MAX_SKILLS=4;
 /** Skills open right now. A skill left out stays visible but locked (no equip, runs refused by /api/runs).
@@ -25,6 +25,7 @@ const SKILLS=[
  {id:'code',name:'Code explainer',description:'Explain, review or comment a code snippet.',category:'Builder',icon:'Code2',cost:4},
  {id:'planner',name:'Task planner',description:'Break a goal into an ordered checklist with time estimates.',category:'Productivity',icon:'ListChecks',cost:3},
  {id:'monitor',name:'Wallet monitor',description:'Read a wallet on Robinhood Chain: balances, RHIO transfers and what changed since the last check.',category:'Automation',icon:'Activity',cost:5},
+ {id:'whales',name:'Whale watch',description:'Report on the RHIO token: the biggest transfers of the last 24 hours, new holders and the biggest holders.',category:'Automation',icon:'Radar',cost:5},
 ];
 export const skillCatalog=SKILLS.map(s=>({...s,planned:!!('planned' in s&&s.planned),locked:!('planned' in s&&s.planned)&&!isOpenSkill(s.id)}));
 export const openSkills=()=>skillCatalog.filter(s=>!s.planned&&!s.locked);

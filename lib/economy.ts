@@ -12,7 +12,7 @@ export function startingCredits(){return envInt('STARTING_CREDITS',25,100_000);}
 /** Credits per live AI run by skill (client, 1 Oct 2026): priced by what the skill costs to run. Research pays for web
     searches, document and code read long inputs. LIVE_SKILL_COSTS overrides entries ("research=12,document=6"); the
     value "flat" charges LIVE_RUN_COST for every skill. */
-export const DEFAULT_SKILL_COSTS:Record<string,number>={research:12,document:6,code:6,write:5,monitor:5,summarize:4,translate:4,brainstorm:4,planner:4};
+export const DEFAULT_SKILL_COSTS:Record<string,number>={research:12,document:6,code:6,write:5,monitor:5,whales:5,summarize:4,translate:4,brainstorm:4,planner:4};
 export function skillCosts():Record<string,number>{
  const raw=String((runtime() as {LIVE_SKILL_COSTS?:string}).LIVE_SKILL_COSTS??'').trim();
  if(raw==='flat')return {};

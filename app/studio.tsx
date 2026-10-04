@@ -12,7 +12,7 @@ import {SIGNIN_EVENT,requireAuth,setAuthenticated} from '@/lib/auth-gate';
 import Avatar,{playMotion,castPower} from './avatar';
 /** How the character works while a task runs: research scans first, writing-type skills type, the rest think. */
 const WORK_MOTION:Record<string,string>={research:'Think',brainstorm:'Think',planner:'Think'};
-function startWork(skill:string){if(skill==='research'||skill==='monitor')castPower('scan');playMotion(WORK_MOTION[skill]||'Typing',true);}
+function startWork(skill:string){if(skill==='research'||skill==='monitor'||skill==='whales')castPower('scan');playMotion(WORK_MOTION[skill]||'Typing',true);}
 import {Roster,OutfitEditor,Powers,MotionDeck,StageControls} from './character-controls';
 import {useTheme} from './theme';
 import type {DocKind} from './content-pages';
@@ -49,6 +49,7 @@ const ProfilePage=lazy(()=>import('@/components/app/profile').then(m=>({default:
 const PublicDocs=lazy(()=>import('./public-docs').then(m=>({default:m.PublicDocs})));
 const PublicRoadmap=lazy(()=>import('./public-docs').then(m=>({default:m.PublicRoadmap})));
 const AgentPage=lazy(()=>import('@/components/rhio/agent-page').then(m=>({default:m.AgentPage})));
+const WhalesPage=lazy(()=>import('@/components/rhio/whales-page').then(m=>({default:m.WhalesPage})));
 const LoginPage=lazy(()=>import('@/components/rhio/login-page').then(m=>({default:m.LoginPage})));
 const NotFoundPage=lazy(()=>import('@/components/rhio/login-page').then(m=>({default:m.NotFoundPage})));
 const SearchPalette=lazy(()=>import('@/components/rhio/search-palette').then(m=>({default:m.SearchPalette})));
@@ -385,6 +386,7 @@ export default function Studio(){
     {view==='roadmap'&&<PublicRoadmap onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
     {view==='login'&&<LoginPage auth={auth} onDone={()=>{refresh();const n=new URLSearchParams(location.search).get('next');router.replace(n&&n.startsWith('/dashboard')?n:'/dashboard');}} onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
     {view==='agent'&&route.doc&&<AgentPage id={route.doc} onRun={a=>{if(!requireAuth())return;setMarketAgent(a);}} onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
+    {view==='whales'&&<WhalesPage onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
     {view==='notfound'&&<NotFoundPage onNavigate={(v,doc)=>navigate(v,doc,'site')}/>}
    </Suspense>
 
@@ -496,8 +498,8 @@ function RunPanel({target,ready,liveCost,skillCosts,liveToday,balance,trials,aut
   {ready&&mode==='live'&&liveToday&&<p className={cn('-mt-2 text-xs',liveToday.used>=liveToday.limit||liveToday.studioFull||liveToday.freeFull?'text-destructive':'text-muted-foreground')}>{liveToday.studioFull?'Live AI is full for today across the studio. Workflow samples still work; live AI opens again after 00:00 UTC.':liveToday.freeFull?'Free live AI is used up for today across the studio. With bought credits live AI still runs; free live runs open again after 00:00 UTC.':`Live AI today: ${liveToday.used} of ${liveToday.limit} runs used (resets 00:00 UTC).`}</p>}
   {ready&&mode==='live'&&liveToday?.heavy&&liveToday.heavy.skills.includes(skill)&&(()=>{const h=liveToday.heavy!;const left=Math.max(0,h.limit-h.used);return <p className={cn('-mt-2 text-xs',left===0?'text-destructive':'text-muted-foreground')}>{`Heavy skill: ${left} of ${h.limit} left in this ${h.hours}-hour window (${h.tier==='paid'?'paid':'free'} tier), resets ${clock(h.resets)}.`}{h.tier==='free'?` Top up for ${h.paidLimit} per window.`:''}</p>;})()}
   {ready&&mode==='live'&&skill==='research'&&noSearchNote(liveToday)&&<p className="-mt-2 text-xs text-muted-foreground">{noSearchNote(liveToday)}</p>}
-  <div className="grid gap-2"><FieldLabel htmlFor="rf-task">What would you like to work on?</FieldLabel><Textarea id="rf-task" value={task} onChange={e=>setTask(e.target.value)} placeholder={skill==='monitor'?'Paste a wallet address (0x…) and say what to watch. Without an address the agent reads your linked wallet.':'Describe your task, or paste a document to work with…'} maxLength={12000} className="min-h-28"/>
-   {!task&&<div className="flex flex-wrap gap-1.5">{(skill==='monitor'?['Check my wallet and tell me what changed','What does this wallet hold, and did RHIO move in the last day? 0x…']:['Compare three projects using official sources','Turn my idea into a launch post','Summarize this document and list next steps']).map(p=><Button key={p} size="sm" variant="outline" shape="pill" className="h-auto py-1.5 text-left whitespace-normal" onClick={()=>setTask(p)}>{p}</Button>)}</div>}</div>
+  <div className="grid gap-2"><FieldLabel htmlFor="rf-task">What would you like to work on?</FieldLabel><Textarea id="rf-task" value={task} onChange={e=>setTask(e.target.value)} placeholder={skill==='monitor'?'Paste a wallet address (0x…) and say what to watch. Without an address the agent reads your linked wallet.':skill==='whales'?'Say what you want to know about RHIO today. The agent gets the token reading with the task.':'Describe your task, or paste a document to work with…'} maxLength={12000} className="min-h-28"/>
+   {!task&&<div className="flex flex-wrap gap-1.5">{(skill==='monitor'?['Check my wallet and tell me what changed','What does this wallet hold, and did RHIO move in the last day? 0x…']:skill==='whales'?['What moved in RHIO in the last 24 hours?','Write a short holder update from today\'s numbers']:['Compare three projects using official sources','Turn my idea into a launch post','Summarize this document and list next steps']).map(p=><Button key={p} size="sm" variant="outline" shape="pill" className="h-auto py-1.5 text-left whitespace-normal" onClick={()=>setTask(p)}>{p}</Button>)}</div>}</div>
   {auth&&!ready&&<Alert className="rounded-xl"><AlertDescription><span>Live AI is not connected on this server yet, so runs return a <b className="text-foreground">labelled workflow sample</b> instead of an AI answer.</span></AlertDescription></Alert>}
   <div className="flex flex-wrap items-center gap-3"><Button className="h-10 flex-1" disabled={running||!skill||task.trim().length<3||short||out} onClick={run}>{running?'Working…':out?`No tries left for ${skillName(skill)}`:`Run ${skillName(skill)}`}</Button><span className="text-xs text-muted-foreground">{cost} credits{target.mine?'':` · ${target.price} to the creator`}{short?' · not enough credits':''}{auth&&left!==null&&trials?` · ${left} of ${trials.limit} tries left`:''}</span></div>
   {out&&<p className="text-[12.5px] text-muted-foreground">You have used every try of {skillName(skill)} in this preview. Pick another skill above, or equip one in the Skills tab.</p>}

@@ -1,0 +1,102 @@
+/* Whale watch: what the RHIO token did lately, read from the holder recorder's own tables (lib/rewards.ts): every
+   Transfer event of the token and the running balance of each address. No chain call is made here and nothing is sent.
+   Used by the public page /whales (GET /api/whales, its link-preview picture) and by the tenth skill, `whales`.
+   What it can say: how many addresses hold RHIO, how many got their first RHIO in the last 24 hours and still hold it,
+   how many transfers there were and how much moved, the biggest transfers, the biggest holders and their share.
+   What it cannot say, and the texts must not pretend otherwise: prices, who owns an address, or whether a transfer was
+   a buy or a sell. The only label an address gets is "not earning holder rewards": it is on the server's
+   REWARD_EXCLUDE list (team, treasury, pool or contract), which is a setting, not a guess.
+   The 24 hours end at the recorder's last block, not at the wall clock, so a recorder that is behind still shows a
+   coherent day and the page says how old it is. A server without the token or without the recorder returns null. */
+import {chainConfig,rewardConfig} from './chain';
+import {HttpError} from './server';
+import {amount} from './monitor';
+
+const ZERO='0x0000000000000000000000000000000000000000';
+const BURN=new Set([ZERO,'0x000000000000000000000000000000000000dead']);
+const DAY=86400,MAX_ROWS=20000;
+
+export type WhaleMove={ts:number;tx:string;from:string;to:string;amount:string;kind:'transfer'|'mint'|'burn';fromOff:boolean;toOff:boolean};
+export type WhaleHolder={address:string;amount:string;share:string|null;off:boolean};
+export type Whales={chainId:number;chain:string;explorer:string;token:string;asOf:{block:number;ts:number};
+ supply:string|null;holders:number;newHolders:number;
+ day:{transfers:number;volume:string;volumeShort:string;wallets:number;capped:boolean};
+ moves:WhaleMove[];top:WhaleHolder[];topShare:string|null};
+
+const whole=(raw:bigint)=>raw/10n**18n;
+/** 12,345,678 RHIO → "12.3M": for a headline, never for a figure someone checks. */
+export function compact(raw:bigint){
+ const n=Number(whole(raw));
+ for(const [div,unit] of [[1e9,'B'],[1e6,'M'],[1e3,'K']] as const)if(n>=div)return (n/div).toFixed(n/div>=100?0:1).replace(/\.0$/,'')+unit;
+ return String(n);
+}
+const pct=(part:bigint,all:bigint)=>all>0n?(Number(part*10000n/all)/100).toFixed(2)+'%':null;
+
+let cache:{at:number;token:string;data:Whales}|null=null;
+/** The reading, kept for a minute in memory (the page, the picture and the skill ask for the same numbers). */
+export async function whales(db:D1Database):Promise<Whales|null>{
+ const c=chainConfig();if(!c.rhio)return null;const token=c.rhio.toLowerCase();
+ if(cache&&cache.token===token&&Date.now()-cache.at<60e3)return cache.data;
+ const sync=await db.prepare('SELECT last_block,last_ts FROM holder_sync WHERE token=?').bind(token).first<{last_block:number;last_ts:number}>();
+ if(!sync)return null;
+ const off=new Set(rewardConfig(c).exclude.map(a=>a.toLowerCase()));
+ const from=sync.last_ts-DAY;
+ type Row={tx_hash:string;from_addr:string;to_addr:string;value:string;ts:number};
+ const [rows,count,top,minted,burned,first]=await Promise.all([
+  db.prepare('SELECT tx_hash,from_addr,to_addr,value,ts FROM holder_transfers WHERE token=? AND ts>=? ORDER BY block DESC,log_index DESC LIMIT ?').bind(token,from,MAX_ROWS+1).all<Row>(),
+  db.prepare("SELECT COUNT(*) AS n FROM holder_balances WHERE token=? AND balance!='0' AND lower(address) NOT IN (?,?)").bind(token,...BURN).first<{n:number}>(),
+  // balances are whole numbers kept as text: longer means bigger, equal length compares as text
+  db.prepare("SELECT address,balance FROM holder_balances WHERE token=? AND balance!='0' ORDER BY LENGTH(balance) DESC,balance DESC LIMIT 14").bind(token).all<{address:string;balance:string}>(),
+  db.prepare('SELECT value FROM holder_transfers WHERE token=? AND from_addr=? LIMIT 5000').bind(token,ZERO).all<{value:string}>(),
+  db.prepare('SELECT value FROM holder_transfers WHERE token=? AND to_addr=? LIMIT 5000').bind(token,ZERO).all<{value:string}>(),
+  db.prepare('SELECT MIN(block) AS b FROM holder_transfers WHERE token=? AND ts>=?').bind(token,from).first<{b:number|null}>(),
+ ]);
+ // wallets whose first RHIO ever arrived inside the window and that still hold some
+ const fresh=first?.b==null?0:(await db.prepare("SELECT COUNT(*) AS n FROM (SELECT t.to_addr FROM holder_transfers t JOIN holder_balances h ON h.token=t.token AND h.address=t.to_addr AND h.balance!='0' WHERE t.token=?1 AND lower(t.to_addr) NOT IN (?3,?4) GROUP BY t.to_addr HAVING MIN(t.block)>=?2)")
+  .bind(token,first.b,...BURN).first<{n:number}>())?.n??0;
+ const sum=(r:{value:string}[])=>r.reduce((a,x)=>a+BigInt(x.value),0n);
+ const supply=sum(minted.results)-sum(burned.results);
+ const capped=rows.results.length>MAX_ROWS;const day=rows.results.slice(0,MAX_ROWS).filter(r=>r.from_addr!==r.to_addr);
+ const wallets=new Set<string>();let volume=0n;
+ for(const r of day){volume+=BigInt(r.value);for(const a of [r.from_addr,r.to_addr])if(!BURN.has(a.toLowerCase()))wallets.add(a);}
+ const moves=[...day].sort((a,b)=>{const x=BigInt(a.value),y=BigInt(b.value);return x===y?b.ts-a.ts:x>y?-1:1;}).slice(0,8)
+  .map(r=>({ts:r.ts,tx:r.tx_hash,from:r.from_addr,to:r.to_addr,amount:amount(BigInt(r.value),18),kind:r.from_addr===ZERO?'mint' as const:BURN.has(r.to_addr.toLowerCase())?'burn' as const:'transfer' as const,
+   fromOff:off.has(r.from_addr.toLowerCase()),toOff:off.has(r.to_addr.toLowerCase())}));
+ const holders=top.results.filter(h=>!BURN.has(h.address.toLowerCase())).slice(0,10);
+ const data:Whales={chainId:c.id,chain:c.name,explorer:c.explorer,token:c.rhio,asOf:{block:sync.last_block,ts:sync.last_ts},
+  supply:supply>0n?amount(supply,18):null,holders:count?.n??0,newHolders:fresh,
+  day:{transfers:day.length,volume:amount(volume,18),volumeShort:compact(volume),wallets:wallets.size,capped},
+  moves,top:holders.map(h=>({address:h.address,amount:amount(BigInt(h.balance),18),share:pct(BigInt(h.balance),supply),off:off.has(h.address.toLowerCase())})),
+  topShare:pct(holders.reduce((a,h)=>a+BigInt(h.balance),0n),supply)};
+ cache={at:Date.now(),token,data};
+ return data;
+}
+
+const when=(ts:number)=>new Date(ts*1000).toISOString().slice(0,16).replace('T',' ')+' UTC';
+const short=(a:string)=>`${a.slice(0,6)}…${a.slice(-4)}`;
+const OFF=' (not earning holder rewards: team, treasury, pool or contract)';
+const moveLine=(m:WhaleMove)=>m.kind==='mint'?`${m.amount} RHIO minted to ${short(m.to)}`:m.kind==='burn'?`${m.amount} RHIO burned by ${short(m.from)}`
+ :`${m.amount} RHIO from ${short(m.from)}${m.fromOff?OFF:''} to ${short(m.to)}${m.toOff?OFF:''}`;
+
+/** The reading for the skill: plain text for the model, and the same numbers as markdown under its answer.
+    Throws 503 when there is no record to read: the caller has not charged anything yet. */
+export async function whaleReading(db:D1Database):Promise<{facts:string;note:string}>{
+ const w=await whales(db).catch(()=>null);
+ if(!w)throw new HttpError(503,'The RHIO token record is not available on this server right now. Nothing was charged; try again later.');
+ const header=`${w.chain} (chain ${w.chainId}) · RHIO · recorded up to block ${w.asOf.block.toLocaleString('en-US')} · ${when(w.asOf.ts)}`;
+ const lines=[`Addresses holding RHIO: ${w.holders.toLocaleString('en-US')}`,
+  `New holders in the 24 hours before that block (first RHIO ever, still holding): ${w.newHolders.toLocaleString('en-US')}`,
+  `Transfers in those 24 hours: ${w.day.transfers.toLocaleString('en-US')}${w.day.capped?' (only the latest 20,000 were counted)':''}, moving ${w.day.volume} RHIO between ${w.day.wallets.toLocaleString('en-US')} wallets`,
+  ...(w.supply?[`Supply: ${w.supply} RHIO`]:[]),...(w.topShare?[`The 10 biggest holders have ${w.topShare} of the supply`]:[])];
+ const moves=w.moves.slice(0,6),top=w.top.slice(0,6);
+ const holder=(h:WhaleHolder,i:number)=>`${i+1}. ${short(h.address)} · ${h.amount} RHIO${h.share?` · ${h.share}`:''}${h.off?OFF:''}`;
+ const facts=['RHIO TOKEN READING (from the RHIO server\'s record of the token\'s Transfer events, read-only)',header,...lines.map(l=>'- '+l),
+  moves.length?'Biggest transfers in those 24 hours:':'No transfer was recorded in those 24 hours.',...moves.map(m=>`- ${when(m.ts)} · ${moveLine(m)}`),
+  'Biggest holders:',...top.map((h,i)=>'- '+holder(h,i)),
+  'A transfer is not a buy or a sell, and an address is not a person: the record says neither.'].join('\n');
+ const note=['---',`**RHIO token reading** · ${header}`,`[Token in the explorer](${w.explorer}/token/${w.token})`,'',...lines.map(l=>'- '+l),
+  ...(moves.length?['','Biggest transfers:',...moves.map(m=>`- ${when(m.ts)} · ${moveLine(m)} · [tx](${w.explorer}/tx/${m.tx})`)]:[]),
+  '','Biggest holders:',...top.map((h,i)=>'- '+holder(h,i)),'',
+  '_Read from the RHIO server\'s record of the token. Where the text above and these numbers differ, the numbers are right. A transfer is not a buy or a sell. Not financial advice._'].join('\n');
+ return {facts,note};
+}

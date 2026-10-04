@@ -26,7 +26,7 @@ export type {View};
 export type NavLink={id:View;title:string;icon:string;desc:string;tone:Tone;doc?:string};
 export const PRODUCT:NavLink[]=[
  {id:'studio',title:'Studio',icon:'cube',desc:'Build, dress and equip an agent',tone:'lime'},
- {id:'skills',title:'Skills',icon:'layers',desc:'Nine open skills and six stage powers',tone:'iris'},
+ {id:'skills',title:'Skills',icon:'layers',desc:'Ten open skills and six stage powers',tone:'iris'},
  {id:'discover',title:'Discover',icon:'store',desc:'Agents other creators published',tone:'coral'},
  {id:'discover',title:'Templates',icon:'list',desc:'Start from a ready-made agent',tone:'amber',doc:'templates'},
 ];
@@ -44,6 +44,7 @@ export const RESOURCES:NavLink[]=[
  {id:'docs',title:'Credits & prices',icon:'coins',desc:'How pay-per-run works',tone:'amber',doc:'credits'},
  {id:'docs',title:'FAQ',icon:'bulb',desc:'Short answers to common questions',tone:'sky',doc:'faq'},
  {id:'paper',title:'Whitepaper',icon:'doc',desc:'The token, holder rewards and economics',tone:'coral'},
+ {id:'whales',title:'Whale watch',icon:'scan',desc:'Biggest RHIO transfers and holders, from the chain',tone:'lime'},
  {id:'roadmap',title:'Roadmap',icon:'map',desc:'Shipped, in progress, planned',tone:'mint'},
 ];
 const TONE_TEXT:Record<Tone,string>={lime:'text-[#3f5f00] dark:text-lime',iris:'text-iris',coral:'text-coral',sky:'text-[#1f7fcf] dark:text-sky',amber:'text-[#9a6500] dark:text-amber',mint:'text-[#15845a] dark:text-mint',pink:'text-pink',ink:'text-foreground'};

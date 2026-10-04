@@ -15,6 +15,7 @@ import {sampleResult} from './runner';
 import {runAI,AIError,searchesWeb} from './provider';
 import {isOpenSkill,skillCatalog,type Agent,type SkillId} from './agents';
 import {monitorTarget,readWallet,saveReading} from './monitor';
+import {whaleReading} from './whales';
 import {SAMPLE_COST,liveRunCost,aiDailyRuns,aiDailyFreeRuns,liveDailyPerUser,quotaKeys,quotaStep,ensureWallet,ledgerRow,split,tierFeePermille,skillTrialLimit,refillFree,heavyWindow,heavyKey,searchForFreeCredits,takeSearchSlot,returnSearchSlot} from './economy';
 /** Heavy skills on manual live runs count against the 5-hour window (lib/economy.ts heavyWindow). */
 const isHeavy=(mode:string,skill:string,scheduled:boolean)=>mode==='live'&&!scheduled&&heavyWindow().skills.includes(skill);
@@ -49,7 +50,9 @@ export async function performRun(db:D1Database,owner:string,data:RunInput,schedu
  const w=await db.prepare('SELECT balance,paid FROM preview_wallets WHERE owner=?').bind(owner).first<{balance:number;paid:number}>();if((w?.balance??0)<cost)throw new HttpError(402,`This run costs ${cost} credits and you have ${w?.balance??0}. You can still edit and export agents.`);
  // The wallet monitor reads the chain before anything is charged: a task without an address, or a chain that does not
  // answer, costs nothing. What it read goes to the model with the task and is attached under the answer.
- const reading=data.skill==='monitor'?await readWallet(db,owner,await monitorTarget(db,owner,data.prompt)):null;
+ const wallet=data.skill==='monitor'?await readWallet(db,owner,await monitorTarget(db,owner,data.prompt)):null;
+ // Whale watch works the same way with the server's record of the RHIO token (lib/whales.ts): no record, no charge.
+ const reading=wallet||(data.skill==='whales'?await whaleReading(db):null);
  // an account that holds bought credits is on the paid tier: more heavy runs, and not limited by the free pool
  const holdsPaid=(w?.paid??0)>0;
  const statements=[
@@ -129,7 +132,7 @@ export async function performRun(db:D1Database,owner:string,data:RunInput,schedu
  const [completed]=await db.batch(settle);
  if(!completed.meta.changes)throw new HttpError(504,TIMED_OUT);
  // the reading becomes "the last check" only once its report exists
- if(reading)await saveReading(db,owner,reading).catch(e=>console.error('RHIO wallet monitor: reading not saved:',safeMessage((e as Error)?.message||e)));
+ if(wallet)await saveReading(db,owner,wallet).catch(e=>console.error('RHIO wallet monitor: reading not saved:',safeMessage((e as Error)?.message||e)));
  return {id:data.id,agent_id:data.agentId,agent_name:record.name,prompt:data.prompt,output,mode:data.mode,cost,status:'complete',created,skill:data.skill,schedule_id:schedule?.id??null};
 }
 

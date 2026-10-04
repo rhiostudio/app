@@ -42,7 +42,7 @@ export function TheIdea({onNavigate}:{onNavigate:(v:'studio')=>void}){
    <div className="grid gap-7">
     <SectionHead eyebrow="The idea" lead="An agent you can see" rest="is an agent you can trust."/>
     <DashedRule/>
-    {[['A face for every agent','Characters blink, breathe and react while a task runs, so you always know what your agent is doing.'],['Skills, not decoration','Nine focused skills. Research, writing, documents, summaries, translation, ideas, code, plans and a wallet monitor.']].map(([t,p])=><Reveal key={t} className="grid gap-1.5"><b className="text-[15px] font-semibold">{t}</b><p className="max-w-[48ch] text-[15px] leading-relaxed text-muted-foreground">{p}</p></Reveal>)}
+    {[['A face for every agent','Characters blink, breathe and react while a task runs, so you always know what your agent is doing.'],['Skills, not decoration','Ten focused skills. Research, writing, documents, summaries, translation, ideas, code, plans, a wallet monitor and a whale watch.']].map(([t,p])=><Reveal key={t} className="grid gap-1.5"><b className="text-[15px] font-semibold">{t}</b><p className="max-w-[48ch] text-[15px] leading-relaxed text-muted-foreground">{p}</p></Reveal>)}
     <div><CutButton className="nudge magnetic" onClick={()=>onNavigate('studio')}>Build one now <I id="arrow"/></CutButton></div>
    </div>
   </div>

@@ -1,10 +1,11 @@
 /* URL routes. Every screen has its own path; the app shell (app/studio.tsx, mounted once in the root layout)
    reads the pathname to decide what to render, so state such as the agent draft survives navigation.
    Public site:  /  /docs[/slug]  /whitepaper[/slug]  /roadmap  /login  /a/<agent id> (one published agent)
+                 /whales (the RHIO token's biggest transfers and holders)
    Dashboard:    /dashboard  /dashboard/{studio,agents,discover,skills,schedules,history,credits,wallet,rewards,profile}
                  /dashboard/docs[/slug]  /dashboard/whitepaper[/slug]  /dashboard/roadmap
    Signed-in only (proxy.ts redirects to /login?next=...): see PROTECTED_PATHS. */
-export type View='home'|'login'|'notfound'|'agent'|'overview'|'profile'|'rewards'|'wallet'|'studio'|'agents'|'discover'|'skills'|'schedules'|'activity'|'credits'|'docs'|'paper'|'roadmap';
+export type View='home'|'login'|'notfound'|'agent'|'whales'|'overview'|'profile'|'rewards'|'wallet'|'studio'|'agents'|'discover'|'skills'|'schedules'|'activity'|'credits'|'docs'|'paper'|'roadmap';
 export type Area='site'|'dash';
 export type Route={view:View;area:Area;doc?:string};
 
@@ -25,6 +26,7 @@ export const agentPath=(id:string)=>`/a/${id}`;
 /** Path for a view. Docs, whitepaper and roadmap live in both areas; everything else has one home. */
 export function pathFor(view:View,doc?:string,area:Area='dash'):string{
  if(view==='agent')return doc?agentPath(doc):'/dashboard/discover';
+ if(view==='whales')return '/whales';
  if(view==='home'||view==='login'||view==='notfound')return view==='login'?'/login':'/';
  const docs=view==='docs'||view==='paper';
  if(area==='site'&&SITE[view])return SITE[view]+(docs&&doc?`/${doc}`:'');
@@ -39,6 +41,7 @@ export function parsePath(pathname:string):Route{
  if(a==='login'&&!b)return {view:'login',area:'site'};
  if((a==='docs'||a==='whitepaper')&&!c)return {view:a==='docs'?'docs':'paper',area:'site',doc:b};
  if(a==='roadmap'&&!b)return {view:'roadmap',area:'site'};
+ if(a==='whales'&&!b)return {view:'whales',area:'site'};
  if(a==='a'&&b&&!c&&AGENT_PATH_ID.test(b))return {view:'agent',area:'site',doc:b.toLowerCase()};
  if(a==='dashboard'){
   if(!b)return {view:'overview',area:'dash'};

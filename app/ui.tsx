@@ -110,7 +110,7 @@ export function TextOut({text:raw}:{text:string}){
  flush();
  return <div className="md text-sm leading-relaxed break-words">{nodes}{widget&&<SearchSuggestions html={widget}/>}</div>;
 }
-export const SKILL_ICON:Record<string,string>={Globe:'globe',PenLine:'pen',FileText:'doc',AlignLeft:'sum',Languages:'lang',Lightbulb:'bulb',Code2:'code',ListChecks:'list',Activity:'wallet',Clock3:'cal'};
+export const SKILL_ICON:Record<string,string>={Globe:'globe',PenLine:'pen',FileText:'doc',AlignLeft:'sum',Languages:'lang',Lightbulb:'bulb',Code2:'code',ListChecks:'list',Activity:'wallet',Radar:'scan',Clock3:'cal'};
 export function I({id,className='i'}:{id:string;className?:string}){return <svg className={className}><use href={`#i-${id}`}/></svg>;}
 export function IconDefs(){return <svg width="0" height="0" style={{position:'absolute'}} aria-hidden="true">
   <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></symbol>
