@@ -27,7 +27,9 @@ export type RunInput={id:string;agentId:string;prompt:string;skill:SkillId;mode:
 type AgentRow={owner:string;config:string;name:string;published:number;price:number;archived:number};
 export type RunRow={id:string;agent_id:string;agent_name:string;prompt:string;output:string;mode:string;cost:number;status:string;created:string;skill:string;schedule_id?:string|null};
 
-export async function performRun(db:D1Database,owner:string,data:RunInput,schedule?:{id:string;cost:number}):Promise<RunRow>{
+/** `opts` (runs started for the owner from outside the Studio, lib/notify.ts): `guard` keeps the agent's instructions
+    unshown even on the owner's own agent, `search:false` answers without web search, `label` names the run in the ledger. */
+export async function performRun(db:D1Database,owner:string,data:RunInput,schedule?:{id:string;cost:number},opts:{guard?:boolean;search?:boolean;label?:string}={}):Promise<RunRow>{
  const previous=await db.prepare('SELECT * FROM runs WHERE id=? AND owner=?').bind(data.id,owner).first<RunRow>();
  if(previous){if(previous.agent_id!==data.agentId||previous.prompt!==data.prompt||previous.mode!==data.mode)throw new HttpError(409,'This request ID is already in use.');return previous;}
  const record=await db.prepare('SELECT owner,config,name,published,price,archived FROM agents WHERE id=?').bind(data.agentId).first<AgentRow>();
@@ -66,7 +68,7 @@ export async function performRun(db:D1Database,owner:string,data:RunInput,schedu
   // the CHECK on the balance aborts the whole batch when it would go below zero: two parallel runs can never overdraw
   db.prepare('UPDATE preview_wallets SET balance=balance-?,paid=paid-(SELECT paid_cost FROM runs WHERE id=? AND owner=?) WHERE owner=?').bind(cost,data.id,owner,owner),
  ];
- if(cost>0)statements.push(ledgerRow(db,owner,-cost,'run',schedule?`Scheduled run · ${record.name}`:mine?`${data.mode==='sample'?'Workflow sample':'Live run'} · ${record.name}`:`Ran ${record.name} (${price} to creator${base?`, ${base} sample`:''})`,data.id,created));
+ if(cost>0)statements.push(ledgerRow(db,owner,-cost,'run',schedule?`Scheduled run · ${record.name}`:mine?`${opts.label||(data.mode==='sample'?'Workflow sample':'Live run')} · ${record.name}`:`Ran ${record.name} (${price} to creator${base?`, ${base} sample`:''})`,data.id,created));
  // every run by someone else counts as a use, free agents included (Discover sorts by it)
  if(!mine){if(price>0)await ensureWallet(db,record.owner);statements.push(db.prepare('UPDATE agents SET uses=uses+1 WHERE id=?').bind(data.agentId));}
  // one try used; at the limit the counter becomes -1, the CHECK fails and the whole batch rolls back (no race)
@@ -105,11 +107,11 @@ export async function performRun(db:D1Database,owner:string,data:RunInput,schedu
  // AI_SEARCH_FREE_CREDITS=false, it answers without browsing and says so. The slot comes back when the provider did not
  // search after all. (The account counts, not the run: free credits are spent first, and someone who bought credits
  // must not lose the search on the runs their daily free credits happen to pay.)
- const search=data.mode==='live'&&data.skill==='research'&&searchesWeb(runtime())&&(holdsPaid||searchForFreeCredits())&&await takeSearchSlot(db,created);
+ const search=opts.search!==false&&data.mode==='live'&&data.skill==='research'&&searchesWeb(runtime())&&(holdsPaid||searchForFreeCredits())&&await takeSearchSlot(db,created);
  // guard: someone else's published agent keeps its instructions private from the person running it
  try{
   if(data.mode==='sample')output=sampleResult(agent,data.prompt,data.skill);
-  else{const r=await runAI(runtime(),agent,data.skill,reading?`${data.prompt}\n\n${reading.facts}`:data.prompt,data.id,{free,guard:!mine,search});output=r.output;if(search&&!r.searched)await returnSearchSlot(db,created).catch(()=>null);}
+  else{const r=await runAI(runtime(),agent,data.skill,reading?`${data.prompt}\n\n${reading.facts}`:data.prompt,data.id,{free,guard:!mine||!!opts.guard,search});output=r.output;if(search&&!r.searched)await returnSearchSlot(db,created).catch(()=>null);}
   if(reading)output=`${output}\n\n${reading.note}`;
  }
  catch(e){

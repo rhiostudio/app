@@ -215,6 +215,19 @@ const tick=async()=>{if(ticking)return;ticking=true;
 // idle only when nothing needs it: no schedules, no holder rewards and no top-ups to settle
 const ticker=E.SCHEDULES_ENABLED==='false'&&E.REWARDS_ENABLED!=='true'&&!(E.PAY_TOKEN_ADDRESS&&E.TOPUP_TREASURY)?null:setInterval(tick,60000);
 
+// 6b. Telegram reader: keeps one request open to the Worker, which holds a long poll on the bot's messages (lib/notify.ts).
+// A question in a chat is then answered within a second or two instead of at the next minute. Idle while no chat is
+// linked for answers and no link is waiting: it then asks again every half minute, which costs one local request
+// (a link opened meanwhile is read by the page itself until the reader takes over).
+let reader=null,lastReader='';
+const readTelegram=async()=>{let pause=30000;
+ try{const r=await fetch(`http://127.0.0.1:${INTERNAL}/api/notify/poll`,{method:'POST',headers:{Authorization:`Bearer ${E.SCHEDULER_TOKEN}`},signal:AbortSignal.timeout(300000)});
+  const d=await r.json().catch(()=>({}));if(r.ok&&!d.idle)pause=d.error?30000:d.busy?2000:250;
+  const note=d.error||'';if(note!==lastReader){lastReader=note;log(note?`telegram: ${note}`:'telegram: back to normal');}}
+ catch{/* runtime still starting, or a long answer */}
+ reader=setTimeout(readTelegram,pause);};
+if(E.TELEGRAM_BOT_TOKEN)reader=setTimeout(readTelegram,20000);
+
 // 7. daily database backup: a consistent copy (SQLite VACUUM INTO) under DATA/backups, the last RHIO_BACKUP_DAYS kept
 const keep=/^\d{1,3}$/.test(E.RHIO_BACKUP_DAYS||'')?Number(E.RHIO_BACKUP_DAYS):7;
 function backup(){
@@ -234,5 +247,5 @@ function backup(){
 }
 const backups=keep>0?[setTimeout(backup,5*60e3),setInterval(backup,24*3600e3)]:[];
 
-for(const sig of ['SIGTERM','SIGINT'])process.on(sig,()=>{if(ticker)clearInterval(ticker);backups.forEach(t=>clearTimeout(t));front.close();child.kill(sig);});
+for(const sig of ['SIGTERM','SIGINT'])process.on(sig,()=>{if(ticker)clearInterval(ticker);if(reader)clearTimeout(reader);backups.forEach(t=>clearTimeout(t));front.close();child.kill(sig);});
 child.on('exit',code=>process.exit(code??0));

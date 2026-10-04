@@ -26,6 +26,7 @@ const STATUS = [
   'Discover gallery of published agents (instructions are never shown)',
   'Schedules: an agent runs a skill 1–24 times a day, paid per run with the skill\'s live price (at least 5 credits), max 3 schedules / 24 runs a day',
   'Delivery: a schedule sends each result to a Discord channel (webhook) or, where the operator connected a bot, a Telegram chat; up to 4 channels per account',
+  'Chat on Telegram (where the operator connected a bot): a connected chat or group asks an agent (/ask in groups); each answer is a paid live run with a daily limit per chat',
   'Wallet-only sign-in (SIWE for Robinhood Chain), several wallets per account',
   'RHIO token on Robinhood Chain mainnet since 2 October 2026; the contract address is in the CA box on the home page',
   'Credit top-ups in USDG on Robinhood Chain mainnet (1 USDG = 100 credits)',

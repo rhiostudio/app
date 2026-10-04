@@ -20,7 +20,7 @@ import {DashPage,EmptyState,Kpi,KpiRow,PageHeader,StatusBadge} from './parts';
 
 export type Schedule={id:string;agent_id:string;agent_name:string|null;skin:string|null;skill:string;prompt:string;per_day:number;start_minute:number;mode:string;active:boolean;
  next_run:string;last_run:string|null;last_status:string|null;last_run_id:string|null;runs:number;created:string;notify?:string|null};
-export type Channel={id:string;kind:'discord'|'telegram';label:string;ok:boolean;lastSent:string|null;lastError:string|null};
+export type Channel={id:string;kind:'discord'|'telegram';label:string;ok:boolean;lastSent:string|null;lastError:string|null;chat?:{agentId:string;skill:string;daily:number;used:number}|null};
 export type Delivery={discord:boolean;telegram:boolean;max:number};
 export type Limits={enabled:boolean;runCost:number;max:number;dailyCap:number;perDay:number[];usedToday:number;mode:'live'|'sample';skillCosts?:Record<string,number>};
 /** Credits for one scheduled run of this skill (the server's price list, else the flat schedule cost). */
@@ -113,10 +113,40 @@ export function ScheduleCard({s,onChange,compact,channels=[]}:{s:Schedule;onChan
 
 /** One channel's icon. */
 const KindIcon=({kind,className}:{kind:string;className?:string})=>kind==='discord'?<FaDiscord className={className}/>:<FaTelegram className={className}/>;
-type DeliveryView={config:Delivery;channels:Channel[];pending:{link:string;group:string;expires:number}|null};
+type DeliveryView={config:Delivery;channels:Channel[];pending:{link:string;group:string;expires:number}|null;chatCosts?:Record<string,number>};
 
-/** Delivery channels of the account: connect Discord (webhook address) or Telegram (the server's bot), test, remove. */
-export function DeliveryPanel({onChange}:{onChange:()=>void}){
+/** A Telegram channel's chat setting: which agent and skill answer questions there, and how many a day. */
+function ChatSetup({c,agents,costs,busy,onSave}:{c:Channel;agents:Agent[];costs:Record<string,number>;busy:boolean;onSave:(p:{agentId:string|null;skill?:string;daily?:number})=>Promise<boolean>}){
+ const saved=agents.filter(a=>a.id&&!a.archived);
+ const [open,setOpen]=useState(false);
+ const [agentId,setAgentId]=useState(c.chat?.agentId||'');const agent=saved.find(a=>a.id===agentId)||saved[0];
+ const skills=(agent?.skills||[]) as readonly string[];
+ const [skill,setSkill]=useState(c.chat?.skill||'');const sk=skills.includes(skill)?skill:skills[0]||'';
+ const [daily,setDaily]=useState(String(c.chat?.daily||20));
+ const current=c.chat?saved.find(a=>a.id===c.chat!.agentId):null;
+ return <div className="grid basis-full gap-2 border-t pt-2">
+  <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-muted-foreground">
+   <span>{c.chat?<>Answers here: <b className="text-foreground">{current?.name||'an agent'} · {skillName(c.chat.skill)}</b> · {c.chat.used}/{c.chat.daily} today</>:'No agent answers in this chat.'}</span>
+   <Button size="sm" variant="ghost" onClick={()=>setOpen(o=>!o)}>{open?'Close':c.chat?'Change':'Let an agent answer'}</Button>
+  </div>
+  {open&&(agent?<div className="grid gap-2">
+   <div className="grid gap-2 sm:grid-cols-3">
+    <NativeSelect size="sm" value={agent.id} onChange={e=>setAgentId(e.target.value)} aria-label="Agent that answers">{saved.map(a=><NativeSelectOption key={a.id} value={a.id!}>{a.name}</NativeSelectOption>)}</NativeSelect>
+    <NativeSelect size="sm" value={sk} onChange={e=>setSkill(e.target.value)} aria-label="Skill that answers">{skills.map(s=><NativeSelectOption key={s} value={s}>{skillName(s)}</NativeSelectOption>)}</NativeSelect>
+    <NativeSelect size="sm" value={daily} onChange={e=>setDaily(e.target.value)} aria-label="Answers per day">{[5,20,50,100].map(n=><NativeSelectOption key={n} value={String(n)}>{n} answers a day</NativeSelectOption>)}</NativeSelect>
+   </div>
+   <p className="text-[12px] text-muted-foreground">In a private chat every message is a question; in a group people write <b className="text-foreground">/ask</b> and the question. Each answer is a live run of this skill ({costs[sk]??'a few'} credits from your balance), at most {daily} a day in this chat. In a group everyone there can ask, their questions go to the AI provider and land in your History, and the agent answers without web search.</p>
+   <div className="flex flex-wrap gap-2">
+    <Button size="sm" disabled={busy||!sk} onClick={async()=>{if(await onSave({agentId:agent.id!,skill:sk,daily:Number(daily)}))setOpen(false);}}>Save</Button>
+    {c.chat&&<Button size="sm" variant="outline" disabled={busy} onClick={async()=>{if(await onSave({agentId:null}))setOpen(false);}}>Turn off</Button>}
+   </div>
+  </div>:<p className="text-[12px] text-muted-foreground">Save an agent in the Studio first; then it can answer here.</p>)}
+ </div>;
+}
+
+/** Delivery channels of the account: connect Discord (webhook address) or Telegram (the server's bot), test, remove,
+    and let an agent answer in a Telegram chat. */
+export function DeliveryPanel({onChange,agents=[]}:{onChange:()=>void;agents?:Agent[]}){
  const [v,setV]=useState<DeliveryView|null>(null);const [url,setUrl]=useState('');const [busy,setBusy]=useState('');
  const sig=v?v.channels.map(c=>c.id+(c.ok?1:0)).join():null;
  // the schedule cards list the same channels: reload them when a channel was added, removed or stopped
@@ -131,13 +161,14 @@ export function DeliveryPanel({onChange}:{onChange:()=>void}){
  const C=v?.config;const full=!!v&&!!C&&v.channels.length>=C.max;
  return <section className="grid gap-4 rounded-xl border bg-card p-5">
   <div className="grid gap-1"><b className="text-[15px] font-semibold">Delivery</b>
-   <p className="text-[13px] text-muted-foreground">Have a schedule send each finished run to your Discord channel or Telegram chat. The report text then leaves RHIO for that service. Research answers that used Google Search stay in History; only a notice is sent.</p></div>
+   <p className="text-[13px] text-muted-foreground">Have a schedule send each finished run to your Discord channel or Telegram chat, and let an agent answer questions in a Telegram chat. The text then leaves RHIO for that service. Research answers that used Google Search stay in History; only a notice is sent.</p></div>
   {v&&v.channels.length>0&&<div className="grid gap-2">{v.channels.map(c=><div key={c.id} className="flex flex-wrap items-center gap-3 rounded-lg border bg-secondary/30 px-3 py-2">
    <KindIcon kind={c.kind} className="size-4 shrink-0 text-muted-foreground"/>
    <div className="grid min-w-40 flex-1"><b className="truncate text-[13px] font-medium">{c.label}</b>
     <span className={cn('text-[11.5px]',c.ok?'text-muted-foreground':'text-coral')}>{c.ok?(c.lastError?`Last send failed: ${c.lastError}`:c.lastSent?`Last sent ${when(c.lastSent)}`:'Connected'):`Disconnected: ${c.lastError||'connect it again'}`}</span></div>
    <Button size="sm" variant="outline" disabled={!!busy} onClick={()=>post('t'+c.id,{action:'test',id:c.id},'Test message sent')}>{busy==='t'+c.id?'Sending…':'Send test'}</Button>
    <Button size="sm" variant="ghost" disabled={!!busy} onClick={()=>{if(confirm('Remove this channel? Schedules that send to it go back to History only.'))act('d'+c.id,{method:'DELETE',body:JSON.stringify({id:c.id})});}}><I id="archive"/>Remove</Button>
+   {c.kind==='telegram'&&c.ok&&<ChatSetup key={c.id+(c.chat?c.chat.agentId+c.chat.skill+c.chat.daily:'')} c={c} agents={agents} costs={v.chatCosts||{}} busy={!!busy} onSave={p=>post('c'+c.id,{action:'chat',id:c.id,...p},p.agentId?'The agent now answers in this chat':'Chat answers turned off')}/>}
   </div>)}</div>}
   <div className="grid gap-3 lg:grid-cols-2">
    <div className="grid content-start gap-2 rounded-lg border p-3">
@@ -193,7 +224,7 @@ export function SchedulesPage({auth,agents,balance,onSignIn,onOpenHistory}:{auth
    <ScheduleForm agents={agents} limits={L} balance={balance} count={list.length} channels={channels} onSaved={d=>{setData(d);setAdding(false);}}/>
   </section>}
   {list.length>0&&<div className="stagger grid gap-3 lg:grid-cols-2">{list.map(s=><ScheduleCard key={s.id} s={s} onChange={setData} channels={channels}/>)}</div>}
-  <DeliveryPanel onChange={load}/>
+  <DeliveryPanel onChange={load} agents={agents}/>
   <p className="text-xs text-muted-foreground">Times use your device clock. A slot missed while the server was down is skipped, not repeated. When credits run out, or the agent or skill is removed, the schedule pauses and shows why.</p>
  </DashPage>;
 }
