@@ -28,7 +28,7 @@ const TIMED_OUT='The task took too long and was cancelled. Any credits were retu
 export type RunInput={id:string;agentId:string;prompt:string;skill:SkillId|typeof TALK_SKILL;mode:'sample'|'live';expectedPrice?:number;
  /** a message of a conversation with the agent (lib/talk.ts): the id of the conversation. The run then uses no skill. */talk?:string;
  /** a step of a team run (lib/teams.ts): the run works from the answer of the step before it */relay?:Relay};
-type AgentRow={owner:string;config:string;name:string;published:number;price:number;archived:number};
+type AgentRow={owner:string;config:string;name:string;published:number;price:number;talk_price:number|null;archived:number};
 export type RunRow={id:string;agent_id:string;agent_name:string;prompt:string;output:string;mode:string;cost:number;status:string;created:string;skill:string;schedule_id?:string|null;relay?:string|null;step?:number|null;talk?:string|null};
 
 /** `opts` (runs started for the owner from outside the Studio, lib/notify.ts): `guard` keeps the agent's instructions
@@ -36,12 +36,14 @@ export type RunRow={id:string;agent_id:string;agent_name:string;prompt:string;ou
 export async function performRun(db:D1Database,owner:string,data:RunInput,schedule?:{id:string;cost:number},opts:{guard?:boolean;search?:boolean;label?:string}={}):Promise<RunRow>{
  const previous=await db.prepare('SELECT * FROM runs WHERE id=? AND owner=?').bind(data.id,owner).first<RunRow>();
  if(previous){if(previous.agent_id!==data.agentId||previous.prompt!==data.prompt||previous.mode!==data.mode)throw new HttpError(409,'This request ID is already in use.');return previous;}
- const record=await db.prepare('SELECT owner,config,name,published,price,archived FROM agents WHERE id=?').bind(data.agentId).first<AgentRow>();
+ const record=await db.prepare('SELECT owner,config,name,published,price,talk_price,archived FROM agents WHERE id=?').bind(data.agentId).first<AgentRow>();
  if(!record||record.archived)throw new HttpError(404,'Save this agent before running a task.');
  const mine=record.owner===owner;
  if(!mine&&(schedule||!record.published))throw new HttpError(404,schedule?'Schedules run your own agents only.':'This agent is not published.');
  // the buyer agreed to the price shown in Discover: a creator who raised it meanwhile does not get the higher amount
- if(!mine&&data.expectedPrice!==undefined&&data.expectedPrice!==record.price)throw new HttpError(409,`The creator changed the price of ${record.name} to ${record.price} credits. Check the new price and run again.`);
+ // a chat message has the creator's chat price (drizzle/0026); the task price when the creator set none
+ const asked=data.talk&&!schedule?record.talk_price??record.price:record.price;
+ if(!mine&&data.expectedPrice!==undefined&&data.expectedPrice!==asked)throw new HttpError(409,`The creator changed the price of ${record.name} to ${asked} credits. Check the new price and ${data.talk?'send it':'run'} again.`);
  // a message of a conversation is answered in the agent's own voice and needs none of its skills
  const talk=!schedule&&data.talk?data.talk:null;if(!!talk!==(data.skill===TALK_SKILL))throw new HttpError(400,'Choose one of the agent\u2019s skills.');
  const agent=JSON.parse(record.config) as Agent;if(!talk&&!agent.skills.includes(data.skill as SkillId))throw new HttpError(400,'Equip this skill on your agent first.');
@@ -53,7 +55,7 @@ export async function performRun(db:D1Database,owner:string,data:RunInput,schedu
  if(limit&&await tryUsed()>=limit)throw tryLimitError();
  if(data.mode==='live'&&!aiReady())throw new HttpError(503,'AI is not connected yet. Try a workflow sample.');
  // price: platform sample or live AI cost + creator price when running someone else's agent; schedules have their own cost
- const base=schedule?schedule.cost:data.mode==='sample'?SAMPLE_COST:talk?talkCost():liveRunCost(data.skill);const price=mine?0:record.price;const cost=base+price;const {fee,creator}=split(price,price>0?await tierFeePermille(db,record.owner):1000);
+ const base=schedule?schedule.cost:data.mode==='sample'?SAMPLE_COST:talk?talkCost():liveRunCost(data.skill);const price=mine?0:asked;const cost=base+price;const {fee,creator}=split(price,price>0?await tierFeePermille(db,record.owner):1000);
  const created=new Date().toISOString();await ensureWallet(db,owner);await refillFree(db,owner);
  const w=await db.prepare('SELECT balance,paid FROM preview_wallets WHERE owner=?').bind(owner).first<{balance:number;paid:number}>();if((w?.balance??0)<cost)throw new HttpError(402,`This run costs ${cost} credits and you have ${w?.balance??0}. You can still edit and export agents.`);
  // The wallet monitor reads the chain before anything is charged: a task without an address, or a chain that does not

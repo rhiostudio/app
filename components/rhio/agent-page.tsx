@@ -66,7 +66,7 @@ export function AgentPage({id,auth,onSignIn,onSpent,onRun,onNavigate}:{id:string
     </div>}
 
     {agent&&<div className="grid grid-cols-3 overflow-hidden rounded-xl border text-center">
-     {([['Price',agent.price===0?'Free':`${agent.price} CR`,agent.price===0?'per run':'per run, plus the skill'],['Runs',String(agent.uses),'so far'],['Answers in',agent.language,agent.tone]] as const).map(([l,v,h],k)=>
+     {([['Chat',agent.talkPrice===0?'Free':`${agent.talkPrice} CR`,agent.talkPrice===0?'the creator asks nothing':'per message, to its creator'],['Task',agent.price===0?'Free':`${agent.price} CR`,agent.price===0?'per run':'per run, plus the skill'],['Runs',String(agent.uses),`so far · ${agent.language}`]] as const).map(([l,v,h],k)=>
       <div key={l} className={k?'grid gap-0.5 border-l p-3':'grid gap-0.5 p-3'}><span className="font-mono text-[10px] tracking-[.08em] text-muted-foreground uppercase">{l}</span><b className="font-display text-xl font-medium tabular-nums">{v}</b><span className="text-[11.5px] text-muted-foreground">{h}</span></div>)}
     </div>}
 

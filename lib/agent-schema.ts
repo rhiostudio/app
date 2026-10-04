@@ -22,4 +22,4 @@ export function agentIssue(error:z.ZodError){
  if(fixed[key])return fixed[key];
  return `${key==='look'||key==='appearance'?'Outfit':key||'Agent'}: ${i?.message||'check this setting'}.`.replace('..','.');
 }
-export type Agent=z.infer<typeof agentSchema> & {id?:string;updated?:string;archived?:number;published?:number;price?:number;uses?:number};
+export type Agent=z.infer<typeof agentSchema> & {id?:string;updated?:string;archived?:number;published?:number;price?:number;talkPrice?:number|null;uses?:number};

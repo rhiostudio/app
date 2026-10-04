@@ -30,14 +30,14 @@ export function AgentTalk({agent,auth,onSignIn,onSpent,onMood}:{agent:MarketAgen
  useEffect(()=>{load();},[load,auth]);
  useEffect(()=>{end.current?.scrollIntoView({block:'nearest'});},[lines.length,busy]);
 
- const each=(info?.message??0)+(agent.mine?0:agent.price);
+ const each=(info?.message??0)+(agent.mine?0:agent.talkPrice);
  const short=info?.balance!==null&&info?.balance!==undefined&&info.balance<each;
  async function send(){
   const message=text.trim();if(!message||busy||!info)return;
   if(!auth){onSignIn();return;}
   const id=crypto.randomUUID();setBusy(true);setText('');setLines(l=>[...l,{id,asked:message,answer:'',ok:false,cost:0,pending:true}]);onMood?.('think');
   try{
-   const r=await api('/api/talk',{method:'POST',body:JSON.stringify({id,agentId:agent.id,thread:thread.current,message,...(agent.mine?{}:{expectedPrice:agent.price})})});
+   const r=await api('/api/talk',{method:'POST',body:JSON.stringify({id,agentId:agent.id,thread:thread.current,message,...(agent.mine?{}:{expectedPrice:agent.talkPrice})})});
    keep(agent.id,thread.current);
    setLines(l=>l.map(x=>x.id===id?{id,asked:message,answer:r.answer,ok:true,cost:r.cost}:x));setInfo(i=>i&&{...i,balance:r.balance});onMood?.('answer');onSpent();
   }catch(e:any){setLines(l=>l.map(x=>x.id===id?{id,asked:message,answer:'',ok:false,cost:0,error:e.message}:x));onMood?.('idle');}
@@ -49,7 +49,7 @@ export function AgentTalk({agent,auth,onSignIn,onSpent,onMood}:{agent:MarketAgen
   <div className="flex flex-wrap items-center justify-between gap-2">
    <div className="flex items-center gap-3"><Thumb id={agent.skin as CharacterId} className="size-10 rounded-lg bg-t-lime object-[50%_18%]"/>
     <div className="grid leading-tight"><b className="font-display text-lg font-medium tracking-[-.02em]">Talk to {agent.name}</b>
-     <span className="font-mono text-[10.5px] tracking-[.06em] text-muted-foreground uppercase">{info?`${each} credits per message${!agent.mine&&agent.price>0?` · ${agent.price} to its creator`:''}`:'Loading…'}</span></div></div>
+     <span className="font-mono text-[10.5px] tracking-[.06em] text-muted-foreground uppercase">{info?`${each} credits per message${!agent.mine&&agent.talkPrice>0?` · ${agent.talkPrice} to its creator`:''}`:'Loading…'}</span></div></div>
    {lines.length>0&&<Button size="sm" variant="ghost" disabled={busy} onClick={fresh}><I id="reset"/>New conversation</Button>}
   </div>
   <div className="grid max-h-[460px] min-h-28 content-start gap-3 overflow-y-auto rounded-xl border bg-background p-3" aria-live="polite">

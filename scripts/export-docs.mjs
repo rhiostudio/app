@@ -23,7 +23,7 @@ const STATUS = [
   'All 10 skills open on a server-side AI provider; runs cost credits, and the operator can cap tries per skill (a failed run gives the try back)',
   'Save, duplicate, archive, export / import JSON, share links, task history',
   'Agent teams: a line of two or three agents (own or published by others); each step is a normal run that works from the answer of the step before it; four ready-made teams; public page /teams',
-  'Talk to an agent: a chat on the page of every published agent, answered in the agent\'s own voice; each message is a run (3 credits by default plus the creator\'s price), the last six turns go with it as context',
+  'Talk to an agent: a chat on the page of every published agent, answered in the agent\'s own voice; each message is a run (3 credits by default plus the creator\'s chat price, set apart from the task price), the last six turns go with it as context',
   'Recipes: four ready-made automations (daily whale brief, wallet check, a post a day, morning plan); one click makes the agent and the schedule; public page /recipes',
   'Holder perks: a tier raises schedules (3 / 6 / 12 / 24), scheduled runs a day (24 / 48 / 96 / 192) and delivery channels (4 / 6 / 8 / 12); the Free tier keeps the server\'s own limits',
   'Quests: ten things to try, each checked by the server and worth free credits once per account (5 by default; free credits cannot be claimed or withdrawn)',
