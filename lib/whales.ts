@@ -33,6 +33,39 @@ export function compact(raw:bigint){
 }
 const pct=(part:bigint,all:bigint)=>all>0n?(Number(part*10000n/all)/100).toFixed(2)+'%':null;
 
+export type TransferRow={tx_hash:string;from_addr:string;to_addr:string;value:string;ts:number;block:number;log_index:number};
+/** One transaction often moves the same tokens through several addresses (a router hands them to a pool): counted
+    log by log, one swap would show up as three "big transfers" and the day's volume could exceed the supply. So each
+    transaction is settled first: what every address sent or received in it on balance. An address that only passed
+    tokens along comes out at zero and disappears; what is left is who the tokens left and who ended up with them. */
+export function settleTransfers(rows:TransferRow[]){
+ const txs=new Map<string,{ts:number;tx:string;net:Map<string,bigint>}>();
+ for(const r of rows){
+  if(r.from_addr===r.to_addr)continue;
+  const key=r.tx_hash||`${r.block}:${r.log_index}`;const t=txs.get(key)||{ts:r.ts,tx:r.tx_hash,net:new Map<string,bigint>()};const v=BigInt(r.value);
+  t.net.set(r.from_addr,(t.net.get(r.from_addr)||0n)-v);t.net.set(r.to_addr,(t.net.get(r.to_addr)||0n)+v);txs.set(key,t);
+ }
+ const wallets=new Set<string>();
+ const list=[...txs.values()].map(t=>{
+  let moved=0n,from='',to='',most=0n,least=0n,ends=0;
+  for(const [a,v] of t.net){
+   if(v===0n)continue;ends++;if(!BURN.has(a.toLowerCase()))wallets.add(a);
+   if(v>0n){moved+=v;if(v>most){most=v;to=a;}}else if(v<least){least=v;from=a;}
+  }
+  return {ts:t.ts,tx:t.tx,moved,from,to,others:ends>2};
+ }).filter(t=>t.moved>0n&&t.from&&t.to);
+ return {list,wallets};
+}
+/** A settled transaction as the page and the texts show it. */
+export const asMove=(t:{ts:number;tx:string;moved:bigint;from:string;to:string;others:boolean},off:Set<string>):WhaleMove=>({ts:t.ts,tx:t.tx,from:t.from,to:t.to,amount:amount(t.moved,18),
+ kind:t.from===ZERO?'mint':BURN.has(t.to.toLowerCase())?'burn':'transfer',others:t.others,fromOff:off.has(t.from.toLowerCase()),toOff:off.has(t.to.toLowerCase())});
+/** The ten biggest holders (burn addresses left out), biggest first. */
+export async function topHolders(db:D1Database,token:string){
+ // balances are whole numbers kept as text: longer means bigger, equal length compares as text
+ const top=await db.prepare("SELECT address,balance FROM holder_balances WHERE token=? AND balance!='0' ORDER BY LENGTH(balance) DESC,balance DESC,address LIMIT 14").bind(token).all<{address:string;balance:string}>();
+ return top.results.filter(h=>!BURN.has(h.address.toLowerCase())).slice(0,10);
+}
+
 let cache:{at:number;token:string;data:Whales}|null=null;
 /** The reading, kept for a minute in memory (the page, the picture and the skill ask for the same numbers). */
 export async function whales(db:D1Database):Promise<Whales|null>{
@@ -42,12 +75,11 @@ export async function whales(db:D1Database):Promise<Whales|null>{
  if(!sync)return null;
  const off=new Set(rewardConfig(c).exclude.map(a=>a.toLowerCase()));
  const from=sync.last_ts-DAY;
- type Row={tx_hash:string;from_addr:string;to_addr:string;value:string;ts:number;block:number;log_index:number};
+ type Row=TransferRow;
  const [rows,count,top,minted,burned,first]=await Promise.all([
   db.prepare('SELECT tx_hash,from_addr,to_addr,value,ts,block,log_index FROM holder_transfers WHERE token=? AND ts>=? ORDER BY block DESC,log_index DESC LIMIT ?').bind(token,from,MAX_ROWS+1).all<Row>(),
   db.prepare("SELECT COUNT(*) AS n FROM holder_balances WHERE token=? AND balance!='0' AND lower(address) NOT IN (?,?)").bind(token,...BURN).first<{n:number}>(),
-  // balances are whole numbers kept as text: longer means bigger, equal length compares as text
-  db.prepare("SELECT address,balance FROM holder_balances WHERE token=? AND balance!='0' ORDER BY LENGTH(balance) DESC,balance DESC LIMIT 14").bind(token).all<{address:string;balance:string}>(),
+  topHolders(db,token),
   db.prepare('SELECT value FROM holder_transfers WHERE token=? AND from_addr=? LIMIT 5000').bind(token,ZERO).all<{value:string}>(),
   db.prepare('SELECT value FROM holder_transfers WHERE token=? AND to_addr=? LIMIT 5000').bind(token,ZERO).all<{value:string}>(),
   db.prepare('SELECT MIN(block) AS b FROM holder_transfers WHERE token=? AND ts>=?').bind(token,from).first<{b:number|null}>(),
@@ -57,31 +89,12 @@ export async function whales(db:D1Database):Promise<Whales|null>{
   .bind(token,first.b,...BURN).first<{n:number}>())?.n??0;
  const sum=(r:{value:string}[])=>r.reduce((a,x)=>a+BigInt(x.value),0n);
  const supply=sum(minted.results)-sum(burned.results);
- // One transaction often moves the same tokens through several addresses (a router hands them to a pool): counted
- // log by log, one swap would show up as three "big transfers" and the day's volume could exceed the supply. So each
- // transaction is settled first: what every address sent or received in it on balance. An address that only passed
- // tokens along comes out at zero and disappears; what is left is who the tokens left and who ended up with them.
+ // each transaction is settled first (settleTransfers), so tokens passed along inside one are counted once
  const capped=rows.results.length>MAX_ROWS;
- const txs=new Map<string,{ts:number;tx:string;net:Map<string,bigint>}>();
- for(const r of rows.results.slice(0,MAX_ROWS)){
-  if(r.from_addr===r.to_addr)continue;
-  const key=r.tx_hash||`${r.block}:${r.log_index}`;const t=txs.get(key)||{ts:r.ts,tx:r.tx_hash,net:new Map<string,bigint>()};const v=BigInt(r.value);
-  t.net.set(r.from_addr,(t.net.get(r.from_addr)||0n)-v);t.net.set(r.to_addr,(t.net.get(r.to_addr)||0n)+v);txs.set(key,t);
- }
- const wallets=new Set<string>();let volume=0n;
- const day=[...txs.values()].map(t=>{
-  let moved=0n,from='',to='',most=0n,least=0n,ends=0;
-  for(const [a,v] of t.net){
-   if(v===0n)continue;ends++;if(!BURN.has(a.toLowerCase()))wallets.add(a);
-   if(v>0n){moved+=v;if(v>most){most=v;to=a;}}else if(v<least){least=v;from=a;}
-  }
-  return {ts:t.ts,tx:t.tx,moved,from,to,others:ends>2};
- }).filter(t=>t.moved>0n&&t.from&&t.to);
+ const {list:day,wallets}=settleTransfers(rows.results.slice(0,MAX_ROWS));let volume=0n;
  for(const t of day)volume+=t.moved;
- const moves=[...day].sort((x,y)=>x.moved===y.moved?y.ts-x.ts:x.moved>y.moved?-1:1).slice(0,8)
-  .map(t=>({ts:t.ts,tx:t.tx,from:t.from,to:t.to,amount:amount(t.moved,18),kind:t.from===ZERO?'mint' as const:BURN.has(t.to.toLowerCase())?'burn' as const:'transfer' as const,
-   others:t.others,fromOff:off.has(t.from.toLowerCase()),toOff:off.has(t.to.toLowerCase())}));
- const holders=top.results.filter(h=>!BURN.has(h.address.toLowerCase())).slice(0,10);
+ const moves=[...day].sort((x,y)=>x.moved===y.moved?y.ts-x.ts:x.moved>y.moved?-1:1).slice(0,8).map(t=>asMove(t,off));
+ const holders=top;
  const data:Whales={chainId:c.id,chain:c.name,explorer:c.explorer,token:c.rhio,asOf:{block:sync.last_block,ts:sync.last_ts},
   supply:supply>0n?amount(supply,18):null,holders:count?.n??0,newHolders:fresh,
   day:{txs:day.length,volume:amount(volume,18),volumeShort:compact(volume),wallets:wallets.size,capped},
@@ -91,10 +104,10 @@ export async function whales(db:D1Database):Promise<Whales|null>{
  return data;
 }
 
-const when=(ts:number)=>new Date(ts*1000).toISOString().slice(0,16).replace('T',' ')+' UTC';
-const short=(a:string)=>`${a.slice(0,6)}…${a.slice(-4)}`;
-const OFF=' (not earning holder rewards: team, treasury, pool or contract)';
-const moveLine=(m:WhaleMove)=>m.kind==='mint'?`${m.amount} RHIO minted to ${short(m.to)}`:m.kind==='burn'?`${m.amount} RHIO burned by ${short(m.from)}`
+export const when=(ts:number)=>new Date(ts*1000).toISOString().slice(0,16).replace('T',' ')+' UTC';
+export const short=(a:string)=>`${a.slice(0,6)}…${a.slice(-4)}`;
+export const OFF=' (not earning holder rewards: team, treasury, pool or contract)';
+export const moveLine=(m:WhaleMove)=>m.kind==='mint'?`${m.amount} RHIO minted to ${short(m.to)}`:m.kind==='burn'?`${m.amount} RHIO burned by ${short(m.from)}`
  :`${m.amount} RHIO from ${short(m.from)}${m.fromOff?OFF:''} to ${short(m.to)}${m.toOff?OFF:''}${m.others?' and others':''}`;
 
 /** The reading for the skill: plain text for the model, and the same numbers as markdown under its answer.

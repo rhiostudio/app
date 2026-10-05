@@ -17,10 +17,12 @@ import {skillCatalog,type Agent} from '@/lib/agents';
 import {Thumb} from '@/components/landing/mocks';
 import type {CharacterId} from '@/lib/characters';
 import {RECIPES,recipeTask,type Recipe} from '@/lib/recipes';
+import {canWatch,watchLabel,watchText,WATCH_MIN_DEFAULT,WATCH_MIN_OPTIONS} from '@/lib/watch-options';
 import {DashPage,EmptyState,Kpi,KpiRow,PageHeader,StatusBadge} from './parts';
 
 export type Schedule={id:string;agent_id:string;agent_name:string|null;skin:string|null;skill:string;prompt:string;per_day:number;start_minute:number;mode:string;active:boolean;
- next_run:string;last_run:string|null;last_status:string|null;last_run_id:string|null;runs:number;created:string;notify?:string|null};
+ next_run:string;last_run:string|null;last_status:string|null;last_run_id:string|null;runs:number;created:string;notify?:string|null;
+ /** reports only on change (lib/watch.ts): the smallest transfer for whale watch, the last look, looks without a change since the last report */on_change?:boolean;watch_min?:number|null;checked?:string|null;quiet?:number};
 export type Channel={id:string;kind:'discord'|'telegram';label:string;ok:boolean;lastSent:string|null;lastError:string|null;chat?:{agentId:string;skill:string;daily:number;used:number}|null};
 export type Delivery={discord:boolean;telegram:boolean;max:number};
 export type Limits={enabled:boolean;runCost:number;max:number;dailyCap:number;perDay:number[];usedToday:number;mode:'live'|'sample';skillCosts?:Record<string,number>;
@@ -54,13 +56,14 @@ export function ScheduleForm({agents,agent,limits,balance,count,channels=[],onSa
  const [skill,setSkill]=useState(skills[0]||'');const sk=skills.includes(skill)?skill:skills[0]||'';
  const [prompt,setPrompt]=useState('');const [perDay,setPerDay]=useState('3');const [time,setTime]=useState('08:00');const [busy,setBusy]=useState(false);
  const [notify,setNotify]=useState<string|null>(null);const sendTo=channels.some(c=>c.id===notify)?notify:null;
+ const [quietly,setQuietly]=useState(false);const [min,setMin]=useState(String(WATCH_MIN_DEFAULT));const onChange=quietly&&canWatch(sk);
  const n=Number(perDay);const each=runCostOf(limits,sk);const cost=each*n;const days=balance!==null&&cost>0?Math.floor(balance/cost):null;
  const full=!!limits&&count>=limits.max;
  async function save(){
   if(busy)return;setBusy(true);
   try{
    const id=agent?(ensureSaved?await ensureSaved():agent.id):agentId;if(!id){setBusy(false);return;}
-   const d=await api('/api/schedules',{method:'POST',body:JSON.stringify({agentId:id,skill:sk,prompt,perDay:n,startMinute:toUtcMinute(time),notify:sendTo})});
+   const d=await api('/api/schedules',{method:'POST',body:JSON.stringify({agentId:id,skill:sk,prompt,perDay:n,startMinute:toUtcMinute(time),notify:sendTo,...(onChange?{onChange:true,...(sk==='whales'?{watchMin:Number(min)}:{})}:{})})});
    toast.success(`Scheduled: ${freq(n).toLowerCase()}, first run ${when(d.schedules.find((s:Schedule)=>s.id===d.id)?.next_run||new Date().toISOString())}`);setPrompt('');onSaved(d);
   }catch(e:any){toast.error(e.message);}finally{setBusy(false);}
  }
@@ -75,12 +78,16 @@ export function ScheduleForm({agents,agent,limits,balance,count,channels=[],onSa
    <Options label="How often" value={perDay} options={(limits?.perDay||[1,2,3,4,6,8,12,24]).map(v=>[String(v),v===24?'Hourly':`${v}×/day`] as const)} onChange={setPerDay}/>
    <div className="grid gap-2"><FieldLabel htmlFor="sch-time">First run</FieldLabel><input id="sch-time" type="time" value={time} onChange={e=>setTime(e.target.value)} className="h-8 rounded-lg border bg-card px-2 text-[13px] tabular-nums"/></div>
   </div>
+  {canWatch(sk)&&<div className="grid gap-3 rounded-xl border p-3">
+   <label className="flex items-start gap-3 text-[13px]"><Switch checked={quietly} onCheckedChange={setQuietly} aria-label="Report only when something changed"/><span><b className="font-medium">Report only when something changed</b><br/><span className="text-muted-foreground">It looks at every slot, and runs only for {watchText(sk,Number(min))}. A look that finds no change costs nothing.</span></span></label>
+   {onChange&&sk==='whales'&&<Options label="Smallest transfer that counts" value={min} options={WATCH_MIN_OPTIONS.map(v=>[String(v),`${watchLabel(v)} RHIO`] as const)} onChange={setMin}/>}
+  </div>}
   <div className="grid gap-2"><FieldLabel htmlFor="sch-send">Send each result to</FieldLabel>
    {channels.length?<SendTo id="sch-send" value={sendTo} channels={channels} onChange={setNotify}/>
    :<p className="text-[12.5px] text-muted-foreground">History only. Connect Discord or Telegram under Schedules → Delivery to have results sent to you.</p>}</div>
   <div className="grid gap-1.5 rounded-xl border bg-secondary/40 p-3 text-[12.5px]">
    <span className="flex flex-wrap items-center gap-1.5 text-muted-foreground"><I id="clock" className="i size-3.5"/>Runs at <b className="text-foreground tabular-nums">{slots(n,toUtcMinute(time)).join(' · ')}</b> (your time)</span>
-   <span className="text-muted-foreground"><b className="text-foreground">{cost} credits/day</b> ({each} per run){days!==null?` · your balance covers about ${days} day${days===1?'':'s'}`:''}. Out of credits pauses the schedule. {limits?.mode==='sample'?'AI is not connected here, so runs return a labelled workflow sample.':''}</span>
+   <span className="text-muted-foreground"><b className="text-foreground">{onChange?`Up to ${cost} credits/day`:`${cost} credits/day`}</b> ({each} per {onChange?'report; a look without a change is free':'run'}){days!==null&&!onChange?` · your balance covers about ${days} day${days===1?'':'s'}`:''}. Out of credits pauses the schedule. {limits?.mode==='sample'?'AI is not connected here, so runs return a labelled workflow sample.':''}</span>
   </div>
   <div className="flex flex-wrap items-center gap-3"><Button className="h-10" disabled={busy||!sk||prompt.trim().length<3||full||limits?.enabled===false} onClick={save}><I id="clock"/>{busy?'Saving…':'Schedule it'}</Button>
    <span className="text-xs text-muted-foreground">{full?`You have ${limits!.max} schedules, the maximum. Delete one first.`:limits?`${count}/${limits.max} schedules · ${limits.usedToday}/${limits.dailyCap} scheduled runs today`:''}</span></div>
@@ -96,7 +103,7 @@ export function ScheduleCard({s,onChange,compact,channels=[]}:{s:Schedule;onChan
   <div className="flex items-start gap-3">
    {!compact&&<Thumb id={(s.skin||'atlas') as CharacterId} className="size-11 shrink-0 rounded-lg bg-t-lime object-[50%_18%]"/>}
    <div className="grid min-w-0 flex-1 gap-1">
-    <b className="flex flex-wrap items-center gap-1.5 text-sm font-semibold">{compact?skillName(s.skill):`${s.agent_name||'Removed agent'} · ${skillName(s.skill)}`}<StatusBadge kind={s.active?'live':'archived'}>{s.active?freq(s.per_day):'paused'}</StatusBadge></b>
+    <b className="flex flex-wrap items-center gap-1.5 text-sm font-semibold">{compact?skillName(s.skill):`${s.agent_name||'Removed agent'} · ${skillName(s.skill)}`}<StatusBadge kind={s.active?'live':'archived'}>{s.active?freq(s.per_day):'paused'}</StatusBadge>{s.on_change&&<StatusBadge kind="planned">only on change</StatusBadge>}</b>
     <p className="line-clamp-2 text-[12.5px] text-muted-foreground">{s.prompt}</p>
    </div>
    <Switch checked={s.active} disabled={busy} aria-label={s.active?'Pause schedule':'Resume schedule'} onCheckedChange={v=>call('PATCH',{id:s.id,active:v})}/>
@@ -105,10 +112,15 @@ export function ScheduleCard({s,onChange,compact,channels=[]}:{s:Schedule;onChan
    <span>{s.active?<>Next <b className="text-foreground">{when(s.next_run)}</b></>:'Not running'}</span>
    <span>{slots(s.per_day,s.start_minute).join(' · ')}</span>
    <span>{s.runs} run{s.runs===1?'':'s'}</span>
+   {s.on_change&&s.checked&&<span>{s.quiet?`${s.quiet} quiet look${s.quiet===1?'':'s'} since the last report · `:''}last look <b className="text-foreground">{when(s.checked)}</b></span>}
   </div>
+  {s.on_change&&<p className="text-[12px] text-muted-foreground">Waits for {watchText(s.skill,s.watch_min)}. A look that finds no change costs nothing.</p>}
   {s.last_status&&<p className={cn('rounded-lg px-2.5 py-1.5 text-[12px]',failed?'bg-t-coral text-coral':'bg-secondary/60 text-muted-foreground')}>{s.last_status}{s.last_run?` · ${when(s.last_run)}`:''}</p>}
   <div className="flex flex-wrap items-center justify-between gap-2">
-   {channels.length?<label className="flex items-center gap-2 text-[12px] text-muted-foreground">Send to<SendTo value={channels.some(c=>c.id===s.notify)?s.notify!:null} channels={channels} disabled={busy} onChange={v=>call('PATCH',{id:s.id,notify:v})}/></label>:<span/>}
+   <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+    {channels.length>0&&<label className="flex items-center gap-2 text-[12px] text-muted-foreground">Send to<SendTo value={channels.some(c=>c.id===s.notify)?s.notify!:null} channels={channels} disabled={busy} onChange={v=>call('PATCH',{id:s.id,notify:v})}/></label>}
+    {canWatch(s.skill)&&<label className="flex items-center gap-2 text-[12px] text-muted-foreground"><Switch checked={!!s.on_change} disabled={busy} aria-label="Report only when something changed" onCheckedChange={v=>call('PATCH',{id:s.id,onChange:v})}/>Only on change</label>}
+   </div>
    <Button size="sm" variant="ghost" disabled={busy} onClick={()=>{if(confirm('Delete this schedule? Past runs stay in History.'))call('DELETE',{id:s.id});}}><I id="archive"/>Delete</Button></div>
  </div>;
 }
@@ -234,7 +246,7 @@ function RecipeStrip({agents,limits,channels,count,open,onDone,onAgents}:{agents
    // an agent this recipe made before is used again; otherwise it is made now
    let id=agents.find(a=>a.id&&!a.archived&&a.name===r.agent.name&&(a.skills as readonly string[]).includes(r.skill))?.id;
    if(!id){id=(await api('/api/agents',{method:'POST',body:JSON.stringify({...r.agent,language:'English'})})).id;onAgents();}
-   const d=await api('/api/schedules',{method:'POST',body:JSON.stringify({agentId:id,skill:r.skill,prompt:recipeTask(r,topic),perDay:r.perDay,startMinute:toUtcMinute(time),notify:channels.some(c=>c.id===notify)?notify:null})});
+   const d=await api('/api/schedules',{method:'POST',body:JSON.stringify({agentId:id,skill:r.skill,prompt:recipeTask(r,topic),perDay:r.perDay,startMinute:toUtcMinute(time),notify:channels.some(c=>c.id===notify)?notify:null,...(r.onChange?{onChange:true,...(r.watchMin?{watchMin:r.watchMin}:{})}:{})})});
    toast.success(`${r.title} is running`,{description:`${r.agent.name} · ${freq(r.perDay).toLowerCase()}, first run ${when(d.schedules.find((s:Schedule)=>s.id===d.id)?.next_run||new Date().toISOString())}`});
    setPick(null);onDone(d);
   }catch(e:any){toast.error(e.message);}finally{setBusy(false);}
@@ -242,11 +254,11 @@ function RecipeStrip({agents,limits,channels,count,open,onDone,onAgents}:{agents
  if(!offered.length)return null;
  return <section className="grid gap-3 rounded-xl border bg-card p-5">
   <div className="flex flex-wrap items-baseline justify-between gap-2"><b className="text-[15px] font-semibold">Recipes</b><span className="text-[12.5px] text-muted-foreground">One click: the agent, the schedule and the delivery</span></div>
-  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">{offered.map(x=><button key={x.id} type="button" onClick={()=>choose(x)} aria-pressed={pick===x.id}
+  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{offered.map(x=><button key={x.id} type="button" onClick={()=>choose(x)} aria-pressed={pick===x.id}
    className={cn('grid content-start gap-2 rounded-lg border p-3 text-left transition-colors',pick===x.id?'border-lime bg-lime/10':'hover:border-foreground/30')}>
    <span className="flex items-center gap-2"><Thumb id={x.agent.skin as CharacterId} className="size-8 shrink-0 rounded-md bg-t-lime object-[50%_18%]"/><b className="text-sm font-semibold">{x.title}</b></span>
    <span className="text-[12.5px] text-muted-foreground">{x.text}</span>
-   <span className="font-mono text-[10.5px] tracking-[.04em] text-muted-foreground uppercase">{skillName(x.skill)} · {freq(x.perDay)} · {runCostOf(limits,x.skill)*x.perDay} CR/day</span>
+   <span className="font-mono text-[10.5px] tracking-[.04em] text-muted-foreground uppercase">{skillName(x.skill)} · {x.onChange?`looks ${freq(x.perDay).toLowerCase()} · ${runCostOf(limits,x.skill)} CR per report`:`${freq(x.perDay)} · ${runCostOf(limits,x.skill)*x.perDay} CR/day`}</span>
   </button>)}</div>
   {r&&<div className="grid gap-3 rounded-lg border bg-secondary/40 p-4">
    <p className="text-[13px] text-muted-foreground"><b className="text-foreground">{r.title}.</b> Makes the agent <b className="text-foreground">{r.agent.name}</b> (you can restyle and rename it later), and schedules: “{recipeTask(r,topic||(r.ask?'…':''))}”</p>
@@ -256,7 +268,7 @@ function RecipeStrip({agents,limits,channels,count,open,onDone,onAgents}:{agents
    </div>
    {channels.length>0&&<div className="grid gap-2"><FieldLabel htmlFor="rec-send">Send each result to</FieldLabel><SendTo id="rec-send" value={channels.some(c=>c.id===notify)?notify:null} channels={channels} onChange={setNotify}/></div>}
    <div className="flex flex-wrap items-center gap-3"><Button disabled={busy||full||(!!r.ask&&topic.trim().length<3)} onClick={start}><I id="play"/>{busy?'Starting…':'Start it'}</Button>
-    <span className="text-xs text-muted-foreground">{full?`You have ${limits!.max} schedules, the maximum for your tier. Delete one first.`:`${each*r.perDay} credits a day (${each} per run). Pause or delete it below at any time.`}{channels.length?'':' Connect Discord or Telegram under Delivery to have it sent to you.'}</span></div>
+    <span className="text-xs text-muted-foreground">{full?`You have ${limits!.max} schedules, the maximum for your tier. Delete one first.`:r.onChange?`${each} credits per report, and only when something changed: a look that finds no change costs nothing. Pause or delete it below at any time.`:`${each*r.perDay} credits a day (${each} per run). Pause or delete it below at any time.`}{channels.length?'':' Connect Discord or Telegram under Delivery to have it sent to you.'}</span></div>
   </div>}
  </section>;
 }
@@ -266,8 +278,9 @@ export function SchedulesPage({auth,agents,balance,onSignIn,onOpenHistory,onAgen
  const [recipe]=useState(()=>{try{return new URLSearchParams(location.search).get('recipe');}catch{return null;}});
  const {data,setData,load}=useSchedules(auth);const [adding,setAdding]=useState(false);const channels=data?.channels||[];
  const list=data?.schedules||[];const L=data?.limits||null;const active=list.filter(s=>s.active);
- const perDay=useMemo(()=>active.reduce((a,s)=>a+s.per_day,0),[active]);
- const perDayCost=useMemo(()=>active.reduce((a,s)=>a+s.per_day*runCostOf(L,s.skill),0),[active,L]);
+ // a schedule that reports only on change looks at every slot but runs (and costs) only when something changed
+ const perDay=useMemo(()=>active.filter(s=>!s.on_change).reduce((a,s)=>a+s.per_day,0),[active]);const watching=useMemo(()=>active.filter(s=>s.on_change).length,[active]);
+ const perDayCost=useMemo(()=>active.filter(s=>!s.on_change).reduce((a,s)=>a+s.per_day*runCostOf(L,s.skill),0),[active,L]);
  const costs=Object.values(L?.skillCosts||{});const lo=costs.length?Math.min(...costs):L?.runCost??5,hi=costs.length?Math.max(...costs):lo;
  if(!auth)return <DashPage><PageHeader icon="clock" tone="mint" title="Schedules" text="Let your agents work on their own: pick a skill, the task and how many times a day."/><EmptyState title="Sign in to schedule agents" text="Schedules run your saved agents on the server and use credits per run." action={<Button onClick={onSignIn}><I id="wallet"/>Connect wallet</Button>}/></DashPage>;
  return <DashPage>
@@ -275,7 +288,7 @@ export function SchedulesPage({auth,agents,balance,onSignIn,onOpenHistory,onAgen
    actions={<><Button variant="outline" onClick={onOpenHistory}><I id="clock"/>History</Button><Button onClick={()=>setAdding(a=>!a)} disabled={!!L&&list.length>=L.max&&!adding}><I id="plus"/>New schedule</Button></>}/>
   <KpiRow>
    <Kpi label="Active" value={`${active.length}/${L?.max??3}`} hint="Schedules per account" tone="mint" icon="clock"/>
-   <Kpi label="Runs per day" value={perDay} hint={`${perDayCost} credits/day`} tone="lime" icon="coins"/>
+   <Kpi label="Runs per day" value={perDay} hint={`${perDayCost} credits/day${watching?` · ${watching} more only on change`:''}`} tone="lime" icon="coins"/>
    <Kpi label="Today" value={`${L?.usedToday??0}/${L?.dailyCap??24}`} hint="Scheduled runs, daily cap" tone="iris" icon="layers"/>
    <Kpi label="Cost per run" value={lo===hi?`${lo} CR`:`${lo}–${hi} CR`} hint={L?.mode==='live'?'Live AI':'Workflow sample'} tone="amber" icon="hype"/>
   </KpiRow>

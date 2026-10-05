@@ -31,7 +31,7 @@ export function RecipesPage({onNavigate}:{onNavigate:Go}){
    <div className="grid gap-3 md:grid-cols-2">{RECIPES.map(r=><div key={r.id} className="grid content-start gap-4 rounded-2xl border bg-card p-5">
     <div className="flex items-start gap-4"><Thumb id={r.agent.skin as CharacterId} className="size-16 shrink-0 rounded-xl bg-t-lime object-[50%_18%]"/>
      <div className="grid gap-1"><b className="font-display text-2xl font-medium tracking-[-.03em]">{r.title}</b>
-      <span className="font-mono text-[11px] tracking-[.06em] text-muted-foreground uppercase">{r.agent.name} · {skillName(r.skill)} · {freq(r.perDay)}</span></div></div>
+      <span className="font-mono text-[11px] tracking-[.06em] text-muted-foreground uppercase">{r.agent.name} · {skillName(r.skill)} · {r.onChange?`looks ${freq(r.perDay).toLowerCase()}, reports only on change`:freq(r.perDay)}</span></div></div>
     <p className="text-[15px] leading-relaxed text-muted-foreground">{r.text}</p>
     <p className="rounded-xl border bg-secondary/50 p-3 text-[13px] break-words text-muted-foreground">“{r.task.replace('{topic}','your topic')}”</p>
     <div className="flex flex-wrap items-center justify-between gap-3">

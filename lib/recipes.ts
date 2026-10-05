@@ -12,6 +12,7 @@ import type {SkillId} from './agents';
 export type Recipe={id:string;title:string;text:string;/** what arrives, in a few words */gives:string;
  agent:{name:string;skin:string;personality:string;tone:'Friendly'|'Professional'|'Concise';skills:SkillId[]};
  skill:SkillId;task:string;perDay:number;/** local hour of the first run */hour:number;needs?:'token';
+ /** the schedule reports only on change (lib/watch.ts); watchMin: whale watch's smallest transfer, whole RHIO */onChange?:boolean;watchMin?:number;
  ask?:{label:string;placeholder:string}};
 
 export const RECIPES:Recipe[]=[
@@ -21,6 +22,12 @@ export const RECIPES:Recipe[]=[
  {id:'wallet-watch',title:'Wallet check, four times a day',text:'Every six hours: what your linked wallet holds and what changed since the last check.',gives:'Balances and changes, every 6 hours',
   agent:{name:'Wallet Guard',skin:'guardian',personality:'You watch one wallet and report only what the reading shows. Lead with what changed. If nothing changed, say so in one line.',tone:'Concise',skills:['monitor','whales','summarize']},
   skill:'monitor',task:'Check my wallet and tell me what changed since the last check.',perDay:4,hour:8,needs:'token'},
+ {id:'whale-alarm',title:'Whale alarm',text:'Looks every hour, and reports only when 1,000,000 RHIO or more moved in one transaction or a new address entered the ten biggest holders.',gives:'A report only when something big happened',
+  agent:{name:'Whale Alarm',skin:'vesper',personality:'You report on the RHIO token from the numbers you are given, and only when something set the report off. Lead with what happened, in one or two lines, then the numbers. Never guess who is behind an address, and never call a transfer a buy or a sell.',tone:'Concise',skills:['whales','monitor','summarize']},
+  skill:'whales',task:'Report what just happened in RHIO: the big transfers and any new address among the biggest holders, against the supply.',perDay:24,hour:8,needs:'token',onChange:true,watchMin:1000000},
+ {id:'wallet-alarm',title:'Wallet alarm',text:'Looks at your linked wallet every hour, and reports only when a balance changed or the wallet sent a transaction.',gives:'A report only when your wallet changed',
+  agent:{name:'Wallet Alarm',skin:'volt',personality:'You watch one wallet and report only what the reading shows, and only when something changed. Lead with what changed and by how much, in one or two lines, then the numbers.',tone:'Concise',skills:['monitor','whales','summarize']},
+  skill:'monitor',task:'Check my wallet and tell me what changed since the last report.',perDay:24,hour:8,needs:'token',onChange:true},
  {id:'daily-post',title:'A post a day',text:'Every morning: one ready-to-edit post about your topic, with a hook and a clear point.',gives:'One draft post, once a day',
   agent:{name:'Post Writer',skin:'nova',personality:'You write short social posts that sound like a person, not an ad. One idea per post, a first line that earns the second, no hashtags unless asked, no invented facts or numbers.',tone:'Friendly',skills:['write','brainstorm','summarize']},
   skill:'write',task:'Write one post for X about {topic}. A strong first line, one clear point, under 280 characters. Give two alternatives for the first line.',perDay:1,hour:9,

@@ -39,8 +39,10 @@ type AgentRow={owner:string;config:string;name:string;published:number;price:num
 export type RunRow={id:string;agent_id:string;agent_name:string;prompt:string;output:string;mode:string;cost:number;status:string;created:string;skill:string;schedule_id?:string|null;relay?:string|null;step?:number|null;talk?:string|null};
 
 /** `opts` (runs started for the owner from outside the Studio, lib/notify.ts): `guard` keeps the agent's instructions
-    unshown even on the owner's own agent, `search:false` answers without web search, `label` names the run in the ledger. */
-export async function performRun(db:D1Database,owner:string,data:RunInput,schedule?:{id:string;cost:number},opts:{guard?:boolean;search?:boolean;label?:string}={}):Promise<RunRow>{
+    unshown even on the owner's own agent, `search:false` answers without web search, `label` names the run in the ledger.
+    `schedule.extra` (a schedule that reports only on change, lib/watch.ts): what set the report off, for the AI after
+    the task and as a note under the answer. */
+export async function performRun(db:D1Database,owner:string,data:RunInput,schedule?:{id:string;cost:number;extra?:{facts:string;note:string}|null},opts:{guard?:boolean;search?:boolean;label?:string}={}):Promise<RunRow>{
  const previous=await db.prepare('SELECT * FROM runs WHERE id=? AND owner=?').bind(data.id,owner).first<RunRow>();
  if(previous){if(previous.agent_id!==data.agentId||previous.prompt!==data.prompt||previous.mode!==data.mode)throw new HttpError(409,'This request ID is already in use.');return previous;}
  const record=await db.prepare('SELECT owner,config,name,published,price,talk_price,archived FROM agents WHERE id=?').bind(data.agentId).first<AgentRow>();
@@ -144,8 +146,9 @@ export async function performRun(db:D1Database,owner:string,data:RunInput,schedu
  try{
   if(data.mode==='sample')output=sampleResult(agent,data.prompt,data.skill);
   else if(check)output=checkReport(await runCheck(runtime(),agent,data.id,free,rhioFacts()));
-  else{const r=await runAI(runtime(),voice?VOICE_WRITER:agent,data.skill,[data.prompt,spoken,kb?.facts,handed?.facts,reading?.facts].filter(Boolean).join('\n\n'),data.id,{free,guard:!mine||!!opts.guard||!!talk,search,about:talk?rhioFacts():null});output=r.output;if(search&&!r.searched)await returnSearchSlot(db,created).catch(()=>null);}
+  else{const r=await runAI(runtime(),voice?VOICE_WRITER:agent,data.skill,[data.prompt,spoken,schedule?.extra?.facts,kb?.facts,handed?.facts,reading?.facts].filter(Boolean).join('\n\n'),data.id,{free,guard:!mine||!!opts.guard||!!talk,search,about:talk?rhioFacts():null});output=r.output;if(search&&!r.searched)await returnSearchSlot(db,created).catch(()=>null);}
   if(kb)output=kb.finish(output);
+  if(schedule?.extra)output=withNote(output,schedule.extra.note);
   if(reading)output=withNote(output,reading.note);
   if(handed)output=withNote(output,handed.note);
  }
