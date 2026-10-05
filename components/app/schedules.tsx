@@ -26,8 +26,8 @@ const EmbedPanel=lazy(()=>import('./embed-panel').then(m=>({default:m.EmbedPanel
 export type Schedule={id:string;agent_id:string;agent_name:string|null;skin:string|null;skill:string;prompt:string;per_day:number;start_minute:number;mode:string;active:boolean;
  next_run:string;last_run:string|null;last_status:string|null;last_run_id:string|null;runs:number;created:string;notify?:string|null;
  /** reports only on change (lib/watch.ts): the smallest transfer for whale watch, the last look, looks without a change since the last report */on_change?:boolean;watch_min?:number|null;checked?:string|null;quiet?:number};
-export type Channel={id:string;kind:'discord'|'telegram';label:string;ok:boolean;lastSent:string|null;lastError:string|null;chat?:{agentId:string;skill:string;daily:number;used:number;name:string;mine:boolean;price:number;gone:boolean}|null};
-export type Delivery={discord:boolean;telegram:boolean;max:number};
+export type Channel={id:string;kind:'discord'|'telegram';label:string;ok:boolean;lastSent:string|null;lastError:string|null;chat?:{agentId:string;skill:string;daily:number;used:number;name:string;mine:boolean;price:number;gone:boolean}|null;vaultAlert?:boolean};
+export type Delivery={discord:boolean;telegram:boolean;max:number;/** the account is of the team and holder rewards run here: vault alerts can be switched on; `hours` is where "low" starts */vault?:{hours:number}|null};
 export type Limits={enabled:boolean;runCost:number;max:number;dailyCap:number;perDay:number[];usedToday:number;mode:'live'|'sample';skillCosts?:Record<string,number>;
  /** the account's holder tier and every tier's limits (where the token is set) */tier?:string;tierName?:string;perks?:{id:string;name:string;min:string;schedules:number;dailyRuns:number;channels:number}[]|null};
 /** Credits for one scheduled run of this skill (the server's price list, else the flat schedule cost). */
@@ -227,6 +227,8 @@ export function DeliveryPanel({onChange,agents=[]}:{onChange:()=>void;agents?:Ag
     <span className={cn('text-[11.5px]',c.ok?'text-muted-foreground':'text-coral')}>{c.ok?(c.lastError?`Last send failed: ${c.lastError}`:c.lastSent?`Last sent ${when(c.lastSent)}`:'Connected'):`Disconnected: ${c.lastError||'connect it again'}`}</span></div>
    <Button size="sm" variant="outline" disabled={!!busy} onClick={()=>post('t'+c.id,{action:'test',id:c.id},'Test message sent')}>{busy==='t'+c.id?'Sending…':'Send test'}</Button>
    <Button size="sm" variant="ghost" disabled={!!busy} onClick={()=>{if(confirm('Remove this channel? Schedules that send to it go back to History only.'))act('d'+c.id,{method:'DELETE',body:JSON.stringify({id:c.id})});}}><I id="archive"/>Remove</Button>
+   {C?.vault&&c.ok&&<label className="flex basis-full items-center gap-2 border-t pt-2 text-[12px] text-muted-foreground"><Switch checked={!!c.vaultAlert} disabled={!!busy} aria-label="Reward vault alerts" onCheckedChange={on=>post('v'+c.id,{action:'vault',id:c.id,on},on?'This channel now gets the vault alerts':'Vault alerts turned off')}/>
+    <span><b className="font-medium text-foreground">Reward vault alerts</b> · a message when fewer than {C.vault.hours} hours of rewards are covered, when periods wait for a refill, and when it is fine again. Team accounts only.</span></label>}
    {c.kind==='telegram'&&c.ok&&<ChatSetup key={c.id+(c.chat?c.chat.agentId+c.chat.skill+c.chat.daily+c.chat.price:'')} c={c} agents={agents} costs={v.chatCosts||{}} busy={!!busy} want={want&&v.channels.find(x=>x.kind==='telegram'&&x.ok)?.id===c.id?want:null} onSave={p=>post('c'+c.id,{action:'chat',id:c.id,...p},p.agentId?'The agent now answers in this chat':'Chat answers turned off')}/>}
   </div>)}</div>}
   <div className="grid gap-3 lg:grid-cols-2">

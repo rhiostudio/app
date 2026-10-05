@@ -7,32 +7,43 @@ import {skillIds} from '@/lib/agents';
 import {checkTarget} from '@/lib/schedules';
 import {liveRunCost} from '@/lib/economy';
 import {talkCost,TALK_SKILL} from '@/lib/talk';
-import {addDiscord,channelLimit,channelsOf,notifyConfig,pendingTelegram,pollTelegram,readerFresh,removeChannel,setChat,startTelegram,testChannel} from '@/lib/notify';
+import {isCreatorAdmin} from '@/lib/creators';
+import {alertsAvailable,alertHours} from '@/lib/vault-alert';
+import {addDiscord,channelLimit,channelsOf,notifyConfig,pendingTelegram,pollTelegram,readerFresh,removeChannel,setChat,setVaultAlert,startTelegram,testChannel} from '@/lib/notify';
 
 const post=z.discriminatedUnion('action',[
  z.object({action:z.literal('discord'),url:z.string().trim().min(20).max(400)}),
  z.object({action:z.literal('telegram')}),
  z.object({action:z.literal('test'),id:z.string().uuid()}),
+ // reward vault alerts to this channel (lib/vault-alert.ts): accounts of the team only
+ z.object({action:z.literal('vault'),id:z.string().uuid(),on:z.boolean()}),
  // an agent that answers in a Telegram chat (agentId null: reports only); daily = answers per day in that chat
  // skill 'chat': the agent answers in its own voice (a conversation). An agent someone else published answers that
  // way only, and `expectedPrice` is its creator's price per message as the page showed it.
  z.object({action:z.literal('chat'),id:z.string().uuid(),agentId:z.string().uuid().nullable(),skill:z.enum([...skillIds,TALK_SKILL]).optional(),daily:z.number().int().min(1).max(200).default(20),expectedPrice:z.number().int().min(0).max(500).optional()}),
 ]);
 
-async function view(db:D1Database,owner:string){
+async function view(db:D1Database,owner:string,wallet?:string|null){
  let pending=await pendingTelegram(db,owner).catch(()=>null);
  // while the owner waits for their chat to appear, the page asks every few seconds: read the bot's messages now
  // (in the container a reader does this all the time; the page only reads where there is none)
  if(pending&&!await readerFresh(db).catch(()=>false)){await pollTelegram(db).catch(()=>null);pending=await pendingTelegram(db,owner).catch(()=>null);}
- return {config:{...notifyConfig(),max:await channelLimit(db,owner)},channels:await channelsOf(db,owner),pending,chatCosts:{...Object.fromEntries(skillIds.map(k=>[k,liveRunCost(k)])),[TALK_SKILL]:talkCost()}};
+ // vault alerts are offered to the team's accounts, where holder rewards run
+ const vault=isCreatorAdmin(wallet)&&alertsAvailable()?{hours:alertHours()}:null;
+ return {config:{...notifyConfig(),max:await channelLimit(db,owner),vault},channels:await channelsOf(db,owner),pending,chatCosts:{...Object.fromEntries(skillIds.map(k=>[k,liveRunCost(k)])),[TALK_SKILL]:talkCost()}};
 }
 
-export async function GET(request:Request){try{const {db,owner}=await context(request);return Response.json(await view(db,owner),{headers:{'Cache-Control':'no-store'}});}catch(e){return failure(e)}}
+export async function GET(request:Request){try{const {db,owner,wallet}=await context(request);return Response.json(await view(db,owner,wallet),{headers:{'Cache-Control':'no-store'}});}catch(e){return failure(e)}}
 
 export async function POST(request:Request){try{
- const {db,owner}=await context(request,true);const p=post.safeParse(await body(request));if(!p.success)throw new HttpError(400,'Check the request and try again.');const d=p.data;
- if(d.action==='discord'){const id=await addDiscord(db,owner,d.url);return Response.json({id,...await view(db,owner)});}
- if(d.action==='telegram'){await startTelegram(db,owner);return Response.json(await view(db,owner));}
+ const {db,owner,wallet}=await context(request,true);const p=post.safeParse(await body(request));if(!p.success)throw new HttpError(400,'Check the request and try again.');const d=p.data;
+ if(d.action==='discord'){const id=await addDiscord(db,owner,d.url);return Response.json({id,...await view(db,owner,wallet)});}
+ if(d.action==='telegram'){await startTelegram(db,owner);return Response.json(await view(db,owner,wallet));}
+ if(d.action==='vault'){
+  if(!isCreatorAdmin(wallet))throw new HttpError(403,'Reward vault alerts are for the team\u2019s accounts.');
+  if(d.on&&!alertsAvailable())throw new HttpError(400,'Holder rewards do not run on this server, so there is no vault to watch.');
+  await setVaultAlert(db,owner,d.id,d.on);return Response.json(await view(db,owner,wallet));
+ }
  if(d.action==='chat'){
   let chat:{agentId:string;skill:string;daily:number;price?:number|null}|null=null;
   if(d.agentId){
@@ -52,12 +63,12 @@ export async function POST(request:Request){try{
     chat={agentId:d.agentId,skill:TALK_SKILL,daily:d.daily,price};
    }
   }
-  await setChat(db,owner,d.id,chat);return Response.json(await view(db,owner));
+  await setChat(db,owner,d.id,chat);return Response.json(await view(db,owner,wallet));
  }
- await testChannel(db,owner,d.id);return Response.json({sent:true,...await view(db,owner)});
+ await testChannel(db,owner,d.id);return Response.json({sent:true,...await view(db,owner,wallet)});
 }catch(e){return failure(e)}}
 
 export async function DELETE(request:Request){try{
- const {db,owner}=await context(request,true);const {id}=await body(request) as {id?:string};
- await removeChannel(db,owner,String(id||''));return Response.json(await view(db,owner));
+ const {db,owner,wallet}=await context(request,true);const {id}=await body(request) as {id?:string};
+ await removeChannel(db,owner,String(id||''));return Response.json(await view(db,owner,wallet));
 }catch(e){return failure(e)}}

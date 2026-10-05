@@ -44,19 +44,20 @@ export type Channel={id:string;kind:'discord'|'telegram';label:string;ok:boolean
  /** the agent that answers questions in this Telegram chat, and today's count. `skill` 'chat': it answers in its own
      voice (a conversation). `mine` false: an agent someone else published; `price` is then what its creator gets per
      message, as accepted when it was set up. `gone`: the agent is no longer there to answer. */
- chat:{agentId:string;skill:string;daily:number;used:number;name:string;mine:boolean;price:number;gone:boolean}|null};
+ chat:{agentId:string;skill:string;daily:number;used:number;name:string;mine:boolean;price:number;gone:boolean}|null;
+ /** this channel gets the reward vault alerts (lib/vault-alert.ts; team accounts only) */vaultAlert:boolean};
 type Row={id:string;owner:string;kind:string;target:string;label:string;fails:number;dead:number;last_error:string|null;last_sent:string|null;
- chat_agent:string|null;chat_skill:string|null;chat_daily:number;chat_day:string|null;chat_used:number;chat_price?:number|null;
+ chat_agent:string|null;chat_skill:string|null;chat_daily:number;chat_day:string|null;chat_used:number;chat_price?:number|null;vault_alert?:number;
  agent_name?:string|null;agent_owner?:string|null;agent_published?:number|null;agent_archived?:number|null};
 /** A name from outside (webhook, chat) as shown on the page: no control or invisible formatting characters. */
 const clean=(s:unknown,n=40)=>String(s??'').replace(/\p{C}/gu,'').trim().slice(0,n);
 
 export async function channelsOf(db:D1Database,owner:string):Promise<Channel[]>{
- const rows=await db.prepare('SELECT c.id,c.kind,c.label,c.dead,c.last_error,c.last_sent,c.chat_agent,c.chat_skill,c.chat_daily,c.chat_day,c.chat_used,c.chat_price,a.name AS agent_name,a.owner AS agent_owner,a.published AS agent_published,a.archived AS agent_archived FROM notify_channels c LEFT JOIN agents a ON a.id=c.chat_agent WHERE c.owner=? ORDER BY c.created').bind(owner).all<Row>();
+ const rows=await db.prepare('SELECT c.id,c.kind,c.label,c.dead,c.last_error,c.last_sent,c.chat_agent,c.chat_skill,c.chat_daily,c.chat_day,c.chat_used,c.chat_price,c.vault_alert,a.name AS agent_name,a.owner AS agent_owner,a.published AS agent_published,a.archived AS agent_archived FROM notify_channels c LEFT JOIN agents a ON a.id=c.chat_agent WHERE c.owner=? ORDER BY c.created').bind(owner).all<Row>();
  const today=new Date().toISOString().slice(0,10);
  return rows.results.map(r=>({id:r.id,kind:r.kind as Channel['kind'],label:r.label,ok:!r.dead,lastSent:r.last_sent,lastError:r.last_error,
   chat:r.chat_agent&&r.chat_skill?{agentId:r.chat_agent,skill:r.chat_skill,daily:r.chat_daily,used:r.chat_day===today?r.chat_used:0,name:r.agent_name||'an agent',mine:r.agent_owner===owner,price:r.agent_owner===owner?0:Number(r.chat_price||0),
-   gone:!r.agent_owner||!!r.agent_archived||(r.agent_owner!==owner&&!r.agent_published)}:null}));
+   gone:!r.agent_owner||!!r.agent_archived||(r.agent_owner!==owner&&!r.agent_published)}:null,vaultAlert:!!r.vault_alert}));
 }
 export async function ownsChannel(db:D1Database,owner:string,id:string){
  return !!await db.prepare('SELECT 1 AS x FROM notify_channels WHERE id=? AND owner=?').bind(id,owner).first();
@@ -331,6 +332,17 @@ export async function deliverRun(db:D1Database,owner:string,channelId:string,run
 /** A schedule that stopped (out of credits, agent or skill removed): one short notice. Never throws. */
 export async function deliverNotice(db:D1Database,owner:string,channelId:string,agent:string,text:string){
  return send(db,owner,channelId,`${clean(agent,60)||'Schedule'} · schedule stopped`,text,origin()?`Schedules: ${origin()}/dashboard/schedules`:'').catch(()=>({ok:false,gone:false,error:'Not sent.'} as Sent));
+}
+/** A short note from the server itself (lib/vault-alert.ts), to a channel of that account. Never throws. */
+export async function sendNote(db:D1Database,owner:string,channelId:string,head:string,body:string,about:'rewards'){
+ return send(db,owner,channelId,clean(head,80),body,about==='rewards'&&origin()?`Rewards: ${origin()}/dashboard/rewards`:'').catch(()=>({ok:false,gone:false,error:'Not sent.'} as Sent));
+}
+/** Switches the reward vault alerts on or off for a channel of this account. The route checks who may. */
+export async function setVaultAlert(db:D1Database,owner:string,id:string,on:boolean){
+ const r=await db.prepare('UPDATE notify_channels SET vault_alert=? WHERE id=? AND owner=?').bind(on?1:0,id,owner).run();
+ if(!r.meta.changes)throw new HttpError(404,'Channel not found.');
+ // a channel that just asked hears how the vault stands at the next look, when it is not fine
+ if(on)await db.prepare("DELETE FROM notify_state WHERE key='vault:alert'").run();
 }
 /** "Send a test": at most one every 10 seconds per channel (the conditional update is the lock). */
 export async function testChannel(db:D1Database,owner:string,channelId:string){

@@ -124,6 +124,8 @@ services:
       REWARD_USD_PER_UNIT_HOUR: ${REWARD_USD_PER_UNIT_HOUR:-0.01}
       REWARD_PRICE_FEED: ${REWARD_PRICE_FEED:-}
       REWARD_PRICE_MAX_AGE_HOURS: ${REWARD_PRICE_MAX_AGE_HOURS:-72}
+      # the team is told the reward vault runs low when fewer than this many hours of rewards are covered
+      REWARD_ALERT_HOURS: ${REWARD_ALERT_HOURS:-12}
       REWARD_PERIOD_HOURS: ${REWARD_PERIOD_HOURS:-1}
       REWARD_START_BLOCK: ${REWARD_START_BLOCK:-0}
       REWARD_EXCLUDE: ${REWARD_EXCLUDE:-}

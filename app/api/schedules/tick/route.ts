@@ -11,6 +11,7 @@ import {autoRewards,scanFundings,syncHolders} from '@/lib/rewards';
 import {sweepStuckRuns} from '@/lib/runs';
 import {settlePendingTopups} from '@/lib/topups';
 import {chatActive,pollTelegram,readerFresh,telegramWaiting} from '@/lib/notify';
+import {vaultAlerts} from '@/lib/vault-alert';
 
 /** Rows that only pile up: expired sign-in nonces and sessions, used link nonces, old daily counters. */
 async function housekeeping(db:D1Database,now:Date){
@@ -48,10 +49,13 @@ export async function POST(request:Request){try{
  const rewards=await autoRewards(db,now).catch(fail);
  // refills of the reward vault are read from the chain (shown on the rewards page; nothing depends on them)
  if(rc.live)await scanFundings(db).catch(()=>null);
+ // the team is told when the reward vault runs low, when periods wait for a refill, and when it is fine again
+ // (lib/vault-alert.ts): looked at every five minutes, and at every tick of a test clock
+ const vault=rc.live&&(testClock||new Date().getUTCMinutes()%5===2)?await vaultAlerts(db,now):null;
  if(new Date().getUTCMinutes()%10===3)await housekeeping(db,new Date()).catch(()=>null);
  // someone is connecting a Telegram chat, or an agent answers in one: read the bot's messages here when no reader
  // does it (the container runs one, POST /api/notify/poll; other hosts get an answer within a minute this way)
  if(!await readerFresh(db).catch(()=>false)&&(await telegramWaiting(db).catch(()=>false)||await chatActive(db).catch(()=>false)))await pollTelegram(db).catch(()=>null);
  const schedules=await runDue(db,testClock?{now}:{}).catch(fail);
- return Response.json({schedules,stuck,holders,rewards,topups});
+ return Response.json({schedules,stuck,holders,rewards,topups,vault});
 }catch(e){return failure(e)}}
