@@ -78,6 +78,49 @@ async function render(request:Request){
    {width:W,height:H,headers:{'Cache-Control':'public, max-age=600'}},
   );
  }
+ if(key==='launch'){
+  // In the website's style: the steps as a list, the first ones ticked, next to the agent on a card of the hero deck.
+  const who=await asset(`${origin}/characters/deck/juno.png`,'image/png');
+  const INK='#1f201e',BG='#171816',TEXT='#f3f4ef',MUTED='#a0a59c',LINE='rgba(255,255,255,0.14)';
+  const rows=[['01','Pick a character',true],['02','Give it a voice',true],['03','Give it what you know',true],['04','Pass the agent check',false],['05','Publish with a price',false],['06','First conversation',false]] as const;
+  return new ImageResponse(
+   <div style={{width:W,height:H,display:'flex',position:'relative',backgroundColor:BG,color:TEXT,fontFamily:'sans-serif'}}>
+    <div style={{display:'flex',flexDirection:'column',justifyContent:'space-between',width:560,height:H,padding:'54px 0 52px 64px'}}>
+     <div style={{display:'flex',alignItems:'center',gap:18}}>
+      {logo?<img src={logo} width={146} height={44}/>:<div style={{display:'flex',fontSize:24,letterSpacing:6,color:'#c8ff24'}}>RHIO</div>}
+      <div style={{display:'flex',alignItems:'center',gap:10,fontSize:16,letterSpacing:3.5,color:MUTED}}><div style={{display:'flex',width:9,height:9,borderRadius:9,backgroundColor:'#c8ff24'}}/>{c.kicker}</div>
+     </div>
+     <div style={{display:'flex',flexDirection:'column',fontSize:66,lineHeight:1.04,letterSpacing:-2.8}}>
+      <div style={{display:'flex',color:MUTED}}>From a character</div>
+      <div style={{display:'flex',color:TEXT}}>to an agent</div>
+      <div style={{display:'flex',color:TEXT}}>people talk to.</div>
+     </div>
+     <div style={{display:'flex',flexDirection:'column',gap:14}}>
+      <div style={{display:'flex',gap:10}}>
+       {['YOUR VOICE','YOUR SOURCES','YOUR PRICE'].map(l=><div key={l} style={{display:'flex',alignItems:'center',flexShrink:0,height:40,padding:'0 16px',borderRadius:999,border:`1px solid ${LINE}`,fontSize:14,letterSpacing:2,whiteSpace:'nowrap',color:TEXT}}>{l}</div>)}
+      </div>
+      <div style={{display:'flex',fontSize:15,letterSpacing:2.6,color:MUTED}}>RHIO.STUDIO/DASHBOARD/LAUNCH</div>
+     </div>
+    </div>
+    <div style={{display:'flex',flexDirection:'column',gap:10,position:'absolute',left:596,top:112,width:300}}>
+     {rows.map(([n,t,done])=><div key={n} style={{display:'flex',alignItems:'center',gap:12,height:56,padding:'0 14px',borderRadius:14,backgroundColor:'#262825',border:`1px solid ${LINE}`}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'center',width:32,height:32,borderRadius:9,backgroundColor:done?'#c8ff24':'#34362f',color:done?INK:MUTED,fontSize:13,letterSpacing:1}}>
+       {done?<svg width="18" height="18" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" stroke={INK} strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>:n}</div>
+      <div style={{display:'flex',fontSize:19,color:done?TEXT:MUTED}}>{t}</div>
+     </div>)}
+    </div>
+    <div style={{display:'flex',flexDirection:'column',justifyContent:'space-between',position:'absolute',left:912,top:132,width:250,height:350,padding:18,borderRadius:22,backgroundColor:'#c8ff24',color:INK,transform:'rotate(4deg)',boxShadow:'0 24px 60px rgba(0,0,0,0.45)'}}>
+     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:13,letterSpacing:2}}>
+      <div style={{display:'flex'}}>#01</div>
+      <div style={{display:'flex',padding:'4px 10px',borderRadius:9,border:'1px solid rgba(31,32,30,0.3)'}}>YOURS</div>
+     </div>
+     {who?<img src={who} width={182} height={243} style={{position:'absolute',left:34,top:44}}/>:null}
+     <div style={{display:'flex',fontSize:24,lineHeight:1.1,letterSpacing:-0.8}}>Your agent</div>
+    </div>
+   </div>,
+   {width:W,height:H,headers:{'Cache-Control':'public, max-age=3600'}},
+  );
+ }
  if(key==='top'){
   // In the website's style: the first three of the week on cards of the deck, with their place and how many people
   // used them. A week without any use shows three open places instead of invented names.

@@ -44,6 +44,7 @@ export function CreatorsPage({onNavigate}:{onNavigate:Go}){
    </div>
    <div className="flex flex-wrap gap-2">
     <Button size="lg" asChild><a href="/dashboard/studio?voice=1">Write my agent<I id="arrow"/></a></Button>
+    <Button size="lg" variant="outline" asChild><a href="/dashboard/launch">Follow the launch guide</a></Button>
     <Button size="lg" variant="outline" onClick={()=>onNavigate('verified')}>The verified mark</Button>
     <Button size="lg" variant="outline" onClick={()=>onNavigate('discover')}>Talk to an agent</Button>
     <Button size="lg" variant="outline" onClick={()=>copyText(link,toast.success,toast.error)}><I id="copy"/>Copy link</Button>

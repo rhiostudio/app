@@ -35,6 +35,7 @@ export const PRODUCT:NavLink[]=[
 ];
 export const WORKSPACE:NavLink[]=[
  {id:'agents',title:'My agents',icon:'users',desc:'Saved agents, prices and publishing',tone:'sky'},
+ {id:'launch',title:'Launch guide',icon:'play',desc:'Seven steps from a character to an agent people talk to',tone:'lime'},
  {id:'creators',title:'Creator agents',icon:'pen',desc:'An agent in your own voice, written from your posts; you earn per message',tone:'lime'},
  {id:'teams',title:'Teams',icon:'link',desc:'Two or three agents in a line: each hands its answer to the next',tone:'iris'},
  {id:'schedules',title:'Schedules',icon:'cal',desc:'Agents that run a skill on their own, a few times a day',tone:'iris'},
