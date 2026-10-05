@@ -57,6 +57,7 @@ export const RESOURCES:NavLink[]=[
  {id:'tiers',title:'Holder tiers',icon:'layers',desc:'What holding RHIO unlocks: more schedules, runs and channels',tone:'amber'},
  {id:'whales',title:'Whale watch',icon:'scan',desc:'Biggest RHIO transfers and holders, from the chain',tone:'lime'},
  {id:'roadmap',title:'Roadmap',icon:'map',desc:'Shipped, in progress, planned',tone:'mint'},
+ {id:'report',title:'Reward report',icon:'hype',desc:'The holder rewards in a few live numbers, day by day',tone:'amber'},
 ];
 const TONE_TEXT:Record<Tone,string>={lime:'text-[#3f5f00] dark:text-lime',iris:'text-iris',coral:'text-coral',sky:'text-[#1f7fcf] dark:text-sky',amber:'text-[#9a6500] dark:text-amber',mint:'text-[#15845a] dark:text-mint',pink:'text-pink',ink:'text-foreground'};
 export function ToneIcon({icon,tone,className}:{icon:string;tone:Tone;className?:string}){

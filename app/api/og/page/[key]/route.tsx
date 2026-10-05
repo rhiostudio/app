@@ -15,6 +15,8 @@ import {referralConfig,referralProgram} from '@/lib/referrals';
 import {getCharacter} from '@/lib/characters';
 import {duelCard} from '@/lib/og-duel';
 import {board} from '@/lib/board';
+import {dailyReport} from '@/lib/report';
+import {leftText} from '@/lib/report-text';
 
 const W=1200,H=630;
 /** Pictures that could not be loaded since the server started: a card rendered without one of them is not kept. */
@@ -76,6 +78,49 @@ async function render(request:Request){
     </div>
    </div>,
    {width:W,height:H,headers:{'Cache-Control':'public, max-age=600'}},
+  );
+ }
+ if(key==='report'){
+  // In the website's style, with the live numbers: what holders earned on a lime card of the deck, what the vault
+  // holds on an iris one. Where the program does not run (or nothing is settled yet) the card says so in words.
+  const db=(env as unknown as {DB?:D1Database}).DB;const r=db?await dailyReport(db).catch(()=>null):null;
+  const [who,who2]=await Promise.all([asset(`${origin}/characters/deck/vesper.png`,'image/png'),asset(`${origin}/characters/deck/lumi.png`,'image/png')]);
+  const INK='#1f201e',BG='#171816',TEXT='#f3f4ef',MUTED='#a0a59c',LINE='rgba(255,255,255,0.14)';
+  const chips=r?[`${r.periods.toLocaleString('en-US')} PERIODS`,`${r.earners.toLocaleString('en-US')} WALLETS EARNING`,'NOT AUDITED']:['LIVE NUMBERS','NOT AUDITED'];
+  const deck=[{n:r?`DAY ${r.day}`:'DAY —',tag:'EARNED',title:r?`${r.earned} ${r.symbol}`:'Not settled yet',sub:r?`about ${r.earnedUsd}, claimable`:'',bg:'#c8ff24',fg:INK,img:who,left:628,top:104,turn:-4},
+   {n:'VAULT',tag:r?.waiting?'WAITING':'FREE',title:r?`${r.free} ${r.symbol}`:'—',sub:r?(r.waiting?'waiting for a refill':leftText(r.hoursLeft)?`${leftText(r.hoursLeft)} covered`:''):'',bg:'#5b5bf6',fg:'#ffffff',img:who2,left:886,top:142,turn:4}];
+  return new ImageResponse(
+   <div style={{width:W,height:H,display:'flex',position:'relative',backgroundColor:BG,color:TEXT,fontFamily:'sans-serif'}}>
+    <div style={{display:'flex',flexDirection:'column',justifyContent:'space-between',width:580,height:H,padding:'54px 0 52px 64px'}}>
+     <div style={{display:'flex',alignItems:'center',gap:18}}>
+      {logo?<img src={logo} width={146} height={44}/>:<div style={{display:'flex',fontSize:24,letterSpacing:6,color:'#c8ff24'}}>RHIO</div>}
+      <div style={{display:'flex',alignItems:'center',gap:10,fontSize:16,letterSpacing:3.5,color:MUTED}}><div style={{display:'flex',width:9,height:9,borderRadius:9,backgroundColor:'#c8ff24'}}/>{c.kicker}</div>
+     </div>
+     <div style={{display:'flex',flexDirection:'column',fontSize:72,lineHeight:1.04,letterSpacing:-3}}>
+      <div style={{display:'flex',color:MUTED}}>{r?`Day ${r.day}.`:'Holder rewards,'}</div>
+      <div style={{display:'flex',color:TEXT}}>{r?'The rewards,':'in numbers.'}</div>
+      {r?<div style={{display:'flex',color:TEXT}}>in numbers.</div>:null}
+     </div>
+     <div style={{display:'flex',flexDirection:'column',gap:14}}>
+      <div style={{display:'flex',gap:10}}>
+       {chips.map(l=><div key={l} style={{display:'flex',alignItems:'center',flexShrink:0,height:40,padding:'0 16px',borderRadius:999,border:`1px solid ${LINE}`,fontSize:14,letterSpacing:2,whiteSpace:'nowrap',color:TEXT}}>{l}</div>)}
+      </div>
+      <div style={{display:'flex',fontSize:15,letterSpacing:2.6,color:MUTED}}>RHIO.STUDIO/REPORT</div>
+     </div>
+    </div>
+    {deck.map(d=><div key={d.n} style={{display:'flex',flexDirection:'column',justifyContent:'space-between',position:'absolute',left:d.left,top:d.top,width:268,height:380,padding:20,borderRadius:22,backgroundColor:d.bg,color:d.fg,transform:`rotate(${d.turn}deg)`,boxShadow:'0 24px 60px rgba(0,0,0,0.45)'}}>
+     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:14,letterSpacing:2.2}}>
+      <div style={{display:'flex'}}>{d.n}</div>
+      <div style={{display:'flex',padding:'4px 10px',borderRadius:9,border:`1px solid ${d.fg==='#ffffff'?'rgba(255,255,255,0.35)':'rgba(31,32,30,0.3)'}`}}>{d.tag}</div>
+     </div>
+     {d.img?<img src={d.img} width={180} height={240} style={{position:'absolute',left:44,top:40}}/>:null}
+     <div style={{display:'flex',flexDirection:'column',gap:4}}>
+      <div style={{display:'flex',fontSize:27,lineHeight:1.05,letterSpacing:-0.9}}>{d.title}</div>
+      {d.sub?<div style={{display:'flex',fontSize:14,letterSpacing:0.2,opacity:0.8}}>{d.sub}</div>:null}
+     </div>
+    </div>)}
+   </div>,
+   {width:W,height:H,headers:{'Cache-Control':'public, max-age=900'}},
   );
  }
  if(key==='launch'){

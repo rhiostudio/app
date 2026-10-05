@@ -10,10 +10,11 @@
                  /arena (two agents, one question)  /arena/<id> (one duel)
                  /top (the agents used most in the last seven days)
                  /embed/<id> (a chat placed on a creator's site; shown inside a frame, without navigation)
+                 /report[/<day>] (the holder reward program in a few live numbers, and a post ready to copy)
    Dashboard:    /dashboard  /dashboard/{studio,launch,insights,agents,teams,discover,skills,schedules,quests,history,credits,wallet,rewards,profile}
                  /dashboard/docs[/slug]  /dashboard/whitepaper[/slug]  /dashboard/roadmap
    Signed-in only (proxy.ts redirects to /login?next=...): see PROTECTED_PATHS. */
-export type View='home'|'login'|'notfound'|'agent'|'shared'|'whales'|'tiers'|'recipes'|'invite'|'referral'|'teamup'|'creators'|'plaza'|'verified'|'arena'|'duel'|'top'|'embed'|'overview'|'profile'|'rewards'|'wallet'|'studio'|'launch'|'insights'|'agents'|'teams'|'discover'|'skills'|'schedules'|'quests'|'activity'|'credits'|'docs'|'paper'|'roadmap';
+export type View='home'|'login'|'notfound'|'agent'|'shared'|'whales'|'tiers'|'recipes'|'invite'|'referral'|'teamup'|'creators'|'plaza'|'verified'|'arena'|'duel'|'top'|'embed'|'report'|'overview'|'profile'|'rewards'|'wallet'|'studio'|'launch'|'insights'|'agents'|'teams'|'discover'|'skills'|'schedules'|'quests'|'activity'|'credits'|'docs'|'paper'|'roadmap';
 export type Area='site'|'dash';
 export type Route={view:View;area:Area;doc?:string};
 
@@ -49,6 +50,7 @@ export function pathFor(view:View,doc?:string,area:Area='dash'):string{
  if(view==='verified')return '/verified';
  if(view==='arena')return '/arena';
  if(view==='top')return '/top';
+ if(view==='report')return doc?`/report/${doc}`:'/report';
  if(view==='embed')return doc?`/embed/${doc}`:'/';
  if(view==='duel')return doc?`/arena/${doc}`:'/arena';
  if(view==='shared')return doc?`/s/${doc}`:'/';
@@ -76,6 +78,8 @@ export function parsePath(pathname:string):Route{
  if(a==='verified'&&!b)return {view:'verified',area:'site'};
  if(a==='arena'&&!b)return {view:'arena',area:'site'};
  if(a==='top'&&!b)return {view:'top',area:'site'};
+ // the day in the address only makes each day's link a new one: the page always shows the numbers of now
+ if(a==='report'&&!c&&(!b||/^[1-9]\d{0,4}$/.test(b)))return {view:'report',area:'site',doc:b};
  if(a==='embed'&&b&&!c&&SHARE_PATH_ID.test(b))return {view:'embed',area:'site',doc:b};
  // a duel's id is case-sensitive, like a shared answer's
  if(a==='arena'&&b&&!c&&SHARE_PATH_ID.test(b))return {view:'duel',area:'site',doc:b};
