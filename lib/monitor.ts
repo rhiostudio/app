@@ -16,14 +16,17 @@ import {userWallets} from './wallets';
 import {HttpError} from './server';
 
 const ADDRESS=/(?<![0-9a-fA-F])0x[0-9a-fA-F]{40}(?![0-9a-fA-F])/g;
+/** The first address written in a text (null when there is none; 400 when one is written and mistyped). */
+export function addressIn(prompt:string):Address|null{
+ const found=[...new Set(prompt.match(ADDRESS)||[])];
+ if(!found.length)return null;
+ const ok=found.find(a=>isAddress(a));
+ if(!ok)throw new HttpError(400,'That address does not pass its checksum (one character is mistyped). Copy it again from your wallet or the explorer. Nothing was charged.');
+ return getAddress(ok);
+}
 /** The address a task is about: the first one written in it, else the account's first linked wallet. */
 export async function monitorTarget(db:D1Database,owner:string,prompt:string):Promise<Address>{
- const found=[...new Set(prompt.match(ADDRESS)||[])];
- if(found.length){
-  const ok=found.find(a=>isAddress(a));
-  if(!ok)throw new HttpError(400,'That address does not pass its checksum (one character is mistyped). Copy it again from your wallet or the explorer. Nothing was charged.');
-  return getAddress(ok);
- }
+ const written=addressIn(prompt);if(written)return written;
  const mine=await userWallets(db,owner);if(mine.length)return mine[0];
  throw new HttpError(400,'Put a wallet address (0x…) in the task, or link a wallet first so the agent can read yours. Nothing was charged.');
 }
@@ -43,8 +46,10 @@ const when=(ts:number)=>new Date(ts*1000).toISOString().slice(0,16).replace('T',
 const span=(sec:number)=>{const m=Math.max(1,Math.round(sec/60));return m<90?`${m} min`:m<2880?`${Math.floor(m/60)} h ${m%60} min`:`${Math.floor(m/1440)} days`;};
 const short=(a:string)=>`${a.slice(0,6)}…${a.slice(-4)}`;
 
-/** Reads the address. Throws 503 when the chain cannot be read: the caller has not charged anything yet. */
-export async function readWallet(db:D1Database,owner:string,address:Address):Promise<WalletReading>{
+/** Reads the address. Throws 503 when the chain cannot be read: the caller has not charged anything yet.
+    `compare:false` (a chat other people use on this account's credits, lib/chat-read.ts): the reading is not set
+    against the account's earlier one. */
+export async function readWallet(db:D1Database,owner:string,address:Address,o:{compare?:boolean}={}):Promise<WalletReading>{
  const c=chainConfig();const rc=rewardConfig(c);const client=chainClient(c);
  const tokens=[c.rhio&&{symbol:'RHIO',address:c.rhio,decimals:18},c.token&&{symbol:c.token.symbol,address:c.token.address,decimals:c.token.decimals},rc.token&&{symbol:rc.token.symbol,address:rc.token.address,decimals:rc.token.decimals}]
   .filter((t):t is {symbol:string;address:Address;decimals:number}=>!!t).filter((t,i,all)=>all.findIndex(x=>x.address===t.address)===i);
@@ -58,14 +63,14 @@ export async function readWallet(db:D1Database,owner:string,address:Address):Pro
  const stored:Stored={eth:eth.toString(),nonce,tokens:Object.fromEntries(tokens.map((t,i)=>[t.address.toLowerCase(),{s:t.symbol,d:t.decimals,v:balances[i].toString()}]))};
 
  // what changed since this account last read the address
- const last=await db.prepare('SELECT block,ts,reading FROM wallet_watch WHERE owner=? AND chain_id=? AND address=?').bind(owner,c.id,address).first<{block:number;ts:number;reading:string}>();
+ const last=o.compare===false?null:await db.prepare('SELECT block,ts,reading FROM wallet_watch WHERE owner=? AND chain_id=? AND address=?').bind(owner,c.id,address).first<{block:number;ts:number;reading:string}>();
  let before:Stored|null=null;try{before=last?JSON.parse(last.reading) as Stored:null;}catch{before=null;}
  const delta=(now:bigint,was:string|undefined,d:number)=>before&&was!==undefined?` (${signed(now-BigInt(was),d)})`:'';
  const lines:string[]=[`ETH: ${amount(eth,18)}${delta(eth,before?.eth,18)}`];
  const rhio=c.rhio?balances[tokens.findIndex(t=>t.address===c.rhio)]:null;
  tokens.forEach((t,i)=>lines.push(`${t.symbol}: ${amount(balances[i],t.decimals)}${delta(balances[i],before?.tokens[t.address.toLowerCase()]?.v,t.decimals)}${t.address===c.rhio?` · enough for the ${tierFor(balances[i]).name} tier`:''}`));
  lines.push(`Transactions sent, all time: ${group(String(nonce))}${before?` (${nonce-before.nonce>0?`+${nonce-before.nonce} new`:'no new ones'})`:''}`);
- const since=last&&before?`Last check by this account: ${when(last.ts)}, ${span(ts-last.ts)} earlier (block ${group(String(last.block))}). Changes since then are in brackets.`:'First check of this address by this account: there is no earlier reading to compare with.';
+ const since=last&&before?`Last check by this account: ${when(last.ts)}, ${span(ts-last.ts)} earlier (block ${group(String(last.block))}). Changes since then are in brackets.`:o.compare===false?'':'First check of this address by this account: there is no earlier reading to compare with.';
 
  // RHIO transfers of this address, from the holder recorder (it follows the chain a few minutes behind)
  const moves:string[]=[];let totals='';

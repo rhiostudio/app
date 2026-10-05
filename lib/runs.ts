@@ -22,6 +22,8 @@ import {voiceCost,VOICE_SKILL,VOICE_WRITER} from './voice';
 import {runCheck,checkReport,checkCost,CHECK_SKILL} from './agent-check';
 import {rhioFacts} from './rhio-facts';
 import {recall,lastAsked} from './knowledge';
+import {chatTool} from './chat-tools';
+import {chatReading} from './chat-read';
 import {withNote} from './grounding';
 import {SAMPLE_COST,liveRunCost,aiDailyRuns,aiDailyFreeRuns,liveDailyPerUser,quotaKeys,quotaStep,ensureWallet,ledgerRow,split,tierFeePermille,skillTrialLimit,refillFree,heavyWindow,heavyKey,searchForFreeCredits,takeSearchSlot,returnSearchSlot} from './economy';
 /** Heavy skills on manual live runs count against the 5-hour window (lib/economy.ts heavyWindow). */
@@ -42,7 +44,8 @@ export type RunRow={id:string;agent_id:string;agent_name:string;prompt:string;ou
     unshown even on the owner's own agent, `search:false` answers without web search, `label` names the run in the ledger.
     `schedule.extra` (a schedule that reports only on change, lib/watch.ts): what set the report off, for the AI after
     the task and as a note under the answer. */
-export async function performRun(db:D1Database,owner:string,data:RunInput,schedule?:{id:string;cost:number;extra?:{facts:string;note:string}|null},opts:{guard?:boolean;search?:boolean;label?:string}={}):Promise<RunRow>{
+export async function performRun(db:D1Database,owner:string,data:RunInput,schedule?:{id:string;cost:number;extra?:{facts:string;note:string}|null},
+ /** `shared`: the people who write are not the account that pays (a chat on a creator's site, a Telegram chat) */opts:{guard?:boolean;search?:boolean;label?:string;shared?:boolean}={}):Promise<RunRow>{
  const previous=await db.prepare('SELECT * FROM runs WHERE id=? AND owner=?').bind(data.id,owner).first<RunRow>();
  if(previous){if(previous.agent_id!==data.agentId||previous.prompt!==data.prompt||previous.mode!==data.mode)throw new HttpError(409,'This request ID is already in use.');return previous;}
  const record=await db.prepare('SELECT owner,config,name,published,price,talk_price,archived FROM agents WHERE id=?').bind(data.agentId).first<AgentRow>();
@@ -75,7 +78,13 @@ export async function performRun(db:D1Database,owner:string,data:RunInput,schedu
  // answer, costs nothing. What it read goes to the model with the task and is attached under the answer.
  const wallet=data.skill==='monitor'?await readWallet(db,owner,await monitorTarget(db,owner,data.prompt)):null;
  // Whale watch works the same way with the server's record of the RHIO token (lib/whales.ts): no record, no charge.
- const reading=wallet||(data.skill==='whales'?await whaleReading(db):null);
+ let reading:{facts:string;note:string}|null=wallet||(data.skill==='whales'?await whaleReading(db):null);
+ // In a conversation the agent can use the two skills that read something, when it carries them (lib/chat-tools.ts
+ // decides from the message, lib/chat-read.ts reads). It costs what any message costs, and a reading that cannot be
+ // made never fails the message: the agent is told to say so.
+ let chatWallet:Awaited<ReturnType<typeof readWallet>>|undefined;
+ if(talk&&data.mode==='live'){const tool=chatTool(data.prompt,agent.skills||[],{shared:!!opts.shared});
+  if(tool){const r=await chatReading(db,owner,tool,data.prompt,!!opts.shared);reading={facts:r.facts,note:r.note};chatWallet=r.wallet;}}
  // A step of a team run works from the answer of the step before it. Checked here, before anything is charged: a
  // step whose predecessor did not complete (or belongs to another account or team run) costs nothing.
  const relay=!schedule&&!talk&&!voice&&data.relay?data.relay:null;const handed=relay?await handover(db,owner,relay):null;
@@ -149,7 +158,7 @@ export async function performRun(db:D1Database,owner:string,data:RunInput,schedu
   else{const r=await runAI(runtime(),voice?VOICE_WRITER:agent,data.skill,[data.prompt,spoken,schedule?.extra?.facts,kb?.facts,handed?.facts,reading?.facts].filter(Boolean).join('\n\n'),data.id,{free,guard:!mine||!!opts.guard||!!talk,search,about:talk?rhioFacts():null});output=r.output;if(search&&!r.searched)await returnSearchSlot(db,created).catch(()=>null);}
   if(kb){const f=kb.finish(output);output=f.output;kbState=f.kb;}
   if(schedule?.extra)output=withNote(output,schedule.extra.note);
-  if(reading)output=withNote(output,reading.note);
+  if(reading?.note)output=withNote(output,reading.note);
   if(handed)output=withNote(output,handed.note);
  }
  catch(e){
@@ -172,7 +181,7 @@ export async function performRun(db:D1Database,owner:string,data:RunInput,schedu
  const [completed]=await db.batch(settle);
  if(!completed.meta.changes)throw new HttpError(504,TIMED_OUT);
  // the reading becomes "the last check" only once its report exists
- if(wallet)await saveReading(db,owner,wallet).catch(e=>console.error('RHIO wallet monitor: reading not saved:',safeMessage((e as Error)?.message||e)));
+ if(wallet||chatWallet)await saveReading(db,owner,(wallet||chatWallet)!).catch(e=>console.error('RHIO wallet monitor: reading not saved:',safeMessage((e as Error)?.message||e)));
  return {id:data.id,agent_id:data.agentId,agent_name:record.name,prompt:data.prompt,output,mode:data.mode,cost,status:'complete',created,skill:data.skill,schedule_id:schedule?.id??null,relay:relay?.id??null,step:relay?.step??null,talk};
 }
 

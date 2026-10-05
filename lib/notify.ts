@@ -216,7 +216,7 @@ async function answer(db:D1Database,a:Ask){
   // grounded with Google Search may not leave the Studio
   const talking=ch.chat_skill===TALK_SKILL;
   const run=talking
-   ?await performRun(db,ch.owner,{id:crypto.randomUUID(),agentId:ch.chat_agent,prompt:a.text.slice(0,TALK_MESSAGE_MAX),skill:TALK_SKILL,mode:'live',talk:ch.chat_thread||ch.id,...(ch.chat_price!==null&&ch.chat_price!==undefined?{expectedPrice:ch.chat_price}:{})},undefined,{guard:true,search:false,label:'Telegram chat'})
+   ?await performRun(db,ch.owner,{id:crypto.randomUUID(),agentId:ch.chat_agent,prompt:a.text.slice(0,TALK_MESSAGE_MAX),skill:TALK_SKILL,mode:'live',talk:ch.chat_thread||ch.id,...(ch.chat_price!==null&&ch.chat_price!==undefined?{expectedPrice:ch.chat_price}:{})},undefined,{guard:true,search:false,label:'Telegram chat',shared:true})
    :await performRun(db,ch.owner,{id:crypto.randomUUID(),agentId:ch.chat_agent,prompt:a.text,skill:ch.chat_skill as SkillId,mode:'live'},undefined,{guard:true,search:false,label:'Telegram chat'});
   const {text,widget}=splitSearchWidget(run.output);
   const parts=messages('telegram',talking?clean(run.agent_name,60):`${clean(run.agent_name,60)} · ${skillName(run.skill)}`,widget?'This answer used Google Search and can only be shown inside the Studio.':text,'','… cut here: the answer was longer than a chat message allows.');

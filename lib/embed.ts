@@ -17,6 +17,7 @@ import {performRun} from './runs';
 import {talkInfo,TALK_SKILL} from './talk';
 import {liveDailyPerUser} from './economy';
 import type {Agent} from './agents';
+import {chatAsk,chatReads} from './chat-tools';
 
 export const EMBED_ID=/^[A-Za-z0-9_-]{16}$/;
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -101,7 +102,7 @@ export async function embedInfo(db:D1Database,id:unknown,site:unknown,viewer?:st
  const {e,mine}=await open(db,id,site,viewer);const c=JSON.parse(e.config!) as Agent;
  return {id:e.id,name:e.name||c.name,skin:c.skin,look:c.look??null,appearance:c.appearance??null,motion:c.motion||null,tagline:c.tagline||'',
   greeting:typeof c.greeting==='string'?c.greeting:'',starters:Array.isArray(c.starters)?c.starters.filter(s=>typeof s==='string'&&s).slice(0,3):[],
-  agentId:e.published&&!e.archived?e.agent_id:null,mode:talkInfo().mode,max:EMBED_MESSAGE_MAX,/** the creator looking at their own chat: answers are charged as usual */preview:mine,active:!!e.active};
+  agentId:e.published&&!e.archived?e.agent_id:null,/* what it can read in a chat (lib/chat-tools.ts); "my wallet" is never read here */reads:chatReads(c.skills||[]).replace('a wallet on Robinhood Chain','a wallet address on Robinhood Chain'),ask:chatAsk(c.skills||[],{shared:true}),mode:talkInfo().mode,max:EMBED_MESSAGE_MAX,/** the creator looking at their own chat: answers are charged as usual */preview:mine,active:!!e.active};
 }
 
 /** The visitor, as a key that says nothing about them: a keyed hash of the embed, the day and the network address. */
@@ -131,7 +132,7 @@ export async function embedSay(db:D1Database,request:Request,input:{id?:unknown;
  const slot=await db.prepare('UPDATE embeds SET used=CASE WHEN day IS ?1 THEN used+1 ELSE 1 END,day=?1 WHERE id=?2 AND (day IS NOT ?1 OR used<daily)').bind(day,e.id).run();
  if(!slot.meta.changes){await back();throw new HttpError(429,'This chat has had its answers for today. It opens again after 00:00 UTC.');}
  try{
-  const run=await performRun(db,e.owner,{id:input.rid.toLowerCase(),agentId:e.agent_id,prompt:message,skill:TALK_SKILL,mode:talkInfo().mode,talk:input.thread.toLowerCase()},undefined,{guard:true,search:false,label:'Chat on your site'});
+  const run=await performRun(db,e.owner,{id:input.rid.toLowerCase(),agentId:e.agent_id,prompt:message,skill:TALK_SKILL,mode:talkInfo().mode,talk:input.thread.toLowerCase()},undefined,{guard:true,search:false,label:'Chat on your site',shared:true});
   return {id:run.id,answer:run.output};
  }catch(err){
   // nothing was produced: both slots go back, and the visitor is told without the owner's numbers

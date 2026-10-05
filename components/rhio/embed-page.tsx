@@ -11,7 +11,7 @@ import {useThumb} from '@/app/avatar';
 import {lookFor} from '@/lib/characters';
 import {agentPath} from '@/lib/routes';
 
-type Info={id:string;name:string;skin:string;look:unknown;appearance:unknown;motion:string|null;tagline:string;greeting:string;starters:string[];agentId:string|null;mode:'live'|'sample';max:number;preview:boolean;active:boolean};
+type Info={/** what it can read in this chat, in words ('' when nothing) */reads?:string;/** how to ask for it */ask?:string;id:string;name:string;skin:string;look:unknown;appearance:unknown;motion:string|null;tagline:string;greeting:string;starters:string[];agentId:string|null;mode:'live'|'sample';max:number;preview:boolean;active:boolean};
 type Line={id:string;asked:string;answer:string;error?:string;pending?:boolean};
 
 /** The site this page is framed by ('' when it is opened on its own). */
@@ -57,6 +57,7 @@ export function EmbedPage({id}:{id:string}){
    <div className="grid gap-3">
     {info&&lines.length===0&&<>
      <div className="max-w-[88%] justify-self-start rounded-2xl rounded-bl-md border bg-card px-3.5 py-2.5 text-[14.5px]">{info.greeting||`Hi. Ask ${info.name} anything.`}</div>
+     {info.reads&&info.mode==='live'&&<p className="text-[12px] text-muted-foreground">It can read {info.reads}. {info.ask||'Paste an address'}.</p>}
      {info.starters.length>0&&<div className="flex flex-wrap gap-1.5">{info.starters.map(s=><button key={s} type="button" disabled={busy} onClick={()=>send(s)} className="rounded-xl border px-3 py-1.5 text-left text-[13px] transition-colors hover:border-foreground/40">{s}</button>)}</div>}
     </>}
     {lines.map(l=><div key={l.id} className="grid gap-2">
