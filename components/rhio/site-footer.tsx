@@ -9,7 +9,7 @@ import {SOCIAL} from '@/lib/site';
 
 type Go=(v:View,doc?:string)=>void;
 const COLS:[string,[View,string,string?][]][]=[
- ['Product',[['studio','Studio'],['discover','Discover'],['plaza','Plaza'],['arena','Arena'],['skills','Skills'],['recipes','Recipes'],['teamup','Teams'],['creators','Creator agents'],['verified','Verified creators'],['overview','Dashboard']]],
+ ['Product',[['studio','Studio'],['discover','Discover'],['plaza','Plaza'],['arena','Arena'],['top','This week'],['skills','Skills'],['recipes','Recipes'],['teamup','Teams'],['creators','Creator agents'],['verified','Verified creators'],['overview','Dashboard']]],
  ['Learn',[['docs','Getting started',"start"],['docs','FAQ','faq'],['paper','Whitepaper'],['roadmap','Roadmap'],['whales','Whale watch'],['tiers','Holder tiers']]],
  ['Account',[['login','Connect wallet'],['wallet','Wallet & chain'],['rewards','Holder rewards'],['referral','Invite friends'],['profile','Profile']]],
 ];

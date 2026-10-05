@@ -14,6 +14,7 @@ import {tierRows} from '@/lib/schedules';
 import {referralConfig,referralProgram} from '@/lib/referrals';
 import {getCharacter} from '@/lib/characters';
 import {duelCard} from '@/lib/og-duel';
+import {board} from '@/lib/board';
 
 const W=1200,H=630;
 /** Pictures that could not be loaded since the server started: a card rendered without one of them is not kept. */
@@ -75,6 +76,48 @@ async function render(request:Request){
     </div>
    </div>,
    {width:W,height:H,headers:{'Cache-Control':'public, max-age=600'}},
+  );
+ }
+ if(key==='top'){
+  // In the website's style: the first three of the week on cards of the deck, with their place and how many people
+  // used them. A week without any use shows three open places instead of invented names.
+  const db=(env as unknown as {DB?:D1Database}).DB;const b=db?await board(db).catch(()=>null):null;
+  const INK='#1f201e',BG='#171816',TEXT='#f3f4ef',MUTED='#a0a59c',LINE='rgba(255,255,255,0.14)';
+  const firsts=(b?.entries||[]).slice(0,3);
+  const pics=await Promise.all(firsts.map(e=>asset(`${origin}/characters/deck/${getCharacter(e.agent.skin).id}.png`,'image/png')));
+  const spots=[{bg:'#c8ff24',fg:INK,left:590,top:74,turn:-4},{bg:'#5b5bf6',fg:'#ffffff',left:790,top:118,turn:2},{bg:'#ff6a3d',fg:INK,left:984,top:86,turn:5}];
+  const cut=(s:string,n:number)=>s.length>n?s.slice(0,n-1).trimEnd()+'…':s;
+  const deck=spots.map((p,i)=>{const e=firsts[i];return {...p,n:`#0${i+1}`,tag:e?`${e.people} ${e.people===1?'PERSON':'PEOPLE'}`:'OPEN',title:e?cut(e.agent.name,20):'Open place',img:e?pics[i]:''};});
+  const chips=b&&b.totals.runs>0?[`${b.totals.runs.toLocaleString('en-US')} ${b.totals.runs===1?'RUN':'RUNS'}`,`${b.totals.people.toLocaleString('en-US')} ${b.totals.people===1?'PERSON':'PEOPLE'}`,`${b.totals.agents} ${b.totals.agents===1?'AGENT':'AGENTS'}`]:['LAST 7 DAYS','BY PEOPLE, THEN RUNS'];
+  return new ImageResponse(
+   <div style={{width:W,height:H,display:'flex',position:'relative',backgroundColor:BG,color:TEXT,fontFamily:'sans-serif'}}>
+    <div style={{display:'flex',flexDirection:'column',justifyContent:'space-between',width:560,height:H,padding:'54px 0 52px 64px'}}>
+     <div style={{display:'flex',alignItems:'center',gap:18}}>
+      {logo?<img src={logo} width={146} height={44}/>:<div style={{display:'flex',fontSize:24,letterSpacing:6,color:'#c8ff24'}}>RHIO</div>}
+      <div style={{display:'flex',alignItems:'center',gap:10,fontSize:16,letterSpacing:3.5,color:MUTED}}><div style={{display:'flex',width:9,height:9,borderRadius:9,backgroundColor:'#c8ff24'}}/>{c.kicker}</div>
+     </div>
+     <div style={{display:'flex',flexDirection:'column',fontSize:70,lineHeight:1.04,letterSpacing:-3}}>
+      <div style={{display:'flex',color:MUTED}}>Seven days.</div>
+      <div style={{display:'flex',color:TEXT}}>The busiest</div>
+      <div style={{display:'flex',color:TEXT}}>agents.</div>
+     </div>
+     <div style={{display:'flex',flexDirection:'column',gap:14}}>
+      <div style={{display:'flex',gap:10}}>
+       {chips.map(l=><div key={l} style={{display:'flex',alignItems:'center',flexShrink:0,height:40,padding:'0 16px',borderRadius:999,border:`1px solid ${LINE}`,fontSize:14,letterSpacing:2,whiteSpace:'nowrap',color:TEXT}}>{l}</div>)}
+      </div>
+      <div style={{display:'flex',fontSize:15,letterSpacing:2.6,color:MUTED}}>RHIO.STUDIO/TOP</div>
+     </div>
+    </div>
+    {deck.map(d=><div key={d.n} style={{display:'flex',flexDirection:'column',justifyContent:'space-between',position:'absolute',left:d.left,top:d.top,width:196,height:300,padding:16,borderRadius:20,backgroundColor:d.bg,color:d.fg,transform:`rotate(${d.turn}deg)`,boxShadow:'0 24px 60px rgba(0,0,0,0.45)'}}>
+     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:12,letterSpacing:1.8}}>
+      <div style={{display:'flex',fontSize:15}}>{d.n}</div>
+      <div style={{display:'flex',padding:'3px 8px',borderRadius:8,border:`1px solid ${d.fg==='#ffffff'?'rgba(255,255,255,0.35)':'rgba(31,32,30,0.3)'}`}}>{d.tag}</div>
+     </div>
+     {d.img?<img src={d.img} width={150} height={200} style={{position:'absolute',left:23,top:44}}/>:<div style={{display:'flex',position:'absolute',left:58,top:96,width:80,height:80,borderRadius:80,border:`2px dashed ${d.fg==='#ffffff'?'rgba(255,255,255,0.5)':'rgba(31,32,30,0.4)'}`}}/>}
+     <div style={{display:'flex',fontSize:21,lineHeight:1.1,letterSpacing:-0.6}}>{d.title}</div>
+    </div>)}
+   </div>,
+   {width:W,height:H,headers:{'Cache-Control':'public, max-age=900'}},
   );
  }
  if(key==='arena'){

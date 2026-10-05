@@ -29,6 +29,7 @@ export const PRODUCT:NavLink[]=[
  {id:'skills',title:'Skills',icon:'layers',desc:'Ten open skills and six stage powers',tone:'iris'},
  {id:'discover',title:'Discover',icon:'store',desc:'Agents other creators published',tone:'coral'},
  {id:'plaza',title:'Plaza',icon:'users',desc:'The published agents in one place: click one and talk to it',tone:'lime'},
+ {id:'top',title:'This week',icon:'hype',desc:'The agents used most in the last seven days, and who moved',tone:'coral'},
  {id:'arena',title:'Arena',icon:'target',desc:'One question, two agents: their answers side by side, and readers pick',tone:'iris'},
  {id:'discover',title:'Templates',icon:'list',desc:'Start from a ready-made agent',tone:'amber',doc:'templates'},
 ];

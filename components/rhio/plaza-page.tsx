@@ -64,6 +64,7 @@ export function PlazaPage({auth,onSignIn,onSpent,onNavigate}:{auth:boolean;onSig
      <h1 className="font-display text-[clamp(38px,6.4vw,76px)] leading-[.96] font-medium tracking-[-.05em]"><span className="text-muted-foreground">Walk in.</span> Pick who to talk to.</h1>
     </div>
     <div className="flex flex-wrap gap-2">
+     <Button variant="outline" onClick={()=>onNavigate('top')}>This week&apos;s busiest</Button>
      <Button variant="outline" onClick={()=>copyText(link,toast.success,toast.error)}><I id="copy"/>Copy link</Button>
      <Button variant="outline" asChild><a href={post} target="_blank" rel="noreferrer noopener"><FaXTwitter aria-hidden="true"/>Post on X</a></Button>
     </div>
