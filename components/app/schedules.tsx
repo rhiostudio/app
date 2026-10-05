@@ -9,11 +9,11 @@ import {Button} from '@/components/ui/button';
 import {Switch} from '@/components/ui/switch';
 import {Textarea} from '@/components/ui/textarea';
 import {Input} from '@/components/ui/input';
-import {NativeSelect,NativeSelectOption} from '@/components/ui/native-select';
+import {NativeSelect,NativeSelectOptGroup,NativeSelectOption} from '@/components/ui/native-select';
 import {FaDiscord,FaTelegram} from 'react-icons/fa6';
 import {api,I,Options,FieldLabel} from '@/app/ui';
 import {cn} from '@/lib/utils';
-import {skillCatalog,type Agent} from '@/lib/agents';
+import {skillCatalog,type Agent,type MarketAgent} from '@/lib/agents';
 import {Thumb} from '@/components/landing/mocks';
 import type {CharacterId} from '@/lib/characters';
 import {RECIPES,recipeTask,type Recipe} from '@/lib/recipes';
@@ -23,7 +23,7 @@ import {DashPage,EmptyState,Kpi,KpiRow,PageHeader,StatusBadge} from './parts';
 export type Schedule={id:string;agent_id:string;agent_name:string|null;skin:string|null;skill:string;prompt:string;per_day:number;start_minute:number;mode:string;active:boolean;
  next_run:string;last_run:string|null;last_status:string|null;last_run_id:string|null;runs:number;created:string;notify?:string|null;
  /** reports only on change (lib/watch.ts): the smallest transfer for whale watch, the last look, looks without a change since the last report */on_change?:boolean;watch_min?:number|null;checked?:string|null;quiet?:number};
-export type Channel={id:string;kind:'discord'|'telegram';label:string;ok:boolean;lastSent:string|null;lastError:string|null;chat?:{agentId:string;skill:string;daily:number;used:number}|null};
+export type Channel={id:string;kind:'discord'|'telegram';label:string;ok:boolean;lastSent:string|null;lastError:string|null;chat?:{agentId:string;skill:string;daily:number;used:number;name:string;mine:boolean;price:number;gone:boolean}|null};
 export type Delivery={discord:boolean;telegram:boolean;max:number};
 export type Limits={enabled:boolean;runCost:number;max:number;dailyCap:number;perDay:number[];usedToday:number;mode:'live'|'sample';skillCosts?:Record<string,number>;
  /** the account's holder tier and every tier's limits (where the token is set) */tier?:string;tierName?:string;perks?:{id:string;name:string;min:string;schedules:number;dailyRuns:number;channels:number}[]|null};
@@ -145,32 +145,54 @@ function TierPerks({limits,onRefresh}:{limits:Limits;onRefresh:()=>void}){
 const KindIcon=({kind,className}:{kind:string;className?:string})=>kind==='discord'?<FaDiscord className={className}/>:<FaTelegram className={className}/>;
 type DeliveryView={config:Delivery;channels:Channel[];pending:{link:string;group:string;expires:number}|null;chatCosts?:Record<string,number>};
 
-/** A Telegram channel's chat setting: which agent and skill answer questions there, and how many a day. */
-function ChatSetup({c,agents,costs,busy,onSave}:{c:Channel;agents:Agent[];costs:Record<string,number>;busy:boolean;onSave:(p:{agentId:string|null;skill?:string;daily?:number})=>Promise<boolean>}){
+/** A Telegram channel's chat setting: which agent answers questions there, how (one of its skills, or its own voice),
+    and how many a day. The agent is one of the account's own, or one someone else published: that one answers in its
+    own voice, and each answer also pays its creator their price per message. `want`: an agent to offer first (the
+    link "Add to my Telegram" on an agent's page, /dashboard/schedules?chat=<agent id>). */
+function ChatSetup({c,agents,costs,busy,want,onSave}:{c:Channel;agents:Agent[];costs:Record<string,number>;busy:boolean;want?:string|null;onSave:(p:{agentId:string|null;skill?:string;daily?:number;expectedPrice?:number})=>Promise<boolean>}){
  const saved=agents.filter(a=>a.id&&!a.archived);
- const [open,setOpen]=useState(false);
- const [agentId,setAgentId]=useState(c.chat?.agentId||'');const agent=saved.find(a=>a.id===agentId)||saved[0];
- const skills=(agent?.skills||[]) as readonly string[];
- const [skill,setSkill]=useState(c.chat?.skill||'');const sk=skills.includes(skill)?skill:skills[0]||'';
+ const [open,setOpen]=useState(!!want);
+ // agents other creators published, loaded when the setting is opened
+ const [market,setMarket]=useState<MarketAgent[]|null>(null);
+ // (the list is the sixty most used; the agent asked for by a link, or the one already answering here, is added
+ // when it is not among them)
+ useEffect(()=>{if(!open||market)return;let alive=true;const ask=want||c.chat?.agentId||'';
+  (async()=>{let list:MarketAgent[]=[];try{list=((await api('/api/market?q=')).agents as MarketAgent[]).filter(a=>!a.mine);}catch{list=[];}
+   if(ask&&!list.some(a=>a.id===ask)&&!saved.some(a=>a.id===ask)){try{const one=(await api(`/api/market?id=${ask}`)).agent as MarketAgent;if(one&&!one.mine)list=[one,...list];}catch{/* not published (anymore) */}}
+   if(alive)setMarket(list);})();
+  return()=>{alive=false;};},[open,market]); // eslint-disable-line react-hooks/exhaustive-deps
+ const [agentId,setAgentId]=useState(want||c.chat?.agentId||'');
+ // the choice: one of the account's own agents, or one someone else published; while that list loads a choice from
+ // it is not known yet; nothing chosen (or the choice is gone) falls back to the first agent there is
+ const chosen=saved.find(a=>a.id===agentId)||null;const picked=chosen?null:market?.find(a=>a.id===agentId)||null;
+ const loading=!chosen&&!!agentId&&market===null;
+ const agent=chosen||(!picked&&!loading?saved[0]||null:null);const other=picked||(!agent&&!loading?market?.[0]||null:null);
+ const skills=agent?[...(agent.skills as readonly string[]),'chat']:['chat'];
+ const [skill,setSkill]=useState(c.chat?.skill||'');const sk=other?'chat':skills.includes(skill)?skill:skills[0];
  const [daily,setDaily]=useState(String(c.chat?.daily||20));
- const current=c.chat?saved.find(a=>a.id===c.chat!.agentId):null;
+ const id=other?.id||agent?.id||'';const message=costs.chat??3;const each=other?message+other.talkPrice:sk==='chat'?message:costs[sk]??null;
+ const name=(k:string)=>k==='chat'?'Its own voice':skillName(k);
  return <div className="grid basis-full gap-2 border-t pt-2">
   <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-muted-foreground">
-   <span>{c.chat?<>Answers here: <b className="text-foreground">{current?.name||'an agent'} · {skillName(c.chat.skill)}</b> · {c.chat.used}/{c.chat.daily} today</>:'No agent answers in this chat.'}</span>
+   <span>{c.chat?<>Answers here: <b className="text-foreground">{c.chat.name}{c.chat.skill==='chat'?'':` · ${skillName(c.chat.skill)}`}</b>{!c.chat.mine&&<> · published by someone else, {c.chat.price} CR to its creator per answer</>} · {c.chat.used}/{c.chat.daily} today{c.chat.gone&&<span className="text-coral"> · this agent is no longer available</span>}</>:'No agent answers in this chat.'}</span>
    <Button size="sm" variant="ghost" onClick={()=>setOpen(o=>!o)}>{open?'Close':c.chat?'Change':'Let an agent answer'}</Button>
   </div>
-  {open&&(agent?<div className="grid gap-2">
+  {open&&(loading||(!id&&market===null)?<p className="text-[12px] text-muted-foreground">Loading the agents…</p>:id?<div className="grid gap-2">
    <div className="grid gap-2 sm:grid-cols-3">
-    <NativeSelect size="sm" value={agent.id} onChange={e=>setAgentId(e.target.value)} aria-label="Agent that answers">{saved.map(a=><NativeSelectOption key={a.id} value={a.id!}>{a.name}</NativeSelectOption>)}</NativeSelect>
-    <NativeSelect size="sm" value={sk} onChange={e=>setSkill(e.target.value)} aria-label="Skill that answers">{skills.map(s=><NativeSelectOption key={s} value={s}>{skillName(s)}</NativeSelectOption>)}</NativeSelect>
+    <NativeSelect size="sm" value={id} onChange={e=>setAgentId(e.target.value)} aria-label="Agent that answers">
+     {saved.length>0&&<NativeSelectOptGroup label="Your agents">{saved.map(a=><NativeSelectOption key={a.id} value={a.id!}>{a.name}</NativeSelectOption>)}</NativeSelectOptGroup>}
+     {!!market?.length&&<NativeSelectOptGroup label="Published by others">{market.map(a=><NativeSelectOption key={a.id} value={a.id}>{a.name} · {a.talkPrice===0?'no creator fee':`${a.talkPrice} CR to its creator`}</NativeSelectOption>)}</NativeSelectOptGroup>}
+    </NativeSelect>
+    <NativeSelect size="sm" value={sk} disabled={!!other} onChange={e=>setSkill(e.target.value)} aria-label="How it answers">{(other?['chat']:skills).map(k=><NativeSelectOption key={k} value={k}>{name(k)}</NativeSelectOption>)}</NativeSelect>
     <NativeSelect size="sm" value={daily} onChange={e=>setDaily(e.target.value)} aria-label="Answers per day">{[5,20,50,100].map(n=><NativeSelectOption key={n} value={String(n)}>{n} answers a day</NativeSelectOption>)}</NativeSelect>
    </div>
-   <p className="text-[12px] text-muted-foreground">In a private chat every message is a question; in a group people write <b className="text-foreground">/ask</b> and the question. Each answer is a live run of this skill ({costs[sk]??'a few'} credits from your balance), at most {daily} a day in this chat. In a group everyone there can ask, their questions go to the AI provider and land in your History, and the agent answers without web search.</p>
+   <p className="text-[12px] text-muted-foreground">In a private chat every message is a question; in a group people write <b className="text-foreground">/ask</b> and the question. {other?<>Each answer is a chat message to <b className="text-foreground">{other.name}</b>, an agent someone else published: <b className="text-foreground">{each} credits</b> from your balance ({message} for the message{other.talkPrice?`, ${other.talkPrice} to its creator`:''}).</>
+    :sk==='chat'?<>Each answer is a chat message in the agent’s own voice ({each} credits from your balance), and it keeps the last turns of this chat in mind.</>:<>Each answer is a live run of this skill ({each??'a few'} credits from your balance).</>} At most {daily} a day in this chat. In a group everyone there can ask, their questions go to the AI provider and land in your History, and the agent answers without web search.{other?' If its creator changes the price, it stops answering until you confirm the new price here.':''}</p>
    <div className="flex flex-wrap gap-2">
-    <Button size="sm" disabled={busy||!sk} onClick={async()=>{if(await onSave({agentId:agent.id!,skill:sk,daily:Number(daily)}))setOpen(false);}}>Save</Button>
+    <Button size="sm" disabled={busy||!id} onClick={async()=>{if(await onSave({agentId:id,skill:sk,daily:Number(daily),...(other?{expectedPrice:other.talkPrice}:{})}))setOpen(false);}}>Save</Button>
     {c.chat&&<Button size="sm" variant="outline" disabled={busy} onClick={async()=>{if(await onSave({agentId:null}))setOpen(false);}}>Turn off</Button>}
    </div>
-  </div>:<p className="text-[12px] text-muted-foreground">Save an agent in the Studio first; then it can answer here.</p>)}
+  </div>:<p className="text-[12px] text-muted-foreground">Save an agent in the Studio first, or publish one; then it can answer here.</p>)}
  </div>;
 }
 
@@ -181,6 +203,9 @@ export function DeliveryPanel({onChange,agents=[]}:{onChange:()=>void;agents?:Ag
  const sig=v?v.channels.map(c=>c.id+(c.ok?1:0)).join():null;
  // the schedule cards list the same channels: reload them when a channel was added, removed or stopped
  useEffect(()=>{if(sig!==null)onChange();},[sig,onChange]);
+ // /dashboard/schedules?chat=<agent id> ("Add to my Telegram" on an agent's page): the first Telegram chat opens its
+ // setting with that agent chosen
+ const [want]=useState(()=>{try{const id=new URLSearchParams(location.search).get('chat');return id&&/^[0-9a-f-]{36}$/i.test(id)?id.toLowerCase():null;}catch{return null;}});
  const refresh=useCallback(()=>{api('/api/notify').then(setV).catch(()=>null);},[]);
  useEffect(()=>{refresh();},[refresh]);
  // while a Telegram link is open, ask the server every few seconds whether the chat pressed Start
@@ -192,13 +217,14 @@ export function DeliveryPanel({onChange,agents=[]}:{onChange:()=>void;agents?:Ag
  return <section className="grid gap-4 rounded-xl border bg-card p-5">
   <div className="grid gap-1"><b className="text-[15px] font-semibold">Delivery</b>
    <p className="text-[13px] text-muted-foreground">Have a schedule send each finished run to your Discord channel or Telegram chat, and let an agent answer questions in a Telegram chat. The text then leaves RHIO for that service. Research answers that used Google Search stay in History; only a notice is sent.</p></div>
+  {want&&v&&!v.channels.some(c=>c.kind==='telegram'&&c.ok)&&<p className="rounded-lg border border-lime bg-lime/10 px-3 py-2 text-[13px]">{v.config.telegram?'To put that agent into a Telegram chat, connect the chat first (Connect Telegram, below). Then choose the agent under the chat.':'Telegram is not connected on this server, so an agent cannot answer in a chat here.'}</p>}
   {v&&v.channels.length>0&&<div className="grid gap-2">{v.channels.map(c=><div key={c.id} className="flex flex-wrap items-center gap-3 rounded-lg border bg-secondary/30 px-3 py-2">
    <KindIcon kind={c.kind} className="size-4 shrink-0 text-muted-foreground"/>
    <div className="grid min-w-40 flex-1"><b className="truncate text-[13px] font-medium">{c.label}</b>
     <span className={cn('text-[11.5px]',c.ok?'text-muted-foreground':'text-coral')}>{c.ok?(c.lastError?`Last send failed: ${c.lastError}`:c.lastSent?`Last sent ${when(c.lastSent)}`:'Connected'):`Disconnected: ${c.lastError||'connect it again'}`}</span></div>
    <Button size="sm" variant="outline" disabled={!!busy} onClick={()=>post('t'+c.id,{action:'test',id:c.id},'Test message sent')}>{busy==='t'+c.id?'Sending…':'Send test'}</Button>
    <Button size="sm" variant="ghost" disabled={!!busy} onClick={()=>{if(confirm('Remove this channel? Schedules that send to it go back to History only.'))act('d'+c.id,{method:'DELETE',body:JSON.stringify({id:c.id})});}}><I id="archive"/>Remove</Button>
-   {c.kind==='telegram'&&c.ok&&<ChatSetup key={c.id+(c.chat?c.chat.agentId+c.chat.skill+c.chat.daily:'')} c={c} agents={agents} costs={v.chatCosts||{}} busy={!!busy} onSave={p=>post('c'+c.id,{action:'chat',id:c.id,...p},p.agentId?'The agent now answers in this chat':'Chat answers turned off')}/>}
+   {c.kind==='telegram'&&c.ok&&<ChatSetup key={c.id+(c.chat?c.chat.agentId+c.chat.skill+c.chat.daily+c.chat.price:'')} c={c} agents={agents} costs={v.chatCosts||{}} busy={!!busy} want={want&&v.channels.find(x=>x.kind==='telegram'&&x.ok)?.id===c.id?want:null} onSave={p=>post('c'+c.id,{action:'chat',id:c.id,...p},p.agentId?'The agent now answers in this chat':'Chat answers turned off')}/>}
   </div>)}</div>}
   <div className="grid gap-3 lg:grid-cols-2">
    <div className="grid content-start gap-2 rounded-lg border p-3">

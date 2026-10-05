@@ -21,6 +21,7 @@ import {HttpError,safeMessage} from './server';
 import {splitSearchWidget} from './grounding';
 import {skillCatalog,type SkillId} from './agents';
 import {performRun} from './runs';
+import {TALK_SKILL,TALK_MESSAGE_MAX} from './talk';
 import {limitsFor} from './tiers';
 
 type Env={TELEGRAM_BOT_TOKEN?:string;NOTIFY_DISCORD?:string;NOTIFY_MAX?:string;NOTIFY_TEST_BASE?:string;APP_ORIGIN?:string};
@@ -40,17 +41,22 @@ export function notifyConfig(){
 /** Channels this account may keep: NOTIFY_MAX, raised by its holder tier (lib/tiers.ts). */
 export const channelLimit=async(db:D1Database,owner:string)=>(await limitsFor(db,owner,{schedules:0,dailyRuns:0,channels:notifyConfig().max})).channels;
 export type Channel={id:string;kind:'discord'|'telegram';label:string;ok:boolean;lastSent:string|null;lastError:string|null;
- /** the agent that answers questions in this Telegram chat, and today's count */chat:{agentId:string;skill:string;daily:number;used:number}|null};
+ /** the agent that answers questions in this Telegram chat, and today's count. `skill` 'chat': it answers in its own
+     voice (a conversation). `mine` false: an agent someone else published; `price` is then what its creator gets per
+     message, as accepted when it was set up. `gone`: the agent is no longer there to answer. */
+ chat:{agentId:string;skill:string;daily:number;used:number;name:string;mine:boolean;price:number;gone:boolean}|null};
 type Row={id:string;owner:string;kind:string;target:string;label:string;fails:number;dead:number;last_error:string|null;last_sent:string|null;
- chat_agent:string|null;chat_skill:string|null;chat_daily:number;chat_day:string|null;chat_used:number};
+ chat_agent:string|null;chat_skill:string|null;chat_daily:number;chat_day:string|null;chat_used:number;chat_price?:number|null;
+ agent_name?:string|null;agent_owner?:string|null;agent_published?:number|null;agent_archived?:number|null};
 /** A name from outside (webhook, chat) as shown on the page: no control or invisible formatting characters. */
 const clean=(s:unknown,n=40)=>String(s??'').replace(/\p{C}/gu,'').trim().slice(0,n);
 
 export async function channelsOf(db:D1Database,owner:string):Promise<Channel[]>{
- const rows=await db.prepare('SELECT id,kind,label,dead,last_error,last_sent,chat_agent,chat_skill,chat_daily,chat_day,chat_used FROM notify_channels WHERE owner=? ORDER BY created').bind(owner).all<Row>();
+ const rows=await db.prepare('SELECT c.id,c.kind,c.label,c.dead,c.last_error,c.last_sent,c.chat_agent,c.chat_skill,c.chat_daily,c.chat_day,c.chat_used,c.chat_price,a.name AS agent_name,a.owner AS agent_owner,a.published AS agent_published,a.archived AS agent_archived FROM notify_channels c LEFT JOIN agents a ON a.id=c.chat_agent WHERE c.owner=? ORDER BY c.created').bind(owner).all<Row>();
  const today=new Date().toISOString().slice(0,10);
  return rows.results.map(r=>({id:r.id,kind:r.kind as Channel['kind'],label:r.label,ok:!r.dead,lastSent:r.last_sent,lastError:r.last_error,
-  chat:r.chat_agent&&r.chat_skill?{agentId:r.chat_agent,skill:r.chat_skill,daily:r.chat_daily,used:r.chat_day===today?r.chat_used:0}:null}));
+  chat:r.chat_agent&&r.chat_skill?{agentId:r.chat_agent,skill:r.chat_skill,daily:r.chat_daily,used:r.chat_day===today?r.chat_used:0,name:r.agent_name||'an agent',mine:r.agent_owner===owner,price:r.agent_owner===owner?0:Number(r.chat_price||0),
+   gone:!r.agent_owner||!!r.agent_archived||(r.agent_owner!==owner&&!r.agent_published)}:null}));
 }
 export async function ownsChannel(db:D1Database,owner:string,id:string){
  return !!await db.prepare('SELECT 1 AS x FROM notify_channels WHERE id=? AND owner=?').bind(id,owner).first();
@@ -184,11 +190,15 @@ export async function pollTelegram(db:D1Database,{wait=0}:{wait?:number}={}){
 }
 
 /** One question from a chat: a normal paid live run of the agent its owner chose, answered in the chat. The owner's
-    numbers (credits, limits) are never written into the chat: other people may be reading. */
+    numbers (credits, limits) are never written into the chat: other people may be reading.
+    With chat_skill 'chat' the agent answers in its own voice, as a conversation (lib/talk.ts: the last turns of this
+    chat are its context). That is also how an agent someone else published answers here: a chat message to it, paid by
+    the account that linked the chat, at the creator's price that account accepted (chat_price). When the creator has
+    changed the price since, nothing is sent to the AI and nothing is charged until the owner confirms the new price. */
 async function answer(db:D1Database,a:Ask){
  const extra=a.messageId&&!a.direct?{reply_parameters:{message_id:a.messageId,allow_sending_without_reply:true}}:{};
  const reply=(text:string)=>tg('sendMessage',{chat_id:a.chatId,text,link_preview_options:{is_disabled:true},...extra}).catch(()=>null);
- const ch=await db.prepare("SELECT id,owner,chat_agent,chat_skill FROM notify_channels WHERE kind='telegram' AND target=? AND dead=0 AND chat_agent IS NOT NULL ORDER BY created LIMIT 1").bind(String(a.chatId)).first<{id:string;owner:string;chat_agent:string;chat_skill:string}>();
+ const ch=await db.prepare("SELECT id,owner,chat_agent,chat_skill,chat_price,chat_thread FROM notify_channels WHERE kind='telegram' AND target=? AND dead=0 AND chat_agent IS NOT NULL ORDER BY created LIMIT 1").bind(String(a.chatId)).first<{id:string;owner:string;chat_agent:string;chat_skill:string;chat_price:number|null;chat_thread:string|null}>();
  if(!ch){await reply('No agent answers in this chat yet. Whoever connected it can choose one in RHIO Agent Studio: Schedules → Delivery.');return false;}
  // one statement takes the slot: not during the pause after the last question, and not beyond today's limit
  const now=Date.now(),day=new Date(now).toISOString().slice(0,10);
@@ -203,9 +213,12 @@ async function answer(db:D1Database,a:Ask){
  try{
   // guard: people in a group are not the agent's owner, so its instructions stay unshown; no web search: a result
   // grounded with Google Search may not leave the Studio
-  const run=await performRun(db,ch.owner,{id:crypto.randomUUID(),agentId:ch.chat_agent,prompt:a.text,skill:ch.chat_skill as SkillId,mode:'live'},undefined,{guard:true,search:false,label:'Telegram chat'});
+  const talking=ch.chat_skill===TALK_SKILL;
+  const run=talking
+   ?await performRun(db,ch.owner,{id:crypto.randomUUID(),agentId:ch.chat_agent,prompt:a.text.slice(0,TALK_MESSAGE_MAX),skill:TALK_SKILL,mode:'live',talk:ch.chat_thread||ch.id,...(ch.chat_price!==null&&ch.chat_price!==undefined?{expectedPrice:ch.chat_price}:{})},undefined,{guard:true,search:false,label:'Telegram chat'})
+   :await performRun(db,ch.owner,{id:crypto.randomUUID(),agentId:ch.chat_agent,prompt:a.text,skill:ch.chat_skill as SkillId,mode:'live'},undefined,{guard:true,search:false,label:'Telegram chat'});
   const {text,widget}=splitSearchWidget(run.output);
-  const parts=messages('telegram',`${clean(run.agent_name,60)} · ${skillName(run.skill)}`,widget?'This answer used Google Search and can only be shown inside the Studio.':text,'','… cut here: the answer was longer than a chat message allows.');
+  const parts=messages('telegram',talking?clean(run.agent_name,60):`${clean(run.agent_name,60)} · ${skillName(run.skill)}`,widget?'This answer used Google Search and can only be shown inside the Studio.':text,'','… cut here: the answer was longer than a chat message allows.');
   for(const part of parts){const s=await sendTelegram(String(a.chatId),part,true,extra);if(!s.ok){if(s.gone)await db.prepare('UPDATE notify_channels SET dead=1,last_error=? WHERE id=?').bind(s.error,ch.id).run();break;}}
   return true;
  }catch(e){
@@ -213,14 +226,16 @@ async function answer(db:D1Database,a:Ask){
   await db.prepare('UPDATE notify_channels SET chat_used=MAX(chat_used-1,0) WHERE id=?').bind(ch.id).run();
   const st=e instanceof HttpError?e.status:500;
   await reply(st===402?'The account behind this chat is out of credits.':st===429?'The limit for live AI has been reached for now. Try again later.'
+   :st===409?'The price of the agent in this chat has changed. Whoever connected it can confirm the new price in RHIO Agent Studio: Schedules → Delivery. Nothing was charged.'
    :st===400||st===503?(e as Error).message:st===404||st===403?'The agent or skill of this chat is no longer available. Its owner can choose another in Schedules → Delivery.':'The agent could not answer this one. Nothing was charged.');
   return false;
  }
 }
 
 /** Lets an agent answer in a Telegram channel of this account (null: reports only). The route checks the agent. */
-export async function setChat(db:D1Database,owner:string,id:string,chat:{agentId:string;skill:string;daily:number}|null){
- const r=await db.prepare("UPDATE notify_channels SET chat_agent=?,chat_skill=?,chat_daily=? WHERE id=? AND owner=? AND kind='telegram'").bind(chat?.agentId??null,chat?.skill??null,chat?.daily??20,id,owner).run();
+export async function setChat(db:D1Database,owner:string,id:string,chat:{agentId:string;skill:string;daily:number;/** the creator's price per message the owner accepted (someone else's agent) */price?:number|null}|null){
+ // every save starts a new conversation: the agent, its voice or its price may have changed
+ const r=await db.prepare("UPDATE notify_channels SET chat_agent=?,chat_skill=?,chat_daily=?,chat_price=?,chat_thread=? WHERE id=? AND owner=? AND kind='telegram'").bind(chat?.agentId??null,chat?.skill??null,chat?.daily??20,chat?.price??null,chat?crypto.randomUUID():null,id,owner).run();
  if(!r.meta.changes)throw new HttpError(404,'An agent can answer in Telegram chats only.');
 }
 /** Is there a chat an agent answers in? Then the bot's messages are read all the time, not only while a link is open. */

@@ -19,7 +19,7 @@ import {cn} from '@/lib/utils';
 import type {MarketAgent} from '@/lib/agents';
 import type {CharacterId} from '@/lib/characters';
 
-type Info={signedIn:boolean;mode:'live'|'sample';message:number;max:number;balance:number|null};
+type Info={signedIn:boolean;mode:'live'|'sample';message:number;max:number;balance:number|null;/** this server has a Telegram bot */telegram?:boolean};
 type Line={id:string;asked:string;answer:string;ok:boolean;cost:number;error?:string;pending?:boolean;/** the visitor's own mark: 1 helpful, -1 not */rating?:number|null};
 const key=(agent:string)=>`rhio-talk:${agent}`;
 const stored=(agent:string)=>{try{const v=localStorage.getItem(key(agent));return v&&/^[0-9a-f-]{36}$/i.test(v)?v:null;}catch{return null;}};
@@ -122,6 +122,7 @@ export function AgentTalk({agent,auth,onSignIn,onSpent,onMood}:{agent:MarketAgen
     <span className="text-xs text-muted-foreground">{short?`A message costs ${each} credits and you have ${info?.balance}.`:auth&&info?.balance!==null&&info?.balance!==undefined?`You have ${info.balance} credits. Enter sends, Shift+Enter makes a new line.`:'Each message is a run, paid in credits.'}</span>
    </div>
   </div>
+  {info?.telegram&&info.mode==='live'&&<a href={`/dashboard/schedules?chat=${agent.id}`} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 justify-self-start rounded-lg border px-3 py-2 text-[13px] transition-colors hover:border-foreground/40"><b className="font-medium">Add {agent.name} to my Telegram</b><span className="text-muted-foreground">It answers in your own chat or group, paid per answer from your credits.</span><I id="arrow" className="i size-3.5"/></a>}
   <p className="text-[12px] text-muted-foreground">{agent.name} is an AI character. It cannot browse here, it can be wrong, and nothing it says is financial advice. Its creator’s instructions are never shown. Your messages are kept in your History.</p>
  </section>;
 }

@@ -7,6 +7,7 @@ import {env} from 'cloudflare:workers';
 import {context,failure,body,HttpError} from '@/lib/server';
 import {performRun} from '@/lib/runs';
 import {talkInfo,talkThread,TALK_MESSAGE_MAX,TALK_SKILL} from '@/lib/talk';
+import {notifyConfig} from '@/lib/notify';
 
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const schema=z.object({id:z.string().uuid(),agentId:z.string().uuid(),thread:z.string().uuid(),message:z.string().trim().min(1).max(TALK_MESSAGE_MAX),expectedPrice:z.number().int().min(0).max(500).optional()});
@@ -18,7 +19,7 @@ export async function GET(request:Request){try{
  try{const ctx=await context(request);db=ctx.db;owner=ctx.owner;}catch(e){if(!(e instanceof HttpError)||e.status!==401)throw e;db=(env as unknown as {DB?:D1Database}).DB;}
  const p=new URL(request.url).searchParams;const agent=p.get('agent')||'',thread=p.get('thread')||'';
  const mine=db&&owner&&UUID.test(agent)&&UUID.test(thread);
- return Response.json({signedIn:!!owner,...talkInfo(),balance:db&&owner?await balanceOf(db,owner):null,messages:mine?await talkThread(db!,owner!,agent.toLowerCase(),thread.toLowerCase()):[]},noStore);
+ return Response.json({signedIn:!!owner,...talkInfo(),/* this server has a Telegram bot: the agent can be put into a chat there */telegram:notifyConfig().telegram,balance:db&&owner?await balanceOf(db,owner):null,messages:mine?await talkThread(db!,owner!,agent.toLowerCase(),thread.toLowerCase()):[]},noStore);
 }catch(e){return failure(e)}}
 
 export async function POST(request:Request){try{
