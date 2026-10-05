@@ -88,6 +88,7 @@ export function AgentPage({id,auth,onSignIn,onSpent,onRun,onNavigate}:{id:string
     <div className="flex flex-wrap gap-2">
      <Button size="lg" disabled={!agent} onClick={()=>talk.current?.scrollIntoView({behavior:'smooth',block:'start'})}>Talk to it<I id="arrow"/></Button>
      <Button size="lg" variant="outline" disabled={!agent} onClick={()=>agent&&onRun(agent)}>Run a task</Button>
+     {agent&&<Button size="lg" variant="outline" asChild><a href={`/arena?a=${agent.id}`}><I id="target"/>Put it in a duel</a></Button>}
      <Button size="lg" variant="outline" onClick={()=>copyText(link,toast.success,toast.error)}><I id="copy"/>Copy link</Button>
      <Button size="lg" variant="outline" asChild><a href={post} target="_blank" rel="noreferrer noopener"><FaXTwitter aria-hidden="true"/>Post on X</a></Button>
     </div>

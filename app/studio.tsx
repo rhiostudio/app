@@ -47,6 +47,8 @@ const VoiceBox=lazy(()=>import('@/components/app/voice').then(m=>({default:m.Voi
 const KnowledgeBox=lazy(()=>import('@/components/app/knowledge').then(m=>({default:m.KnowledgeBox})));
 const VerifiedPage=lazy(()=>import('@/components/rhio/verified-page').then(m=>({default:m.VerifiedPage})));
 const PlazaPage=lazy(()=>import('@/components/rhio/plaza-page').then(m=>({default:m.PlazaPage})));
+const ArenaPage=lazy(()=>import('@/components/rhio/arena-page').then(m=>({default:m.ArenaPage})));
+const DuelPage=lazy(()=>import('@/components/rhio/arena-page').then(m=>({default:m.DuelPage})));
 const CreatorsPage=lazy(()=>import('@/components/rhio/creators-page').then(m=>({default:m.CreatorsPage})));
 const TeamsPage=lazy(()=>import('@/components/app/teams').then(m=>({default:m.TeamsPage})));
 const TeamsInfoPage=lazy(()=>import('@/components/rhio/teams-page').then(m=>({default:m.TeamsInfoPage})));
@@ -420,6 +422,8 @@ export default function Studio(){
     {view==='referral'&&<ReferralPage onNavigate={(v,doc)=>navigate(v,doc)}/>}
     {view==='verified'&&<VerifiedPage onNavigate={(v,doc)=>navigate(v,doc)}/>}
     {view==='plaza'&&<PlazaPage auth={auth} onSignIn={()=>setSignin(true)} onSpent={refresh} onNavigate={(v,doc)=>navigate(v,doc)}/>}
+    {view==='arena'&&<ArenaPage auth={auth} onSignIn={()=>setSignin(true)} onSpent={refresh} onNavigate={(v,doc)=>navigate(v,doc)}/>}
+    {view==='duel'&&route.doc&&<DuelPage key={route.doc} id={route.doc} auth={auth} onSignIn={()=>setSignin(true)} onNavigate={(v,doc)=>navigate(v,doc)}/>}
     {view==='creators'&&<CreatorsPage onNavigate={(v,doc)=>navigate(v,doc)}/>}
     {view==='teamup'&&<TeamsInfoPage onNavigate={(v,doc)=>navigate(v,doc)}/>}
     {view==='recipes'&&<RecipesPage onNavigate={(v,doc)=>navigate(v,doc)}/>}

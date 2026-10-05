@@ -7,10 +7,11 @@
                  /teams (agents that hand their work to the next one)  /creators (an agent in your own voice)
                  /plaza (the published agents in one place; click one to talk)
                  /verified (how a creator's X handle gets on their agents)
+                 /arena (two agents, one question)  /arena/<id> (one duel)
    Dashboard:    /dashboard  /dashboard/{studio,agents,teams,discover,skills,schedules,quests,history,credits,wallet,rewards,profile}
                  /dashboard/docs[/slug]  /dashboard/whitepaper[/slug]  /dashboard/roadmap
    Signed-in only (proxy.ts redirects to /login?next=...): see PROTECTED_PATHS. */
-export type View='home'|'login'|'notfound'|'agent'|'shared'|'whales'|'tiers'|'recipes'|'invite'|'referral'|'teamup'|'creators'|'plaza'|'verified'|'overview'|'profile'|'rewards'|'wallet'|'studio'|'agents'|'teams'|'discover'|'skills'|'schedules'|'quests'|'activity'|'credits'|'docs'|'paper'|'roadmap';
+export type View='home'|'login'|'notfound'|'agent'|'shared'|'whales'|'tiers'|'recipes'|'invite'|'referral'|'teamup'|'creators'|'plaza'|'verified'|'arena'|'duel'|'overview'|'profile'|'rewards'|'wallet'|'studio'|'agents'|'teams'|'discover'|'skills'|'schedules'|'quests'|'activity'|'credits'|'docs'|'paper'|'roadmap';
 export type Area='site'|'dash';
 export type Route={view:View;area:Area;doc?:string};
 
@@ -44,6 +45,8 @@ export function pathFor(view:View,doc?:string,area:Area='dash'):string{
  if(view==='creators')return '/creators';
  if(view==='plaza')return '/plaza';
  if(view==='verified')return '/verified';
+ if(view==='arena')return '/arena';
+ if(view==='duel')return doc?`/arena/${doc}`:'/arena';
  if(view==='shared')return doc?`/s/${doc}`:'/';
  if(view==='home'||view==='login'||view==='notfound')return view==='login'?'/login':'/';
  const docs=view==='docs'||view==='paper';
@@ -67,6 +70,9 @@ export function parsePath(pathname:string):Route{
  if(a==='creators'&&!b)return {view:'creators',area:'site'};
  if(a==='plaza'&&!b)return {view:'plaza',area:'site'};
  if(a==='verified'&&!b)return {view:'verified',area:'site'};
+ if(a==='arena'&&!b)return {view:'arena',area:'site'};
+ // a duel's id is case-sensitive, like a shared answer's
+ if(a==='arena'&&b&&!c&&SHARE_PATH_ID.test(b))return {view:'duel',area:'site',doc:b};
  if(a==='r'&&b&&!c&&INVITE_PATH_CODE.test(b.toUpperCase()))return {view:'invite',area:'site',doc:b.toUpperCase()};
  if(a==='s'&&b&&!c&&SHARE_PATH_ID.test(b))return {view:'shared',area:'site',doc:b};
  if(a==='a'&&b&&!c&&AGENT_PATH_ID.test(b))return {view:'agent',area:'site',doc:b.toLowerCase()};

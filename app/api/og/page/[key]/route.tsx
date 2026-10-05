@@ -13,6 +13,7 @@ import {rewardsOverview} from '@/lib/rewards';
 import {tierRows} from '@/lib/schedules';
 import {referralConfig,referralProgram} from '@/lib/referrals';
 import {getCharacter} from '@/lib/characters';
+import {duelCard} from '@/lib/og-duel';
 
 const W=1200,H=630;
 /** Pictures that could not be loaded since the server started: a card rendered without one of them is not kept. */
@@ -75,6 +76,12 @@ async function render(request:Request){
    </div>,
    {width:W,height:H,headers:{'Cache-Control':'public, max-age=600'}},
   );
+ }
+ if(key==='arena'){
+  // In the website's style: the lime corner and the iris corner of the hero deck, one question between them.
+  const [ia,ib]=await Promise.all([asset(`${origin}/characters/deck/juno.png`,'image/png'),asset(`${origin}/characters/deck/rook.png`,'image/png')]);
+  return new ImageResponse(duelCard({logo,kicker:c.kicker,muted:'One question.',bright:'Two agents.',chips:['PICK TWO','ASK ONCE','READERS PICK'],foot:'RHIO.STUDIO/ARENA',
+   a:{tag:getCharacter('juno').role,name:'Captain Juno',img:ia},b:{tag:getCharacter('rook').role,name:'Rook the Roaster',img:ib}}),{width:W,height:H,headers:{'Cache-Control':'public, max-age=3600'}});
  }
  if(key==='teams'){
   // In the website's own style: the page background, a two-tone headline, mono labels, and two
