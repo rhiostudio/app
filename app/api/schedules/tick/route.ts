@@ -21,6 +21,8 @@ async function housekeeping(db:D1Database,now:Date){
   db.prepare('DELETE FROM chain_nonces WHERE expires<?').bind(ms),
   db.prepare('DELETE FROM notify_links WHERE expires<?').bind(ms),
   db.prepare('DELETE FROM tg_updates WHERE at<?').bind(ms-2*864e5),
+  // per-visitor counts of chats on creators' sites (lib/embed.ts) are only needed for their own day
+  db.prepare('DELETE FROM embed_hits WHERE day<?').bind(day),
   db.prepare("DELETE FROM ai_quotas WHERE (key LIKE 'u:%' OR key LIKE 'all:%' OR key LIKE 'free:%' OR key LIKE 't:%' OR key LIKE 'search:%') AND substr(key,-10)<?").bind(day),
   db.prepare("DELETE FROM ai_quotas WHERE key LIKE 'h:%' AND CAST(substr(key,-13) AS INTEGER)<?").bind(ms-3*864e5),
  ]);

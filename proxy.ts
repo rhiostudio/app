@@ -23,11 +23,12 @@ function csp(embed:boolean,https:boolean){
   ...(https?['upgrade-insecure-requests']:[])].join('; ');
 }
 
-// The only page other sites may frame: the Studio's character preview (the share dialog's embed code). Every other
-// page, with or without ?view=embed, refuses framing.
-const EMBED_PATH='/dashboard/studio';
+// The only pages other sites may frame: the Studio's character preview (the share dialog's embed code) and a chat a
+// creator placed on their own site (/embed/<id>, lib/embed.ts: which site may show it is checked there, per chat).
+// Every other page, with or without ?view=embed, refuses framing.
+const EMBED_PATH='/dashboard/studio';const CHAT_EMBED=/^\/embed\/[A-Za-z0-9_-]{16}\/?$/;
 function secure(res:NextResponse,req:NextRequest){
- const embed=req.nextUrl.searchParams.get('view')==='embed'&&(req.nextUrl.pathname.replace(/\/+$/,'')||'/')===EMBED_PATH;
+ const embed=CHAT_EMBED.test(req.nextUrl.pathname)||(req.nextUrl.searchParams.get('view')==='embed'&&(req.nextUrl.pathname.replace(/\/+$/,'')||'/')===EMBED_PATH);
  const h=res.headers;
  h.set('X-Content-Type-Options','nosniff');
  h.set('Referrer-Policy','strict-origin-when-cross-origin');

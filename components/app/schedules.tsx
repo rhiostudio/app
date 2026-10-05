@@ -3,7 +3,7 @@
    skills, the task, how many times a day and the time of the first run. The server scheduler runs it on those slots
    and charges credits per run; results land in History and, when the schedule has a delivery channel, in the owner's
    Discord channel or Telegram chat. Data: /api/schedules (lib/schedules.ts), /api/notify (lib/notify.ts). */
-import {useCallback,useEffect,useMemo,useState} from 'react';
+import {lazy,Suspense,useCallback,useEffect,useMemo,useState} from 'react';
 import {toast} from 'sonner';
 import {Button} from '@/components/ui/button';
 import {Switch} from '@/components/ui/switch';
@@ -19,6 +19,9 @@ import type {CharacterId} from '@/lib/characters';
 import {RECIPES,recipeTask,type Recipe} from '@/lib/recipes';
 import {canWatch,watchLabel,watchText,WATCH_MIN_DEFAULT,WATCH_MIN_OPTIONS} from '@/lib/watch-options';
 import {DashPage,EmptyState,Kpi,KpiRow,PageHeader,StatusBadge} from './parts';
+
+/* The chat a creator places on their own site is set up on this page too; its panel loads on its own. */
+const EmbedPanel=lazy(()=>import('./embed-panel').then(m=>({default:m.EmbedPanel})));
 
 export type Schedule={id:string;agent_id:string;agent_name:string|null;skin:string|null;skill:string;prompt:string;per_day:number;start_minute:number;mode:string;active:boolean;
  next_run:string;last_run:string|null;last_status:string|null;last_run_id:string|null;runs:number;created:string;notify?:string|null;
@@ -325,6 +328,7 @@ export function SchedulesPage({auth,agents,balance,onSignIn,onOpenHistory,onAgen
   </section>}
   {list.length>0&&<div className="stagger grid gap-3 lg:grid-cols-2">{list.map(s=><ScheduleCard key={s.id} s={s} onChange={setData} channels={channels}/>)}</div>}
   <DeliveryPanel onChange={load} agents={agents}/>
+  <Suspense fallback={null}><EmbedPanel agents={agents}/></Suspense>
   {L&&<TierPerks limits={L} onRefresh={load}/>}
   <p className="text-xs text-muted-foreground">Times use your device clock. A slot missed while the server was down is skipped, not repeated. When credits run out, or the agent or skill is removed, the schedule pauses and shows why.</p>
  </DashPage>;

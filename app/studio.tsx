@@ -47,6 +47,7 @@ const VoiceBox=lazy(()=>import('@/components/app/voice').then(m=>({default:m.Voi
 const KnowledgeBox=lazy(()=>import('@/components/app/knowledge').then(m=>({default:m.KnowledgeBox})));
 const VerifiedPage=lazy(()=>import('@/components/rhio/verified-page').then(m=>({default:m.VerifiedPage})));
 const PlazaPage=lazy(()=>import('@/components/rhio/plaza-page').then(m=>({default:m.PlazaPage})));
+const EmbedPage=lazy(()=>import('@/components/rhio/embed-page').then(m=>({default:m.EmbedPage})));
 const BoardPage=lazy(()=>import('@/components/rhio/board-page').then(m=>({default:m.BoardPage})));
 const ArenaPage=lazy(()=>import('@/components/rhio/arena-page').then(m=>({default:m.ArenaPage})));
 const DuelPage=lazy(()=>import('@/components/rhio/arena-page').then(m=>({default:m.DuelPage})));
@@ -200,6 +201,8 @@ export default function Studio(){
  },[agents,market]); // eslint-disable-line react-hooks/exhaustive-deps
  const suggestions=paletteItems.filter(i=>['p-studioStudio','p-discoverDiscover','p-agentsMy agents','p-skillsSkills','p-docs','p-roadmapRoadmap','c-atlas','c-scout'].includes(i.id));
 
+ // a chat placed on a creator's site: only the chat, no navigation (it sits inside a frame there)
+ if(view==='embed'&&route.doc)return <Suspense fallback={null}><IconDefs/><EmbedPage key={route.doc} id={route.doc}/></Suspense>;
  if(embed)return <div className="grid min-h-svh grid-rows-[1fr_auto] bg-background"><IconDefs/><div className="relative min-h-[420px] bg-stage"><Avatar skin={draft.skin} appearance={draft.appearance} look={draft.look} animation={draft.motion||'Idle'} paused={paused}/></div><div className="grid gap-2 p-4"><Badge className="justify-self-start rounded-md font-mono text-[10px] uppercase">RHIO agent preview</Badge><h2 className="font-display text-2xl font-medium">{draft.name}</h2><p className="text-sm text-muted-foreground">{draft.personality}</p><Button asChild className="justify-self-start"><a href={`/dashboard/studio#agent=${encoded(draft)}`} target="_blank" rel="noreferrer">Open in RHIO</a></Button></div></div>;
 
  const navProps={view,navigate:(v:View,doc?:string)=>navigate(v,doc,'site'),onSearch:()=>setPalette(true),theme,setTheme,auth,balance,email,onAccount:()=>setSettings(true),onSignIn:()=>setSignin(true)};
