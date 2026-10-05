@@ -54,6 +54,7 @@ const DuelPage=lazy(()=>import('@/components/rhio/arena-page').then(m=>({default
 const CreatorsPage=lazy(()=>import('@/components/rhio/creators-page').then(m=>({default:m.CreatorsPage})));
 const TeamsPage=lazy(()=>import('@/components/app/teams').then(m=>({default:m.TeamsPage})));
 const TeamsInfoPage=lazy(()=>import('@/components/rhio/teams-page').then(m=>({default:m.TeamsInfoPage})));
+const InsightsPage=lazy(()=>import('@/components/app/insights').then(m=>({default:m.InsightsPage})));
 const LaunchPage=lazy(()=>import('@/components/app/launch').then(m=>({default:m.LaunchPage})));
 const QuestsPage=lazy(()=>import('@/components/app/quests').then(m=>({default:m.QuestsPage})));
 const AccountPanel=lazy(()=>import('@/components/app/account').then(m=>({default:m.AccountPanel})));
@@ -300,6 +301,8 @@ export default function Studio(){
     onStudio={(id,to,voice)=>{const a=id?agents.find(x=>x.id===id):null;if(a){setDraft({...a});navigate('studio');}else fresh();if(voice)setVoiceOpen(true);setTab(to);}}
     onPublish={id=>{const a=agents.find(x=>x.id===id);if(a)setPublishFor(a);}}
     onGo={(v,q)=>router.push(pathFor(v)+(q||''))}/>}
+   {view==='insights'&&<InsightsPage auth={auth} tick={agents} onSignIn={()=>setSignin(true)} onStart={()=>navigate('launch')}
+    onSources={id=>{const a=agents.find(x=>x.id===id);if(a){setDraft({...a});navigate('studio');setTab('persona');}}}/>}
    {view==='quests'&&<QuestsPage auth={auth} onSignIn={()=>setSignin(true)} onGo={v=>navigate(v)} onClaimed={refresh}/>}
    {view==='rewards'&&<RewardsPage wallet={wallet||undefined} auth={auth} onSignIn={()=>setSignin(true)} onPaper={()=>navigate('paper','token')}/>}
 

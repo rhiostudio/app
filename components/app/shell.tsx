@@ -12,16 +12,16 @@ import {I} from '@/app/ui';
 import {cn} from '@/lib/utils';
 import {Logo,type View} from '@/components/rhio/navbar';
 
-export const APP_VIEWS:View[]=['overview','profile','studio','launch','agents','teams','discover','skills','schedules','quests','activity','credits','wallet','rewards','docs','paper','roadmap'];
+export const APP_VIEWS:View[]=['overview','profile','studio','launch','insights','agents','teams','discover','skills','schedules','quests','activity','credits','wallet','rewards','docs','paper','roadmap'];
 type Item={id:View;title:string;icon:string;badge?:number|string};
-const TITLES:Record<string,[string,string]>={overview:['Dashboard','Overview'],profile:['Account','Profile'],studio:['Build','Studio'],launch:['Build','Launch guide'],agents:['Build','My agents'],teams:['Build','Teams'],skills:['Build','Skills'],schedules:['Build','Schedules'],quests:['Dashboard','Quests'],discover:['Marketplace','Discover'],activity:['Account','History'],credits:['Account','Credits'],wallet:['Account','Wallet & chain'],rewards:['Account','Holder rewards'],docs:['Learn','Docs'],paper:['Learn','Whitepaper'],roadmap:['Learn','Roadmap']};
+const TITLES:Record<string,[string,string]>={overview:['Dashboard','Overview'],profile:['Account','Profile'],studio:['Build','Studio'],launch:['Build','Launch guide'],insights:['Build','Insights'],agents:['Build','My agents'],teams:['Build','Teams'],skills:['Build','Skills'],schedules:['Build','Schedules'],quests:['Dashboard','Quests'],discover:['Marketplace','Discover'],activity:['Account','History'],credits:['Account','Credits'],wallet:['Account','Wallet & chain'],rewards:['Account','Holder rewards'],docs:['Learn','Docs'],paper:['Learn','Whitepaper'],roadmap:['Learn','Roadmap']};
 
 export function AppShell({view,navigate,onSearch,theme,setTheme,auth,label,balance,counts,onAccount,onSignIn,onNew,collapsed,children}:{
  view:View;navigate:(v:View,doc?:string)=>void;onSearch:()=>void;theme:'dark'|'light';setTheme:(t:'dark'|'light')=>void;
  auth:boolean;label:string;balance:number|null;counts:{agents:number;published:number;runs:number;schedules?:number};onAccount:()=>void;onSignIn:()=>void;onNew:()=>void;collapsed:boolean;children:ReactNode}){
  const groups:[string,Item[]][]=[
   ['Dashboard',[{id:'overview',title:'Overview',icon:'grid'},{id:'profile',title:'Profile',icon:'user'},{id:'quests',title:'Quests',icon:'target',badge:'+CR'}]],
-  ['Build',[{id:'studio',title:'Studio',icon:'cube'},{id:'launch',title:'Launch guide',icon:'play'},{id:'agents',title:'My agents',icon:'users',badge:counts.agents||undefined},{id:'teams',title:'Teams',icon:'link'},{id:'skills',title:'Skills',icon:'layers'},{id:'schedules',title:'Schedules',icon:'clock',badge:counts.schedules||undefined}]],
+  ['Build',[{id:'studio',title:'Studio',icon:'cube'},{id:'launch',title:'Launch guide',icon:'play'},{id:'agents',title:'My agents',icon:'users',badge:counts.agents||undefined},{id:'insights',title:'Insights',icon:'hype'},{id:'teams',title:'Teams',icon:'link'},{id:'skills',title:'Skills',icon:'layers'},{id:'schedules',title:'Schedules',icon:'clock',badge:counts.schedules||undefined}]],
   ['Marketplace',[{id:'discover',title:'Discover',icon:'store',badge:counts.published?`${counts.published} live`:undefined}]],
   ['Account',[{id:'activity',title:'History',icon:'clock',badge:counts.runs||undefined},{id:'credits',title:'Credits',icon:'coins'},{id:'wallet',title:'Wallet & chain',icon:'wallet'},{id:'rewards',title:'Holder rewards',icon:'hype',badge:'NVDA'}]],
  ];

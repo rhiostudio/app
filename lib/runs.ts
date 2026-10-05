@@ -130,7 +130,7 @@ export async function performRun(db:D1Database,owner:string,data:RunInput,schedu
  if(cost>0&&((await db.prepare('SELECT balance FROM preview_wallets WHERE owner=?').bind(owner).first<{balance:number}>())?.balance??0)<0){
   await failRun(db,reserved,'Not enough credits.',false);throw new HttpError(402,`This run costs ${cost} credits. Top up or wait for more credits.`);
  }
- let output:string;
+ let output:string;/** what the run did with the agent's sources (runs.kb) */let kbState:number|null=null;
  // a live run paid entirely with free credits (starting grant, allotments) may use a cheaper model (AI_MODEL_FREE)
  const free=data.mode==='live'&&((await db.prepare('SELECT paid_cost FROM runs WHERE id=? AND owner=?').bind(data.id,owner).first<{paid_cost:number}>())?.paid_cost??0)===0;
  // web search is billed per query on top of the tokens, so the research skill takes one of today's studio-wide slots
@@ -147,7 +147,7 @@ export async function performRun(db:D1Database,owner:string,data:RunInput,schedu
   if(data.mode==='sample')output=sampleResult(agent,data.prompt,data.skill);
   else if(check)output=checkReport(await runCheck(runtime(),agent,data.id,free,rhioFacts()));
   else{const r=await runAI(runtime(),voice?VOICE_WRITER:agent,data.skill,[data.prompt,spoken,schedule?.extra?.facts,kb?.facts,handed?.facts,reading?.facts].filter(Boolean).join('\n\n'),data.id,{free,guard:!mine||!!opts.guard||!!talk,search,about:talk?rhioFacts():null});output=r.output;if(search&&!r.searched)await returnSearchSlot(db,created).catch(()=>null);}
-  if(kb)output=kb.finish(output);
+  if(kb){const f=kb.finish(output);output=f.output;kbState=f.kb;}
   if(schedule?.extra)output=withNote(output,schedule.extra.note);
   if(reading)output=withNote(output,reading.note);
   if(handed)output=withNote(output,handed.note);
@@ -161,7 +161,7 @@ export async function performRun(db:D1Database,owner:string,data:RunInput,schedu
  }
  // complete the run and pay the creator together; both only if the run is still 'running' (not swept meanwhile)
  const done="EXISTS (SELECT 1 FROM runs WHERE id=? AND owner=? AND status='complete')";
- const settle=[db.prepare("UPDATE runs SET output=?,status='complete' WHERE id=? AND owner=? AND status='running'").bind(output,data.id,owner)];
+ const settle=[db.prepare("UPDATE runs SET output=?,status='complete',kb=? WHERE id=? AND owner=? AND status='running'").bind(output,kbState,data.id,owner)];
  if(!mine&&price>0){
   const backed='(SELECT creator_paid FROM runs WHERE id=? AND owner=?)';
   settle.push(db.prepare(`UPDATE preview_wallets SET balance=balance+?,earned=earned+?,paid=paid+${backed},earned_paid=earned_paid+${backed} WHERE owner=? AND ${done}`).bind(creator,creator,data.id,owner,data.id,owner,record.owner,data.id,owner));
