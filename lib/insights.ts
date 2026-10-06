@@ -48,8 +48,8 @@ export async function insights(db:D1Database,owner:string,want?:string|null,at=n
  const [cur,prev,gain,gainBefore,marks,mine,series,sources,gaps]=await Promise.all([
   others(from,to),others(earlier,from),earned(from,to),earned(earlier,from),
   db.prepare('SELECT SUM(CASE WHEN value=1 THEN 1 ELSE 0 END) AS up,SUM(CASE WHEN value=-1 THEN 1 ELSE 0 END) AS down FROM run_ratings WHERE agent_id=? AND owner!=? AND created>=? AND created<?').bind(row.id,owner,from,to).first<{up:number;down:number}>(),
-  db.prepare(`SELECT SUM(CASE WHEN note LIKE 'Chat on your site%' THEN 1 ELSE 0 END) AS site,SUM(CASE WHEN note LIKE 'Telegram chat%' THEN 1 ELSE 0 END) AS telegram,
-    SUM(CASE WHEN note LIKE 'Chat on your site%' OR note LIKE 'Telegram chat%' THEN cost ELSE 0 END) AS spent,
+  db.prepare(`SELECT SUM(CASE WHEN note LIKE 'Chat on your site%' OR note LIKE 'Guest chat on its page%' THEN 1 ELSE 0 END) AS site,SUM(CASE WHEN note LIKE 'Telegram chat%' THEN 1 ELSE 0 END) AS telegram,
+    SUM(CASE WHEN note LIKE 'Chat on your site%' OR note LIKE 'Guest chat on its page%' OR note LIKE 'Telegram chat%' THEN cost ELSE 0 END) AS spent,
     SUM(CASE WHEN kb=1 THEN 1 ELSE 0 END) AS covered,SUM(CASE WHEN kb IN (2,3) THEN 1 ELSE 0 END) AS uncovered
     FROM (SELECT r.cost,r.kb,${PLACE} AS note FROM runs r WHERE r.agent_id=? AND r.owner=? AND r.status='complete' AND r.created>=? AND r.created<?)`).bind(row.id,owner,from,to).first<{site:number;telegram:number;spent:number;covered:number;uncovered:number}>(),
   db.prepare("SELECT substr(created,1,10) AS day,SUM(CASE WHEN owner!=?1 THEN 1 ELSE 0 END) AS others,SUM(CASE WHEN owner=?1 THEN 1 ELSE 0 END) AS own FROM runs WHERE agent_id=?2 AND status='complete' AND created>=?3 GROUP BY day").bind(owner,row.id,first.toISOString()).all<{day:string;others:number;own:number}>(),
@@ -64,5 +64,5 @@ export async function insights(db:D1Database,owner:string,want?:string|null,at=n
   before:{people:n(prev?.people),answers:n(prev?.answers),earned:n(gainBefore?.v)},
   own:{site:n(mine?.site),telegram:n(mine?.telegram),spent:n(mine?.spent),covered:n(mine?.covered),uncovered:n(mine?.uncovered)},
   series:days,sources:n(sources?.n),
-  gaps:gaps.results.map(g=>({asked:clip(g.prompt),at:g.created,where:(g.note||'').startsWith('Chat on your site')?'site' as const:(g.note||'').startsWith('Telegram chat')?'telegram' as const:'you' as const,kind:g.kb===3?'nomatch' as const:'unused' as const}))};
+  gaps:gaps.results.map(g=>({asked:clip(g.prompt),at:g.created,where:(g.note||'').startsWith('Chat on your site')||(g.note||'').startsWith('Guest chat on its page')?'site' as const:(g.note||'').startsWith('Telegram chat')?'telegram' as const:'you' as const,kind:g.kb===3?'nomatch' as const:'unused' as const}))};
 }

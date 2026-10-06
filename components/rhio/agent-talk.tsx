@@ -5,7 +5,9 @@
    from are shown (its creator wrote them; they cost nothing). Each answer can be marked helpful or not (POST /api/rate,
    lib/ratings.ts). "Share" puts the conversation so far (the last answered message
    and up to five turns before it) on a public page, /s/<id> (lib/share.ts), and "Stop sharing" takes it down. The conversation's id is kept in this browser, so coming back to
-   the page reopens it; "New conversation" starts a fresh one. Signed out, the box asks to connect a wallet. */
+   the page reopens it; "New conversation" starts a fresh one. Signed out, the box asks to connect a wallet, unless the
+   agent's creator lets visitors try it without one (agent.guest, lib/embed.ts): then a frame with that guest chat is
+   shown instead, where a few answers a day are paid by the creator. */
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {toast} from 'sonner';
 import {FaXTwitter} from 'react-icons/fa6';
@@ -63,6 +65,10 @@ export function AgentTalk({agent,auth,onSignIn,onSpent,onMood,ask}:{agent:Market
   catch(e:any){setLines(ls=>ls.map(x=>x.id===l.id?{...x,rating:l.rating??null}:x));toast.error(e.message);}
  }
  function fresh(){thread.current=crypto.randomUUID();try{localStorage.removeItem(key(agent.id));}catch{/* nothing kept */}setLines([]);setShared(null);toast.success('New conversation');}
+ // signed out, on an agent whose creator pays a few answers for visitors: the guest chat instead of the wallet box
+ const guest=!auth&&agent.guest?agent.guest:null;
+ const [tone,setTone]=useState('');
+ useEffect(()=>{try{setTone(document.documentElement.getAttribute('data-theme')==='light'?'light':'dark');}catch{setTone('dark');}},[]);
  const answered=lines.filter(l=>l.ok);const last=answered[answered.length-1];
  const link=shared?`${location.origin}/s/${shared.id}`:'';
  async function share(){
@@ -84,7 +90,13 @@ export function AgentTalk({agent,auth,onSignIn,onSpent,onMood,ask}:{agent:Market
      <span className="font-mono text-[10.5px] tracking-[.06em] text-muted-foreground uppercase">{info?`${each} credits per message${!agent.mine&&agent.talkPrice>0?` · ${agent.talkPrice} to its creator`:''}`:'Loading…'}</span></div></div>
    {lines.length>0&&<div className="flex flex-wrap gap-1">{last&&!shared&&<Button size="sm" variant="ghost" disabled={busy||sharing} onClick={share}><I id="share"/>{sharing?'Sharing…':'Share'}</Button>}<Button size="sm" variant="ghost" disabled={busy} onClick={fresh}><I id="reset"/>New conversation</Button></div>}
   </div>
-  <div className="grid max-h-[460px] min-h-28 content-start gap-3 overflow-y-auto rounded-xl border bg-background p-3" aria-live="polite">
+  {guest&&<div className="grid gap-3">
+   <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5"><b className="text-sm font-semibold">Try it without a wallet</b><span className="text-[12.5px] text-muted-foreground">No account needed: a few answers a day are on its creator, who can read what is asked here.</span></div>
+   {tone&&<iframe src={`/embed/${guest}?theme=${tone}`} title={`Try ${agent.name} without a wallet`} loading="lazy" className="h-[520px] w-full rounded-xl border bg-background"/>}
+   <div className="flex flex-wrap items-center gap-3"><Button variant="outline" onClick={onSignIn}><I id="wallet"/>Connect wallet</Button>
+    <span className="text-xs text-muted-foreground">for a conversation of your own: it is kept in your History, you can share it, and you pay your own messages ({each} credits each).</span></div>
+  </div>}
+  {!guest&&<div className="grid max-h-[460px] min-h-28 content-start gap-3 overflow-y-auto rounded-xl border bg-background p-3" aria-live="polite">
    {!lines.length&&<div className="grid gap-3">
     {agent.greeting?<div className="flex max-w-[92%] items-start gap-2 justify-self-start"><Thumb id={agent.skin as CharacterId} className="size-7 shrink-0 rounded-md bg-t-lime object-[50%_18%]"/>
       <p className="rounded-2xl rounded-bl-md border bg-card px-3.5 py-2 text-[14px] break-words whitespace-pre-wrap">{agent.greeting}</p></div>
@@ -109,7 +121,7 @@ export function AgentTalk({agent,auth,onSignIn,onSpent,onMood,ask}:{agent:Market
     </div>}
    </div>)}
    <div ref={end}/>
-  </div>
+  </div>}
   {shared&&<div className="grid gap-2 rounded-xl border bg-secondary/40 p-3">
    <span className="text-[12.5px] text-muted-foreground">{shared.run===last?.id?'This conversation is public up to here.':'The public page ends before your newer messages. Share again to include them.'} Anyone with the link can read it; it does not say who you are.</span>
    <div className="flex flex-wrap gap-2"><Input readOnly value={link} aria-label="Public link" onFocus={e=>e.currentTarget.select()} className="h-9 min-w-[200px] flex-1 font-mono text-[12px]"/>
@@ -118,7 +130,7 @@ export function AgentTalk({agent,auth,onSignIn,onSpent,onMood,ask}:{agent:Market
     {shared.run!==last?.id&&<Button size="sm" variant="outline" className="h-9" disabled={sharing} onClick={share}>Share again</Button>}
     <Button size="sm" variant="ghost" className="h-9" disabled={sharing} onClick={unshare}>Stop sharing</Button></div>
   </div>}
-  <div className="grid gap-2">
+  {!guest&&<div className="grid gap-2">
    {ask&&text===ask&&<span className="text-[12.5px] text-muted-foreground">This question came with the link. Send it, or write your own.</span>}
    <Textarea value={text} onChange={e=>setText(e.target.value)} maxLength={info?.max??2000} disabled={busy} aria-label={`Message to ${agent.name}`} placeholder={auth?`Message ${agent.name}…`:'Connect a wallet to talk'} className="min-h-16"
     onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();send();}}}/>
@@ -127,7 +139,7 @@ export function AgentTalk({agent,auth,onSignIn,onSpent,onMood,ask}:{agent:Market
      :<Button onClick={onSignIn}><I id="wallet"/>Connect wallet to talk</Button>}
     <span className="text-xs text-muted-foreground">{short?`A message costs ${each} credits and you have ${info?.balance}.`:auth&&info?.balance!==null&&info?.balance!==undefined?`You have ${info.balance} credits. Enter sends, Shift+Enter makes a new line.`:'Each message is a run, paid in credits.'}</span>
    </div>
-  </div>
+  </div>}
   {info?.telegram&&info.mode==='live'&&<a href={`/dashboard/schedules?chat=${agent.id}`} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 justify-self-start rounded-lg border px-3 py-2 text-[13px] transition-colors hover:border-foreground/40"><b className="font-medium">Add {agent.name} to my Telegram</b><span className="text-muted-foreground">It answers in your own chat or group, paid per answer from your credits.</span><I id="arrow" className="i size-3.5"/></a>}
   {info?.mode==='live'&&chatReads(agent.skills)&&<p className="flex items-start gap-2 rounded-lg border px-3 py-2 text-[12.5px] text-muted-foreground"><I id="scan" className="i mt-0.5 size-3.5 shrink-0"/><span><b className="font-medium text-foreground">It can read {chatReads(agent.skills)}.</b> {chatAsk(agent.skills)}: the numbers it read are shown under its answer.</span></p>}
   <p className="text-[12px] text-muted-foreground">{agent.name} is an AI character. It cannot browse here, it can be wrong, and nothing it says is financial advice. Its creator’s instructions are never shown. Your messages are kept in your History.</p>

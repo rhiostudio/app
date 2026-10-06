@@ -43,7 +43,7 @@ const SKILLS=[
 export const skillCatalog=SKILLS.map(s=>({...s,planned:!!('planned' in s&&s.planned),locked:!('planned' in s&&s.planned)&&!isOpenSkill(s.id)}));
 export const openSkills=()=>skillCatalog.filter(s=>!s.planned&&!s.locked);
 export type MarketAgent={id:string;name:string;skin:Agent['skin'];look?:Agent['look'];appearance?:Agent['appearance'];motion?:Agent['motion'];skills:Agent['skills'];tone:string;language:string;tagline:string;price:number;/** the creator's price for one chat message */talkPrice:number;uses:number;publishedAt:string|null;/** "@handle" of a verified creator, else an anonymous id */creator:string;verified:boolean;mine:boolean;
- /** the agent's opening line and questions to start from (its creator wrote them) */greeting:string;starters:string[];/** it carries notes or sources from its creator */knows:boolean;/** how many sources (lib/knowledge.ts) */sources?:number;
+ /** the agent's opening line and questions to start from (its creator wrote them) */greeting:string;starters:string[];/** it carries notes or sources from its creator */knows:boolean;/** signed-out visitors can try it on its page: the id of that chat (lib/embed.ts) */guest?:string|null;/** how many sources (lib/knowledge.ts) */sources?:number;
  /** the day it last passed the agent check with the instructions it has now, else null */checked:string|null;
  /** share of helpful marks from other accounts, once there are enough */rating:{percent:number;count:number}|null;
  /** only on the single-agent endpoint: answered runs among its last ones */health?:{ok:number;total:number}};

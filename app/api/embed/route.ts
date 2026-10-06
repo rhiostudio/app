@@ -1,14 +1,18 @@
 /* A chat with an agent on its creator's own site (lib/embed.ts).
    GET ?id=<embed>&site=<origin the page is shown on>   public: the agent's public face for the chat page
-   GET                                                  the signed-in account's own embeds and the limits
+   GET                                                  the signed-in account's own embeds, its guest chats and the limits
    POST {action:'say', id, site, thread, rid, message}  public: one message of a visitor (paid by the embed's owner)
-   POST {action:'create', agentId, origin, daily}       makes an embed for one of the account's own agents
+   POST {action:'create', agentId, origin, daily}       makes an embed for one of the account's own agents; origin
+                                                        'rhio:page' makes a guest chat on the agent's own page instead
    POST {action:'update', id, origin?, daily?, active?} changes it
    DELETE {id}                                          removes it
    The public calls need no session. `say` must come from this site's own page (Origin), like every write here. */
 import {env} from 'cloudflare:workers';
 import {context,failure,body,HttpError,appOrigin} from '@/lib/server';
-import {createEmbed,embedInfo,embedLimits,embedSay,listEmbeds,removeEmbed,updateEmbed} from '@/lib/embed';
+import {createEmbed,embedInfo,embedLimits,embedSay,listEmbeds,listGuests,removeEmbed,updateEmbed} from '@/lib/embed';
+
+/** What the pages that set chats up read: the chats on sites, the guest chats on agent pages, and the limits. */
+const mineOf=async(db:D1Database,owner:string)=>({embeds:await listEmbeds(db,owner),guests:await listGuests(db,owner),limits:embedLimits()});
 
 const noStore={headers:{'Cache-Control':'no-store','X-Robots-Tag':'noindex'}};
 /** The signed-in account when there is one (the creator previewing their own chat); never required here. */
@@ -19,8 +23,8 @@ async function who(request:Request){
 
 export async function GET(request:Request){try{
  const {db,owner}=await who(request);const p=new URL(request.url).searchParams;const id=p.get('id');
- if(id===null){if(!owner)throw new HttpError(401,'Sign in to put a chat on your site.');return Response.json({embeds:await listEmbeds(db,owner),limits:embedLimits()},noStore);}
- return Response.json({embed:await embedInfo(db,id,p.get('site'),owner)},noStore);
+ if(id===null){if(!owner)throw new HttpError(401,'Sign in to put a chat on your site.');return Response.json(await mineOf(db,owner),noStore);}
+ return Response.json({embed:await embedInfo(db,id,p.get('site'),owner,appOrigin(request))},noStore);
 }catch(e){return failure(e)}}
 
 export async function POST(request:Request){try{
@@ -32,12 +36,12 @@ export async function POST(request:Request){try{
  }
  const {db,owner}=await context(request,true);
  if(data?.action==='update')await updateEmbed(db,owner,data.id,data);
- else if(data?.action==='create'){const id=await createEmbed(db,owner,data);return Response.json({id,embeds:await listEmbeds(db,owner),limits:embedLimits()},noStore);}
+ else if(data?.action==='create'){const id=await createEmbed(db,owner,data);return Response.json({id,...await mineOf(db,owner)},noStore);}
  else throw new HttpError(400,'Check the request and try again.');
- return Response.json({embeds:await listEmbeds(db,owner),limits:embedLimits()},noStore);
+ return Response.json(await mineOf(db,owner),noStore);
 }catch(e){return failure(e)}}
 
 export async function DELETE(request:Request){try{
  const {db,owner}=await context(request,true);const data=await body(request) as {id?:unknown};
- await removeEmbed(db,owner,data?.id);return Response.json({embeds:await listEmbeds(db,owner),limits:embedLimits()},noStore);
+ await removeEmbed(db,owner,data?.id);return Response.json(await mineOf(db,owner),noStore);
 }catch(e){return failure(e)}}

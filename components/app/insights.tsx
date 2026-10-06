@@ -62,7 +62,7 @@ export function InsightsPage({auth,tick,onSignIn,onSources,onStart}:{auth:boolea
  const a=d?.agent||null;const n=d?.now||null;const b=d?.before||null;const own=d?.own||null;
  const marks=n?n.up+n.down:0;const read=n&&own?n.covered+n.uncovered+own.covered+own.uncovered:0;const missed=n&&own?n.uncovered+own.uncovered:0;
  const quiet=!!d&&!!n&&!!own&&n.answers===0&&n.failed===0&&own.site===0&&own.telegram===0&&d.series.every(s=>!s.others&&!s.own);
- const WHERE={site:'Your site',telegram:'Telegram',you:'You'} as const;
+ const WHERE={site:'Your site or a guest',telegram:'Telegram',you:'You'} as const;
  return <DashPage>
   <PageHeader title="Insights" icon="hype" tone="iris" text="What your agent did in the last seven days: who it answered, what you earned, and where its sources fell short."/>
   {!auth?<EmptyState title="Connect a wallet to see your agents" text="Insights are read from your own agents' runs." action={<Button onClick={onSignIn}><I id="wallet"/>Connect wallet</Button>}/>
@@ -85,7 +85,7 @@ export function InsightsPage({auth,tick,onSignIn,onSources,onStart}:{auth:boolea
     <section className="grid content-start gap-3 rounded-xl border bg-card p-5">
      <b className="text-[15px] font-semibold">Where it answered <span className="font-normal text-muted-foreground">· 7 days</span></b>
      <ul className="grid gap-2 text-[13.5px]">
-      {[['Its page, Discover and the plaza',n.answers,'paid by the people who asked'],['Your own site',own.site,'paid by you'],['Your Telegram chats',own.telegram,'paid by you']].map(([t,v,by])=><li key={String(t)} className="flex items-baseline justify-between gap-3 border-b border-border/50 pb-2 last:border-0 last:pb-0"><span>{t}<span className="text-muted-foreground"> · {by}</span></span><b className="font-medium tabular-nums">{num(Number(v))}</b></li>)}
+      {[['Its page, Discover and the plaza',n.answers,'paid by the people who asked'],['Your own site, and guests on its page',own.site,'paid by you'],['Your Telegram chats',own.telegram,'paid by you']].map(([t,v,by])=><li key={String(t)} className="flex items-baseline justify-between gap-3 border-b border-border/50 pb-2 last:border-0 last:pb-0"><span>{t}<span className="text-muted-foreground"> · {by}</span></span><b className="font-medium tabular-nums">{num(Number(v))}</b></li>)}
      </ul>
      <p className="text-[12.5px] text-muted-foreground">{own.spent?`Your site and Telegram answers cost you ${num(own.spent)} credits this week.`:'Nothing was paid by you on your site or in Telegram this week.'} Credits you earn stay on RHIO.</p>
     </section>

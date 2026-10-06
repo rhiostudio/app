@@ -24,6 +24,7 @@ const STATUS = [
   'Save, duplicate, archive, export / import JSON, share links, task history',
   'Agent teams: a line of two or three agents (own or published by others); each step is a normal run that works from the answer of the step before it; four ready-made teams; public page /teams',
   'Talk to an agent: a chat on the page of every published agent, answered in the agent\'s own voice; each message is a run (3 credits by default plus the creator\'s chat price, set apart from the task price), the last six turns go with it as context',
+  'Try it without a wallet: the creator of a published agent can open its page to signed-out visitors for 20 to 500 answers a day, paid from the creator\'s credits at the message price (15 a day per visitor); off by default, closed while the agent is unpublished',
   'Question links: /a/<id>?ask=N links to one of a published agent\'s own questions to start from; the preview card shows the question, the page opens with it ready in the chat box (not sent by itself); only the creator\'s own text is ever shown',
   'Verdict and fix: the three hard questions of the agent check can be asked in the Chat tab and are read at once by the check\'s own rules (held / did not hold); one tap adds the sentence that mends a rule to the instructions, in the Chat tab and under a failed check in the publish dialog',
   'Chat in the Studio: a creator talks to their own agent on the Chat tab before publishing it; each message saves the agent first and costs the message price only; a change of the agent starts a new conversation',

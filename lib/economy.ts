@@ -135,10 +135,12 @@ export async function ensureWallet(db:D1Database,owner:string){
 }
 /** Public shape of a published agent: no instructions, no owner identity. */
 export function publicAgent(row:{id:string;name:string;config:string;price:number;talk_price?:number|null;uses:number;published_at:string|null;owner:string;/** the creator's verified X handle (lib/creators.ts), when the query selected it */handle?:string|null;
- /** the last agent check and the helpful / not helpful marks of other accounts, when the query selected them */checked_at?:string|null;check_mark?:string|null;check_passed?:number|null;up?:number|null;down?:number|null;/** how often its sources changed, and how many it has (lib/knowledge.ts) */kb_rev?:number|null;sources?:number|null},viewer?:string){
+ /** the last agent check and the helpful / not helpful marks of other accounts, when the query selected them */checked_at?:string|null;check_mark?:string|null;check_passed?:number|null;up?:number|null;down?:number|null;/** how often its sources changed, and how many it has (lib/knowledge.ts) */kb_rev?:number|null;sources?:number|null;/** the id of its guest chat (lib/embed.ts), when the query selected it */guest?:string|null},viewer?:string){
  const c=JSON.parse(row.config);
  return {id:row.id,name:row.name,skin:c.skin,look:c.look,appearance:c.appearance,motion:c.motion,skills:c.skills,tone:c.tone,language:ANSWER_LANGUAGE,tagline:c.tagline||'',price:row.price,/* per chat message; the task price when the creator set none */talkPrice:row.talk_price??row.price,uses:row.uses,publishedAt:row.published_at,/* a handle is shown only when a reviewer confirmed it; otherwise an anonymous id */creator:row.handle?`@${row.handle}`:'creator-'+hash(row.owner),verified:!!row.handle,mine:viewer===row.owner,
   greeting:typeof c.greeting==='string'?c.greeting:'',starters:Array.isArray(c.starters)?c.starters.filter((s:unknown)=>typeof s==='string'&&s).slice(0,3):[],knows:!!c.knowledge||Number(row.sources||0)>0,/* how many sources its creator gave it to answer from; never their text */sources:Number(row.sources||0),
+  // signed-out visitors can try it on its page, paid by its creator: the id of that chat's frame (lib/embed.ts PAGE_ORIGIN)
+  guest:typeof row.guest==='string'&&row.guest?row.guest:null,
   // checked = it passed, and it still says and knows what was checked
   checked:row.checked_at&&row.check_passed&&row.check_mark===configMark(c,row.kb_rev)?row.checked_at:null,rating:scoreOf(Number(row.up||0),Number(row.down||0))};
 }

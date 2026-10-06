@@ -47,6 +47,7 @@ const AgentCheck=lazy(()=>import('@/components/app/agent-check').then(m=>({defau
 const VoiceBox=lazy(()=>import('@/components/app/voice').then(m=>({default:m.VoiceBox})));
 const KnowledgeBox=lazy(()=>import('@/components/app/knowledge').then(m=>({default:m.KnowledgeBox})));
 const StudioChat=lazy(()=>import('@/components/app/studio-chat').then(m=>({default:m.StudioChat})));
+const GuestTrial=lazy(()=>import('@/components/app/guest-trial').then(m=>({default:m.GuestTrial})));
 const VerifiedPage=lazy(()=>import('@/components/rhio/verified-page').then(m=>({default:m.VerifiedPage})));
 const PlazaPage=lazy(()=>import('@/components/rhio/plaza-page').then(m=>({default:m.PlazaPage})));
 const ReportPage=lazy(()=>import('@/components/rhio/report-page').then(m=>({default:m.ReportPage})));
@@ -489,6 +490,7 @@ export default function Studio(){
      <div className="grid gap-2"><FieldLabel htmlFor="pub-talk">Price per chat message</FieldLabel><div className="flex items-center gap-2"><Input id="pub-talk" type="number" min={0} max={500} value={rawTalk} onChange={e=>setTalkDraft(d=>({...d,[a.id!]:e.target.value}))} className="h-11 tabular-nums"/><span className="font-mono text-sm text-muted-foreground">CR</span></div><span className="text-xs text-muted-foreground">What you earn each time someone sends a message on the agent&apos;s page. Keep it small so people can try it: they also pay the message itself.</span></div>
      <div className="grid grid-cols-2 gap-2"><div className="rounded-lg border bg-t-mint p-3"><span className="font-mono text-[10px] tracking-[.08em] text-muted-foreground uppercase">You keep per task</span><b className="block font-display text-2xl font-medium">{n-fee} CR</b></div><div className="rounded-lg border bg-secondary p-3"><span className="font-mono text-[10px] tracking-[.08em] text-muted-foreground uppercase">Platform fee</span><b className="block font-display text-2xl font-medium">{fee} CR</b></div></div>
      <Suspense fallback={null}><AgentCheck agent={a} balance={balance} onDone={refresh} onFix={line=>addGuardLine(a,line)}/></Suspense>
+     {a.published&&<Suspense fallback={null}><GuestTrial agent={a}/></Suspense>}
      <div className="flex flex-wrap gap-2">{a.published
       ?<><Button disabled={busy} onClick={async()=>{await publish(a,true);setPublishFor(null);}}>Update prices</Button><Button variant="outline" disabled={busy} onClick={async()=>{await publish(a,false);setPublishFor(null);}}>Unpublish</Button></>
       :<Button disabled={busy} onClick={async()=>{await publish(a,true);setPublishFor(null);}}><I id="store"/>Publish to Discover</Button>}</div>

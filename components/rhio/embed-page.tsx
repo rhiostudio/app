@@ -20,6 +20,15 @@ function parentSite(){
  try{const a=(location as unknown as {ancestorOrigins?:{length:number;[i:number]:string}}).ancestorOrigins;if(a&&a.length)return a[0];}catch{/* not supported */}
  try{return document.referrer?new URL(document.referrer).origin:'unknown';}catch{return 'unknown';}
 }
+/** A visitor's message. Sent with fetch itself, NOT with api() (app/ui.tsx): api() stops every write of a browser
+    that is signed out and opens the sign-in panel, and a visitor of this chat is signed out by design (a frame on
+    another site gets no cookies at all). The server takes the message without a session (lib/embed.ts). */
+async function sayTo(body:unknown):Promise<{answer:string}>{
+ const r=await fetch('/api/embed',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+ const d=await r.json().catch(()=>({})) as {answer?:string;error?:string};
+ if(!r.ok)throw new Error(d.error||'That message could not be answered.');
+ return {answer:String(d.answer||'')};
+}
 const threadOf=(id:string)=>{const k=`rhio-embed:${id}`;try{const had=localStorage.getItem(k);if(had&&/^[0-9a-f-]{36}$/.test(had))return had;const t=crypto.randomUUID();localStorage.setItem(k,t);return t;}catch{return crypto.randomUUID();}};
 
 function Face({info}:{info:Info}){
@@ -41,7 +50,7 @@ export function EmbedPage({id}:{id:string}){
   const message=(given??text).trim();if(!message||busy||!info)return;
   const rid=crypto.randomUUID();setBusy(true);setText('');setLines(l=>[...l,{id:rid,asked:message,answer:'',pending:true}]);
   try{
-   const r=await api('/api/embed',{method:'POST',body:JSON.stringify({action:'say',id,site:site.current,thread:thread.current,rid,message})});
+   const r=await sayTo({action:'say',id,site:site.current,thread:thread.current,rid,message});
    setLines(l=>l.map(x=>x.id===rid?{id:rid,asked:message,answer:r.answer}:x));
   }catch(e:any){setLines(l=>l.map(x=>x.id===rid?{id:rid,asked:message,answer:'',error:e.message||'That message could not be answered.'}:x));}
   finally{setBusy(false);}

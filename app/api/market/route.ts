@@ -1,6 +1,6 @@
 import {context,failure,HttpError} from '@/lib/server';
 import {publicAgent} from '@/lib/economy';
-import {publishedAgent} from '@/lib/market';
+import {publishedAgent,GUEST_COLUMN} from '@/lib/market';
 import {RATING_COLUMNS} from '@/lib/ratings';
 type Row={id:string;owner:string;name:string;config:string;price:number;talk_price:number|null;uses:number;published_at:string|null;handle:string|null;checked_at:string|null;check_mark:string|null;check_passed:number|null;up:number;down:number;kb_rev:number;sources:number};
 /** Public gallery of published agents. Sign-in optional; owners see which entries are theirs.
@@ -15,7 +15,7 @@ export async function GET(request:Request){try{
  // search runs in SQL before the limit, on public fields only (never the private instructions)
  const like=`%${q.replace(/[\\%_]/g,m=>'\\'+m)}%`;
  const where=q?` AND (lower(name) LIKE ?1 ESCAPE '\\' OR lower(COALESCE(json_extract(config,'$.tagline'),'')) LIKE ?1 ESCAPE '\\' OR lower(json_extract(config,'$.skills')) LIKE ?1 ESCAPE '\\')`:'';
- const stmt=db.prepare(`SELECT id,owner,name,config,price,talk_price,uses,published_at,checked_at,check_mark,check_passed,kb_rev,(SELECT COUNT(*) FROM knowledge_sources WHERE knowledge_sources.agent_id=agents.id) AS sources,${RATING_COLUMNS},(SELECT handle FROM creators WHERE creators.owner=agents.owner AND creators.status='verified') AS handle FROM agents WHERE published=1 AND archived=0${where} ORDER BY ${sort} LIMIT 60`);
+ const stmt=db.prepare(`SELECT id,owner,name,config,price,talk_price,uses,published_at,checked_at,check_mark,check_passed,kb_rev,(SELECT COUNT(*) FROM knowledge_sources WHERE knowledge_sources.agent_id=agents.id) AS sources,${GUEST_COLUMN},${RATING_COLUMNS},(SELECT handle FROM creators WHERE creators.owner=agents.owner AND creators.status='verified') AS handle FROM agents WHERE published=1 AND archived=0${where} ORDER BY ${sort} LIMIT 60`);
  const rows=await (q?stmt.bind(like):stmt).all<Row>();
  const list=rows.results.map(r=>publicAgent(r,viewer));
  return Response.json({agents:list},{headers:{'Cache-Control':'no-store'}});
