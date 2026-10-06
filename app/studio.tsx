@@ -45,6 +45,7 @@ const RewardsPage=lazy(()=>import('@/components/app/rewards').then(m=>({default:
 const AgentCheck=lazy(()=>import('@/components/app/agent-check').then(m=>({default:m.AgentCheck})));
 const VoiceBox=lazy(()=>import('@/components/app/voice').then(m=>({default:m.VoiceBox})));
 const KnowledgeBox=lazy(()=>import('@/components/app/knowledge').then(m=>({default:m.KnowledgeBox})));
+const StudioChat=lazy(()=>import('@/components/app/studio-chat').then(m=>({default:m.StudioChat})));
 const VerifiedPage=lazy(()=>import('@/components/rhio/verified-page').then(m=>({default:m.VerifiedPage})));
 const PlazaPage=lazy(()=>import('@/components/rhio/plaza-page').then(m=>({default:m.PlazaPage})));
 const ReportPage=lazy(()=>import('@/components/rhio/report-page').then(m=>({default:m.ReportPage})));
@@ -248,8 +249,8 @@ export default function Studio(){
     </div>
     <aside aria-label="Agent editor" className="flex min-h-0 flex-col border-l bg-surface max-[820px]:order-3 max-[820px]:border-t max-[820px]:border-l-0">
      <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col gap-0">
-      <TabsList variant="line" className="h-12 w-full justify-start gap-0 overflow-x-auto rounded-none border-b px-2">
-       {[['character','Avatar'],['look','Outfit'],['persona','Persona'],['skills','Skills'],['run','Run'],['automate','Automate']].map(([id,l])=><TabsTrigger key={id} value={id} className="h-full flex-none px-1.5 text-[13px] after:bg-lime">{l}{id==='skills'&&<span className="rounded bg-secondary px-1.5 font-mono text-[10px] text-brand">{draft.skills.length}</span>}</TabsTrigger>)}
+      <TabsList variant="line" className="h-12 w-full justify-start gap-0 overflow-x-auto rounded-none border-b px-1.5">
+       {[['character','Avatar'],['look','Outfit'],['persona','Persona'],['skills','Skills'],['chat','Chat'],['run','Run'],['automate','Automate']].map(([id,l])=><TabsTrigger key={id} value={id} className="h-full flex-none px-1 text-[13px] after:bg-lime">{l}{id==='skills'&&<span className="rounded bg-secondary px-1.5 font-mono text-[10px] text-brand">{draft.skills.length}</span>}</TabsTrigger>)}
       </TabsList>
       <div className="min-h-0 flex-1 overflow-y-auto p-4 [scrollbar-width:thin] max-[820px]:overflow-visible">
        <TabsContent value="character"><Roster skin={draft.skin} onSelect={chooseCharacter}/></TabsContent>
@@ -278,6 +279,7 @@ export default function Studio(){
         <Mono className="mt-3">Planned</Mono>
         {skillCatalog.filter(s=>s.planned).map(s=><SkillRow key={s.id} muted icon={SKILL_ICON[s.icon]||'globe'} name={s.name} tag="planned" desc={s.description}/>)}
        </TabsContent>
+       <TabsContent value="chat"><Suspense fallback={<Loading/>}><StudioChat agent={draft} auth={auth} published={!!agents.find(a=>a.id===draft.id)?.published} onSignIn={()=>setSignin(true)} ensureSaved={ensureCurrent} onSpent={refresh} onMood={m=>playMotion(m==='think'?'Think':'Nod',true)}/></Suspense></TabsContent>
        <TabsContent value="run" className="grid gap-4"><RunPanel target={{id:draft.id,name:draft.name,skills:draft.skills,price:0,mine:true}} ready={ready} liveCost={liveCost} skillCosts={skillCosts} liveToday={liveToday} balance={balance} trials={trials} auth={auth} ensureSaved={ensureCurrent} onDone={refresh} onSignIn={()=>setSignin(true)} onShare={setRunDetail}/></TabsContent>
        <TabsContent value="automate" className="grid gap-4"><Suspense fallback={<Loading/>}><AgentSchedules auth={auth} agent={draft} agents={agents} balance={balance} onSignIn={()=>setSignin(true)} ensureSaved={ensureCurrent}/></Suspense></TabsContent>
       </div>
