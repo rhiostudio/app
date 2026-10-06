@@ -66,6 +66,7 @@ export function AgentPage({id,auth,onSignIn,onSpent,onRun,onNavigate}:{id:string
     <div className="grid gap-3">
      <div className="flex flex-wrap items-center gap-2">
       <StatusBadge kind="live">Published</StatusBadge>
+      {agent?.guest&&<span className="rounded-md border border-lime bg-lime/10 px-2 py-0.5 font-mono text-[10.5px] tracking-[.06em] uppercase" title="Its creator pays a few answers a day for visitors without an account.">No wallet needed</span>}
       {c&&<span className="font-mono text-[11px] tracking-[.08em] text-muted-foreground uppercase">{c.name} · {c.role}</span>}
      </div>
      <h1 className="font-display text-[clamp(34px,5vw,60px)] leading-[1.02] font-medium tracking-[-.045em] break-words">{agent?.name||' '}</h1>

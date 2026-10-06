@@ -10,6 +10,7 @@ import {api,I,TextOut} from '@/app/ui';
 import {useThumb} from '@/app/avatar';
 import {lookFor} from '@/lib/characters';
 import {agentPath} from '@/lib/routes';
+import {ASK_PARAM,askedQuestion} from '@/lib/ask-link';
 
 type Info={/** what it can read in this chat, in words ('' when nothing) */reads?:string;/** how to ask for it */ask?:string;id:string;name:string;skin:string;look:unknown;appearance:unknown;motion:string|null;tagline:string;greeting:string;starters:string[];agentId:string|null;mode:'live'|'sample';max:number;preview:boolean;active:boolean};
 type Line={id:string;asked:string;answer:string;error?:string;pending?:boolean};
@@ -46,6 +47,10 @@ export function EmbedPage({id}:{id:string}){
   api(`/api/embed?id=${encodeURIComponent(id)}&site=${encodeURIComponent(site.current)}`).then(d=>{if(alive)setInfo(d.embed);}).catch(e=>{if(alive)setProblem(e.message||'This chat is not available.');});
   return()=>{alive=false;};},[id]);
  useEffect(()=>{end.current?.scrollIntoView({block:'end'});},[lines]);
+ // ?ask=N: one of the agent's own questions came with the link (lib/ask-link.ts). It waits in the box; it is not sent.
+ const [came,setCame]=useState('');
+ useEffect(()=>{if(!info)return;let q:ReturnType<typeof askedQuestion>=null;try{q=askedQuestion(info.starters,new URLSearchParams(location.search).get(ASK_PARAM));}catch{q=null;}
+  if(q){setCame(q.text);setText(t=>t.trim()?t:q!.text);}},[info]);
  async function send(given?:string){
   const message=(given??text).trim();if(!message||busy||!info)return;
   const rid=crypto.randomUUID();setBusy(true);setText('');setLines(l=>[...l,{id:rid,asked:message,answer:'',pending:true}]);
@@ -77,6 +82,7 @@ export function EmbedPage({id}:{id:string}){
     <div ref={end}/>
    </div>
   </div>
+  {came&&text===came&&lines.length===0&&<p className="px-4 pb-1 text-[12px] text-muted-foreground">This question came with the link. Send it, or write your own.</p>}
   <form className="flex items-end gap-2 border-t p-3" onSubmit={e=>{e.preventDefault();send();}}>
    <textarea value={text} onChange={e=>setText(e.target.value)} maxLength={info?.max??600} rows={1} disabled={!info||busy} aria-label={info?`Message to ${info.name}`:'Message'} placeholder={info?`Message ${info.name}…`:''}
     onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();send();}}}

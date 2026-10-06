@@ -92,7 +92,7 @@ export function AgentTalk({agent,auth,onSignIn,onSpent,onMood,ask}:{agent:Market
   </div>
   {guest&&<div className="grid gap-3">
    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5"><b className="text-sm font-semibold">Try it without a wallet</b><span className="text-[12.5px] text-muted-foreground">No account needed: a few answers a day are on its creator, who can read what is asked here.</span></div>
-   {tone&&<iframe src={`/embed/${guest}?theme=${tone}`} title={`Try ${agent.name} without a wallet`} loading="lazy" className="h-[520px] w-full rounded-xl border bg-background"/>}
+   {tone&&<iframe src={`/embed/${guest}?theme=${tone}${ask&&agent.starters.includes(ask)?`&ask=${agent.starters.indexOf(ask)+1}`:''}`} title={`Try ${agent.name} without a wallet`} loading="lazy" className="h-[520px] w-full rounded-xl border bg-background"/>}
    <div className="flex flex-wrap items-center gap-3"><Button variant="outline" onClick={onSignIn}><I id="wallet"/>Connect wallet</Button>
     <span className="text-xs text-muted-foreground">for a conversation of your own: it is kept in your History, you can share it, and you pay your own messages ({each} credits each).</span></div>
   </div>}

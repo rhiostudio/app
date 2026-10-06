@@ -14,7 +14,9 @@ export async function GET(request:Request){try{
  const sort=url.searchParams.get('sort')==='new'?'published_at DESC':'(uses+3*up-5*down) DESC, published_at DESC';
  // search runs in SQL before the limit, on public fields only (never the private instructions)
  const like=`%${q.replace(/[\\%_]/g,m=>'\\'+m)}%`;
- const where=q?` AND (lower(name) LIKE ?1 ESCAPE '\\' OR lower(COALESCE(json_extract(config,'$.tagline'),'')) LIKE ?1 ESCAPE '\\' OR lower(json_extract(config,'$.skills')) LIKE ?1 ESCAPE '\\')`:'';
+ // ?guest=1: only agents that visitors can try without a wallet (lib/embed.ts PAGE_ORIGIN), wherever they stand in the order
+ const onlyGuest=url.searchParams.get('guest')==='1'?" AND EXISTS (SELECT 1 FROM embeds e WHERE e.agent_id=agents.id AND e.owner=agents.owner AND e.origin='rhio:page' AND e.active=1)":'';
+ const where=onlyGuest+(q?` AND (lower(name) LIKE ?1 ESCAPE '\\' OR lower(COALESCE(json_extract(config,'$.tagline'),'')) LIKE ?1 ESCAPE '\\' OR lower(json_extract(config,'$.skills')) LIKE ?1 ESCAPE '\\')`:'');
  const stmt=db.prepare(`SELECT id,owner,name,config,price,talk_price,uses,published_at,checked_at,check_mark,check_passed,kb_rev,(SELECT COUNT(*) FROM knowledge_sources WHERE knowledge_sources.agent_id=agents.id) AS sources,${GUEST_COLUMN},${RATING_COLUMNS},(SELECT handle FROM creators WHERE creators.owner=agents.owner AND creators.status='verified') AS handle FROM agents WHERE published=1 AND archived=0${where} ORDER BY ${sort} LIMIT 60`);
  const rows=await (q?stmt.bind(like):stmt).all<Row>();
  const list=rows.results.map(r=>publicAgent(r,viewer));

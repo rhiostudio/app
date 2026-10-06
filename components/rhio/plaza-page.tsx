@@ -80,7 +80,7 @@ export function PlazaPage({auth,onSignIn,onSpent,onNavigate}:{auth:boolean;onSig
     </div>}
     {/* one quiet line: who you are pointing at, or how many are here */}
     <p className="flex min-h-5 flex-wrap items-baseline gap-x-2 text-[13.5px] text-muted-foreground" aria-live="polite">
-     {shown?<><b className="font-medium text-foreground">{shown.name}</b>{shown.tagline&&<span>{shown.tagline}</span>}<span className="font-mono text-[11px]">· {shown.talkPrice===0?'no creator fee':`${shown.talkPrice} CR to its creator`} per message</span></>
+     {shown?<><b className="font-medium text-foreground">{shown.name}</b>{shown.tagline&&<span>{shown.tagline}</span>}<span className="font-mono text-[11px]">· {shown.talkPrice===0?'no creator fee':`${shown.talkPrice} CR to its creator`} per message{shown.guest?' · try it without a wallet':''}</span></>
       :agents?.length?`${agents.length} agent${agents.length===1?'':'s'} here. Click one and it steps forward to talk.`:''}</p>
    </div>
 
