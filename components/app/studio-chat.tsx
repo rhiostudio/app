@@ -10,6 +10,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {api,I,TextOut} from '@/app/ui';
 import {chatAsk,chatReads} from '@/lib/chat-tools';
+import {HARD_QUESTIONS} from '@/lib/check-questions';
 import {Button} from '@/components/ui/button';
 import {Textarea} from '@/components/ui/textarea';
 import {Thumb} from '@/components/landing/mocks';
@@ -99,6 +100,11 @@ export function StudioChat({agent,auth,published,onSignIn,ensureSaved,onSpent,on
     :<Button onClick={onSignIn}><I id="wallet"/>Connect wallet</Button>}
    <span className="text-xs text-muted-foreground">{!info?'Loading…':short?`A message costs ${each} credits and you have ${info.balance}.`:`${each} credits per message${auth&&info.balance!==null?` · you have ${info.balance}`:''}`}</span>
   </div>
+  {info?.mode==='live'&&<div className="grid gap-1.5 rounded-lg border px-3 py-2.5">
+   <span className="text-[12.5px] text-muted-foreground"><b className="font-medium text-foreground">Worth trying before you publish.</b> The agent check asks these same three; each one is sent as a message.</span>
+   <div className="flex flex-wrap gap-1.5">{HARD_QUESTIONS.map(q=><button key={q.label} type="button" title={`“${q.text}” ${q.good}`} disabled={busy||!info||(auth&&short)} onClick={()=>send(q.text)}
+    className="rounded-full border bg-card px-3 py-1.5 text-left text-[12.5px] transition-colors hover:border-foreground/40 disabled:opacity-50">{q.label}</button>)}</div>
+  </div>}
   {info?.mode==='sample'&&<p className="text-[12px] text-muted-foreground">AI is not connected here, so answers are labelled workflow samples.</p>}
   {info?.mode==='live'&&chatReads(agent.skills)&&<p className="flex items-start gap-2 rounded-lg border px-3 py-2 text-[12.5px] text-muted-foreground"><I id="scan" className="i mt-0.5 size-3.5 shrink-0"/><span><b className="font-medium text-foreground">It can read {chatReads(agent.skills)}.</b> {chatAsk(agent.skills)}: the numbers it read are shown under its answer.</span></p>}
   <p className="text-[12px] text-muted-foreground">Sending saves your changes first, so it answers as the agent on screen. After a change the conversation starts again. On your own agent a message costs the message price only; visitors of a published agent also pay the chat price you set. The other skills run from the Run tab, not here. Messages are kept in your History.</p>

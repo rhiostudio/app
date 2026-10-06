@@ -20,7 +20,7 @@ type Data=Launch&{signedIn:boolean};
 const ACTION:Record<string,string>={look:'Open the Studio',voice:'Write its voice',persona:'Open its persona',publish:'Open publishing',share:'Share it',profile:'Open your profile',schedules:'Open Schedules',arena:'Open the arena'};
 
 export function LaunchPage({auth,tick,onSignIn,onStudio,onPublish,onGo}:{auth:boolean;/** changes whenever the account's agents were loaded again */tick:unknown;onSignIn:()=>void;
- /** opens the Studio on a tab for that agent (no agent: a new one) */onStudio:(agentId:string|null,tab:'look'|'persona',voice?:boolean)=>void;
+ /** opens the Studio on a tab for that agent (no agent: a new one) */onStudio:(agentId:string|null,tab:'look'|'persona'|'chat',voice?:boolean)=>void;
  /** opens the publish dialog (price, agent check) for that agent */onPublish:(agentId:string)=>void;
  onGo:(v:View,query?:string)=>void}){
  const [d,setD]=useState<Data|null>(null);
@@ -67,8 +67,12 @@ export function LaunchPage({auth,tick,onSignIn,onStudio,onPublish,onGo}:{auth:bo
    <div className="flex flex-wrap items-end justify-between gap-3">
     <div className="grid gap-1"><span className="font-mono text-[10.5px] tracking-[.1em] text-muted-foreground uppercase">{a?a.name:auth?'No agent yet':'Signed out'}</span>
      <b className="font-display text-[clamp(26px,3.4vw,40px)] leading-none font-medium tracking-[-.04em]">{d?(all?'Launched.':`${d.done} of ${total} done`):' '}</b></div>
-    {all&&a?<Button asChild><a href={agentPath(a.id)} target="_blank" rel="noreferrer noopener">Open its page<I id="arrow"/></a></Button>
-     :!auth?<Button onClick={onSignIn}><I id="wallet"/>Connect wallet</Button>:null}
+    <div className="flex flex-wrap gap-2">
+     {/* at any step: hear how it answers, in the Studio's Chat tab (it need not be published) */}
+     {a&&auth&&<Button variant="outline" onClick={()=>onStudio(a.id,'chat')}>Talk to it yourself</Button>}
+     {all&&a?<Button asChild><a href={agentPath(a.id)} target="_blank" rel="noreferrer noopener">Open its page<I id="arrow"/></a></Button>
+      :!auth?<Button onClick={onSignIn}><I id="wallet"/>Connect wallet</Button>:null}
+    </div>
    </div>
    <div className="h-1.5 overflow-hidden rounded-full bg-secondary" role="progressbar" aria-valuemin={0} aria-valuemax={total||1} aria-valuenow={d?.done||0} aria-label="Steps done"><div className="h-full rounded-full bg-lime transition-[width] duration-500" style={{width:`${total?Math.round((d?.done||0)*100/total):0}%`}}/></div>
   </div>
