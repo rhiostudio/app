@@ -1,13 +1,16 @@
 /* Route marker for the public page of one published agent (/a/<id>). The app shell in app/layout.tsx renders the
    screen from the pathname (lib/routes.ts, components/rhio/agent-page.tsx); this file gives the link its own title,
    description and preview picture, so a post on X or Telegram shows this agent and not the general site card.
+   /a/<id>?ask=N is a link to one of the agent's own questions to start from (lib/ask-link.ts): its preview says the
+   question and the card shows it; the page itself is the same one (canonical /a/<id>).
    Only public fields are read (lib/market.ts); an agent that is not published gets the site's defaults. */
 import type {Metadata} from 'next';
 import {env} from 'cloudflare:workers';
 import {notFound} from 'next/navigation';
 import {publishedAgent,agentSummary,previewVersion} from '@/lib/market';
+import {ASK_PARAM,askedQuestion,askMark} from '@/lib/ask-link';
 
-type P={params:Promise<{id:string}>|{id:string}};
+type P={params:Promise<{id:string}>|{id:string};searchParams?:Promise<Record<string,string|string[]|undefined>>|Record<string,string|string[]|undefined>};
 async function load({params}:P){
  const {id}=await params;
  const db=(env as unknown as {DB?:D1Database}).DB;
@@ -17,11 +20,14 @@ async function load({params}:P){
 export async function generateMetadata(p:P):Promise<Metadata>{
  const a=await load(p);
  if(!a)return {title:'Agent not available',robots:{index:false,follow:false}};
- const title=`${a.name} · RHIO agent`,description=agentSummary(a),url=`/a/${a.id}`;
- const image=`/api/og/agent/${a.id}?v=${previewVersion(a)}`;
+ const sp=await p.searchParams;const ask=askedQuestion(a.starters,sp?.[ASK_PARAM]);
+ const url=`/a/${a.id}`;
+ const title=ask?`Ask ${a.name}: “${ask.text}”`:`${a.name} · RHIO agent`;
+ const description=ask?`${a.name} is an AI agent on RHIO. Open the link and ask it yourself.${a.tagline?` ${a.tagline}`:''}`:agentSummary(a);
+ const image=ask?`/api/og/agent/${a.id}?${ASK_PARAM}=${ask.n}&v=${previewVersion(a)}-${askMark(ask.text)}`:`/api/og/agent/${a.id}?v=${previewVersion(a)}`;
  return {
   title:{absolute:title},description,alternates:{canonical:url},
-  openGraph:{type:'website',siteName:'RHIO Agent Studio',title,description,url,images:[{url:image,width:1200,height:630,alt:`${a.name}, an AI agent on RHIO`}]},
+  openGraph:{type:'website',siteName:'RHIO Agent Studio',title,description,url:ask?`${url}?${ASK_PARAM}=${ask.n}`:url,images:[{url:image,width:1200,height:630,alt:ask?`${a.name}, an AI agent on RHIO, and a question to ask it`:`${a.name}, an AI agent on RHIO`}]},
   twitter:{card:'summary_large_image',title,description,images:[image]},
  };
 }

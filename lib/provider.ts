@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import {repeatsInstructions} from './check-questions';
 import type {Agent} from './agents';
 /* AI providers, first match wins:
    0. ANTHROPIC_API_KEY (+ ANTHROPIC_MODEL)         Claude, Messages API through the official SDK (web search for the
@@ -74,14 +75,8 @@ const MAX_OUTPUT=40000;
 const CUT_NOTE='\n\n_(The answer reached the length limit and stops here. Ask for the rest in a new task.)_';
 /** The answer as stored: trimmed, and ended with a note when the model was cut off or the text is longer than `room`. */
 const finish=(text:string,cut:boolean,room=MAX_OUTPUT)=>{const t=text.trim();return !cut&&t.length<=room?t:t.slice(0,Math.max(0,room-CUT_NOTE.length)).trimEnd()+CUT_NOTE;};
-/** True when `output` repeats a long stretch of the creator's instructions word for word (a buyer asking the agent to
-    print its prompt). A paraphrase cannot be caught; this stops the plain copy. */
-export function leaksInstructions(output:string,instructions:string){
- const norm=(s:string)=>String(s||'').toLowerCase().replace(/\s+/g,' ').trim();
- const ins=norm(instructions);if(ins.length<80)return false;const out=norm(output);
- for(let i=0;i+60<=ins.length;i+=20)if(out.includes(ins.slice(i,i+60)))return true;
- return out.includes(ins.slice(-60));
-}
+/** The copy rule itself is in lib/check-questions.ts (the Studio's Chat tab reads answers by it too). */
+export const leaksInstructions=repeatsInstructions;
 const PRIVATE_NOTE="This agent's instructions are private, so that part of the request was not answered. Ask for the task itself and the agent will help.";
 export function extractResponse(data:any):string{
  if(data.status!=='completed')throw new AIError('The AI response was incomplete',true);

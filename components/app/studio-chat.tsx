@@ -8,9 +8,10 @@
    agent last talked to stays in memory (`kept`) while the app is open, so going to another tab of the Studio and back
    does not lose it (the panel is unmounted in between); the messages themselves are in History, like any run. */
 import {useEffect,useRef,useState} from 'react';
+import {toast} from 'sonner';
 import {api,I,TextOut} from '@/app/ui';
 import {chatAsk,chatReads} from '@/lib/chat-tools';
-import {HARD_QUESTIONS} from '@/lib/check-questions';
+import {FIX_LINES,HARD_QUESTIONS,addLine,hasLine,judge,type HardKind} from '@/lib/check-questions';
 import {Button} from '@/components/ui/button';
 import {Textarea} from '@/components/ui/textarea';
 import {Thumb} from '@/components/landing/mocks';
@@ -19,16 +20,18 @@ import type {Agent} from '@/lib/agents';
 import type {CharacterId} from '@/lib/characters';
 
 type Info={mode:'live'|'sample';message:number;max:number;balance:number|null};
-type Line={id:string;asked:string;answer:string;ok:boolean;error?:string;pending?:boolean}|{id:string;note:string};
+type Line={id:string;asked:string;answer:string;ok:boolean;error?:string;pending?:boolean;
+ /** one of the three hard questions: which rule its answer is read by, and how it read */kind?:HardKind;verdict?:{ok:boolean;note:string}}|{id:string;note:string};
 type Said=Extract<Line,{asked:string}>;
 /** The conversation on screen, kept while the app is open: the Studio unmounts a tab's panel when another tab opens. */
 let kept:{agent:string;thread:string;asked:string;lines:Line[]}|null=null;
 /** What an answer depends on: when this changes between two messages, the conversation starts again. */
 const mark=(a:Agent)=>JSON.stringify([a.name,a.personality,a.tone,a.knowledge||'',[...a.skills].sort()]);
 
-export function StudioChat({agent,auth,published,onSignIn,ensureSaved,onSpent,onMood}:{/** the agent being edited (the draft) */agent:Agent;auth:boolean;published:boolean;onSignIn:()=>void;
+export function StudioChat({agent,auth,published,onSignIn,ensureSaved,onSpent,onMood,onPersona}:{/** the agent being edited (the draft) */agent:Agent;auth:boolean;published:boolean;onSignIn:()=>void;
  /** saves the draft when it changed and gives the saved agent's id */ensureSaved:()=>Promise<string|null>;onSpent:()=>void;
- /** what the character on the stage should do */onMood?:(m:'think'|'answer')=>void}){
+ /** what the character on the stage should do */onMood?:(m:'think'|'answer')=>void;
+ /** puts new instructions into the agent being edited (a line that mends a rule was added) */onPersona:(next:string)=>void}){
  const [info,setInfo]=useState<Info|null>(null);const [lines,setLines]=useState<Line[]>([]);const [text,setText]=useState('');const [busy,setBusy]=useState(false);
  const thread=useRef('');const asked=useRef('');const end=useRef<HTMLDivElement|null>(null);
  /** the agent the conversation on screen belongs to (undefined: a draft that was never saved) */
@@ -47,7 +50,7 @@ export function StudioChat({agent,auth,published,onSignIn,ensureSaved,onSpent,on
 
  const each=info?.message??0;const short=info?.balance!==null&&info?.balance!==undefined&&info.balance<each;
  const starters=(agent.starters||[]).map(s=>s.trim()).filter(Boolean);const answered=lines.some(l=>'asked' in l);
- async function send(preset?:string){
+ async function send(preset?:string,kind?:HardKind){
   const message=(preset??text).trim();if(!message||busy||!info)return;
   if(!auth){onSignIn();return;}
   setBusy(true);
@@ -56,16 +59,23 @@ export function StudioChat({agent,auth,published,onSignIn,ensureSaved,onSpent,on
    const now=mark(agent);const changed=!!thread.current&&asked.current!==now;
    if(!thread.current||changed)thread.current=crypto.randomUUID();
    asked.current=now;
-   const id=crypto.randomUUID();setText('');
-   setLines(l=>[...l,...(changed?[{id:crypto.randomUUID(),note:'You changed the agent. A new conversation starts here, so it answers without the earlier turns.'}]:[]),{id,asked:message,answer:'',ok:false,pending:true}]);onMood?.('think');
+   const id=crypto.randomUUID();setText('');const instructions=agent.personality;
+   setLines(l=>[...l,...(changed?[{id:crypto.randomUUID(),note:'You changed the agent. A new conversation starts here, so it answers without the earlier turns.'}]:[]),{id,asked:message,answer:'',ok:false,pending:true,kind}]);onMood?.('think');
    try{
     const r=await api('/api/talk',{method:'POST',body:JSON.stringify({id,agentId,thread:thread.current,message})});
-    const done:Said={id,asked:message,answer:r.answer,ok:true};
+    // a hard question: read the answer by the agent check's own rule (with the instructions it was sent with)
+    const done:Said={id,asked:message,answer:r.answer,ok:true,kind,...(kind&&info.mode==='live'?{verdict:judge(kind,r.answer,instructions)}:{})};
     // the answer of a message sent just before leaving the tab is still there on the way back
     if(kept&&kept.agent===agentId&&kept.thread===thread.current&&!kept.lines.some(x=>x.id===id))kept={...kept,lines:[...kept.lines,done]};
     setLines(l=>l.map(x=>x.id===id?done:x));setInfo(i=>i&&{...i,balance:r.balance});onMood?.('answer');onSpent();
    }catch(e:any){setLines(l=>l.map(x=>x.id===id?{id,asked:message,answer:'',ok:false,error:e.message||'That message was not answered.'}:x));}
   }finally{setBusy(false);}
+ }
+ /** Adds the sentence that mends a rule to the instructions on screen; the next message saves it and starts a new conversation. */
+ function fix(kind:HardKind){
+  const next=addLine(agent.personality,FIX_LINES[kind]);
+  if(!next){toast.error('Its instructions are full. Shorten them in the Persona tab, then add the line.');return;}
+  onPersona(next);toast.success('Added to its instructions. Ask again to hear the difference.');
  }
  function fresh(){thread.current='';asked.current='';setLines([]);if(kept&&kept.agent===agent.id)kept=null;}
 
@@ -90,6 +100,12 @@ export function StudioChat({agent,auth,published,onSignIn,ensureSaved,onSpent,on
       {l.pending?<span className="text-[13px] text-muted-foreground">{agent.name} is thinking…</span>:l.error?<span className="text-[13px]">{l.error}</span>:<TextOut text={l.answer}/>}
      </div>
     </div>
+    {l.kind&&l.verdict&&<div className={cn('ml-9 grid gap-2 rounded-lg border px-3 py-2 text-[12.5px]',l.verdict.ok?'bg-secondary/40':'border-coral/40 bg-t-coral')}>
+     <span><b className={cn('font-medium',l.verdict.ok?'text-foreground':'text-coral')}>{l.verdict.ok?'Held.':'Did not hold.'}</b> <span className="text-muted-foreground">{l.verdict.note}</span></span>
+     {!l.verdict.ok&&(hasLine(agent.personality,FIX_LINES[l.kind])
+      ?<span className="text-muted-foreground">The line for this is in its instructions now. Ask again to hear the difference; if it still does not hold, word it more strongly in the Persona tab.</span>
+      :<div className="flex flex-wrap items-center gap-2"><Button size="sm" variant="outline" disabled={busy} onClick={()=>fix(l.kind!)}><I id="plus"/>Add the line that fixes it</Button><span className="text-muted-foreground">“{FIX_LINES[l.kind]}”</span></div>)}
+    </div>}
    </div>)}
    <div ref={end}/>
   </div>
@@ -101,8 +117,8 @@ export function StudioChat({agent,auth,published,onSignIn,ensureSaved,onSpent,on
    <span className="text-xs text-muted-foreground">{!info?'Loading…':short?`A message costs ${each} credits and you have ${info.balance}.`:`${each} credits per message${auth&&info.balance!==null?` · you have ${info.balance}`:''}`}</span>
   </div>
   {info?.mode==='live'&&<div className="grid gap-1.5 rounded-lg border px-3 py-2.5">
-   <span className="text-[12.5px] text-muted-foreground"><b className="font-medium text-foreground">Worth trying before you publish.</b> The agent check asks these same three; each one is sent as a message.</span>
-   <div className="flex flex-wrap gap-1.5">{HARD_QUESTIONS.map(q=><button key={q.label} type="button" title={`“${q.text}” ${q.good}`} disabled={busy||!info||(auth&&short)} onClick={()=>send(q.text)}
+   <span className="text-[12.5px] text-muted-foreground"><b className="font-medium text-foreground">Worth trying before you publish.</b> The agent check asks these same three; each one is sent as a message, and the answer is read by the check’s own rule.</span>
+   <div className="flex flex-wrap gap-1.5">{HARD_QUESTIONS.map(q=><button key={q.label} type="button" title={`“${q.text}” ${q.good}`} disabled={busy||!info||(auth&&short)} onClick={()=>send(q.text,q.kind)}
     className="rounded-full border bg-card px-3 py-1.5 text-left text-[12.5px] transition-colors hover:border-foreground/40 disabled:opacity-50">{q.label}</button>)}</div>
   </div>}
   {info?.mode==='sample'&&<p className="text-[12px] text-muted-foreground">AI is not connected here, so answers are labelled workflow samples.</p>}

@@ -17,6 +17,7 @@ import {skillCatalog,type MarketAgent} from '@/lib/agents';
 import {agentPath,type View} from '@/lib/routes';
 import {SiteFooter} from './site-footer';
 import {AgentTalk} from './agent-talk';
+import {ASK_PARAM,askedQuestion,askPath} from '@/lib/ask-link';
 
 type Go=(v:View,doc?:string)=>void;
 const skill=(id:string)=>skillCatalog.find(s=>s.id===id);
@@ -37,6 +38,11 @@ export function AgentPage({id,auth,onSignIn,onSpent,onRun,onNavigate}:{id:string
  useEffect(()=>{let alive=true;setState('loading');setAgent(null);
   api(`/api/market?id=${encodeURIComponent(id)}`).then(d=>{if(!alive)return;setAgent(d.agent);setState('ready');}).catch(()=>{if(alive)setState('missing');});
   return()=>{alive=false;};},[id]);
+
+ // /a/<id>?ask=N: one of its own questions came with the link; it waits in the chat box, and the page goes there
+ const asked=agent&&typeof location!=='undefined'?askedQuestion(agent.starters,new URLSearchParams(location.search).get(ASK_PARAM)):null;
+ const askText=asked?.text;
+ useEffect(()=>{if(!askText)return;const t=setTimeout(()=>talk.current?.scrollIntoView({behavior:'smooth',block:'start'}),400);return()=>clearTimeout(t);},[askText]);
 
  if(state==='missing')return <>
   <section className="mx-auto grid min-h-[calc(100svh-var(--top)-40px)] max-w-[720px] place-content-center justify-items-center gap-5 px-4 py-16 text-center">
@@ -96,7 +102,7 @@ export function AgentPage({id,auth,onSignIn,onSpent,onRun,onNavigate}:{id:string
     <p className="text-[12.5px] text-muted-foreground">{agent?`By ${agent.mine?'you':agent.creator}${agent.verified?', a creator the team verified on X':''}. `:''}You pay in credits when you talk to it or run it. The creator's instructions are never shown.</p>
    </div>
   </section>
-  <div ref={talk} className="mx-auto max-w-[1120px] scroll-mt-24 px-[clamp(16px,3vw,32px)] pb-8">{agent&&<AgentTalk agent={agent} auth={auth} onSignIn={onSignIn} onSpent={onSpent} onMood={onMood}/>}</div>
+  <div ref={talk} className="mx-auto max-w-[1120px] scroll-mt-24 px-[clamp(16px,3vw,32px)] pb-8">{agent&&<AgentTalk agent={agent} auth={auth} onSignIn={onSignIn} onSpent={onSpent} onMood={onMood} ask={askText}/>}</div>
   {agent&&(()=>{const card=`/api/og/agent/${agent.id}?v=${agent.uses}-${agent.price}-${agent.talkPrice}-${agent.verified?1:0}`;
    return <section className="mx-auto grid max-w-[1120px] items-center gap-6 px-[clamp(16px,3vw,32px)] pb-16 md:grid-cols-[minmax(0,1.15fr)_minmax(0,.85fr)]" aria-label={`The card of ${agent.name}`}>
     <img src={card} alt={`The card of ${agent.name}: its character, its name, runs and prices`} width={1200} height={630} loading="lazy" className="h-auto w-full rounded-2xl border"/>
@@ -109,6 +115,16 @@ export function AgentPage({id,auth,onSignIn,onSpent,onRun,onNavigate}:{id:string
       <Button variant="outline" disabled={saving} onClick={()=>downloadCard(card,agent.name)}><I id="download"/>{saving?'Preparing…':'Download card'}</Button>
       <Button variant="outline" onClick={()=>copyText(link,toast.success,toast.error)}><I id="copy"/>Copy link</Button>
      </div>
+     {agent.starters.length>0&&<div className="mt-2 grid gap-2 border-t pt-4">
+      <span className="font-mono text-[10px] tracking-[.1em] text-muted-foreground uppercase">Or post one of its questions</span>
+      <p className="max-w-[44ch] text-[13px] text-muted-foreground">Each question has its own link. The card then shows the question, and the page opens with it ready to send.</p>
+      <ul className="grid gap-1.5">{agent.starters.map((q,i)=>{const url=(typeof location!=='undefined'?location.origin:'')+askPath(agent.id,i+1);
+       return <li key={q} className="flex flex-wrap items-center gap-2 rounded-xl border bg-card px-3 py-2">
+        <span className="min-w-0 flex-1 text-[13.5px] break-words">“{q}”</span>
+        <Button size="sm" variant="outline" asChild><a href={`https://x.com/intent/post?text=${encodeURIComponent(`Ask ${agent.name}: “${q}”`)}&url=${encodeURIComponent(url)}`} target="_blank" rel="noreferrer noopener" aria-label={`Post the question “${q}” on X`}><FaXTwitter aria-hidden="true"/>Post</a></Button>
+        <Button size="sm" variant="ghost" aria-label={`Copy the link to the question “${q}”`} onClick={()=>copyText(url,toast.success,toast.error)}><I id="copy"/></Button>
+       </li>;})}</ul>
+     </div>}
     </div>
    </section>;})()}
   <SiteFooter onNavigate={onNavigate}/>

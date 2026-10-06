@@ -26,7 +26,8 @@ const key=(agent:string)=>`rhio-talk:${agent}`;
 const stored=(agent:string)=>{try{const v=localStorage.getItem(key(agent));return v&&/^[0-9a-f-]{36}$/i.test(v)?v:null;}catch{return null;}};
 const keep=(agent:string,thread:string)=>{try{localStorage.setItem(key(agent),thread);}catch{/* the conversation still works for this visit */}};
 
-export function AgentTalk({agent,auth,onSignIn,onSpent,onMood}:{agent:MarketAgent;auth:boolean;onSignIn:()=>void;onSpent:()=>void;
+export function AgentTalk({agent,auth,onSignIn,onSpent,onMood,ask}:{agent:MarketAgent;auth:boolean;onSignIn:()=>void;onSpent:()=>void;
+ /** the question the link came with (/a/<id>?ask=N): it waits in the box, it is not sent by itself */ask?:string;
  /** what the character on the stage should do: think while it answers, nod when the answer is there */onMood?:(m:'think'|'answer'|'idle')=>void}){
  const [info,setInfo]=useState<Info|null>(null);const [lines,setLines]=useState<Line[]>([]);const [text,setText]=useState('');const [busy,setBusy]=useState(false);
  const thread=useRef<string>('');const end=useRef<HTMLDivElement|null>(null);
@@ -37,6 +38,9 @@ export function AgentTalk({agent,auth,onSignIn,onSpent,onMood}:{agent:MarketAgen
   try{const d=await api(`/api/talk?agent=${agent.id}${t?`&thread=${t}`:''}`);setInfo(d);setLines(d.messages||[]);}catch{setInfo(null);}
  },[agent.id]);
  useEffect(()=>{load();},[load,auth]);
+ // a link to one of its questions: the question is ready to send (sending costs credits, so the visitor presses Send)
+ const asked=useRef('');
+ useEffect(()=>{if(ask&&asked.current!==ask){asked.current=ask;setText(t=>t.trim()?t:ask);}},[ask]);
  useEffect(()=>{end.current?.scrollIntoView({block:'nearest'});},[lines.length,busy]);
 
  const each=(info?.message??0)+(agent.mine?0:agent.talkPrice);
@@ -115,6 +119,7 @@ export function AgentTalk({agent,auth,onSignIn,onSpent,onMood}:{agent:MarketAgen
     <Button size="sm" variant="ghost" className="h-9" disabled={sharing} onClick={unshare}>Stop sharing</Button></div>
   </div>}
   <div className="grid gap-2">
+   {ask&&text===ask&&<span className="text-[12.5px] text-muted-foreground">This question came with the link. Send it, or write your own.</span>}
    <Textarea value={text} onChange={e=>setText(e.target.value)} maxLength={info?.max??2000} disabled={busy} aria-label={`Message to ${agent.name}`} placeholder={auth?`Message ${agent.name}…`:'Connect a wallet to talk'} className="min-h-16"
     onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();send();}}}/>
    <div className="flex flex-wrap items-center gap-3">

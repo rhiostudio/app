@@ -5,12 +5,16 @@
    numbers (runs, the price of a chat message, the price of a task).
    Public data only (lib/market.ts): an agent that is not published gets the site's general picture instead, so a
    private agent cannot be probed through this route. The character is the default picture of its character
-   (public/characters/deck/<id>.png): an outfit made in the Studio is not drawn here. */
+   (public/characters/deck/<id>.png): an outfit made in the Studio is not drawn here.
+   With ?ask=N (lib/ask-link.ts) the left side shows question N of the agent's own questions to start from instead of
+   its numbers: the picture of a link to that question. Only the creator's own text is ever drawn; a number that names
+   no question gives the ordinary card. */
 import {ImageResponse} from 'next/og';
 import {env} from 'cloudflare:workers';
 import {appOrigin} from '@/lib/server';
 import {publishedAgent} from '@/lib/market';
 import {getCharacter} from '@/lib/characters';
+import {ASK_PARAM,askedQuestion} from '@/lib/ask-link';
 
 const W=1200,H=630;
 const clip=(s:string,n:number)=>s.length>n?s.slice(0,n-1).trimEnd()+'…':s;
@@ -43,25 +47,34 @@ async function render(request:Request){
  const serial=a.id.replace(/-/g,'').slice(0,4).toUpperCase();
  const tag=a.verified?a.creator.toUpperCase():ch.role;
  const cr=(n:number)=>n===0?'FREE':`${n} CR`;
+ const ask=askedQuestion(a.starters,new URL(request.url).searchParams.get(ASK_PARAM));const q=ask?clip(ask.text,110):'';
  const stats:[string,string][]=[['RUNS',Number(a.uses||0)>0?Number(a.uses).toLocaleString('en-US'):'NEW'],['CHAT',cr(a.talkPrice)],['TASK',cr(a.price)]];
  return new ImageResponse(
   <div style={{width:W,height:H,display:'flex',position:'relative',backgroundColor:BG,color:TEXT,fontFamily:'sans-serif'}}>
    <div style={{display:'flex',flexDirection:'column',justifyContent:'space-between',width:700,height:H,padding:'54px 0 52px 64px'}}>
     <div style={{display:'flex',alignItems:'center',gap:18}}>
      {logo?<img src={logo} width={146} height={44}/>:<div style={{display:'flex',fontSize:24,letterSpacing:6,color:'#c8ff24'}}>RHIO</div>}
-     <div style={{display:'flex',alignItems:'center',gap:10,fontSize:16,letterSpacing:3.5,color:MUTED}}><div style={{display:'flex',width:9,height:9,borderRadius:9,backgroundColor:'#c8ff24'}}/>AGENT CARD</div>
+     <div style={{display:'flex',alignItems:'center',gap:10,fontSize:16,letterSpacing:3.5,color:MUTED}}><div style={{display:'flex',width:9,height:9,borderRadius:9,backgroundColor:'#c8ff24'}}/>{ask?'ASK THIS AGENT':'AGENT CARD'}</div>
     </div>
-    <div style={{display:'flex',flexDirection:'column',gap:16,width:600}}>
+    {ask?<div style={{display:'flex',flexDirection:'column',gap:22,width:610}}>
+     <div style={{display:'flex',fontSize:q.length>70?44:q.length>40?54:66,lineHeight:1.08,letterSpacing:-2}}>{`\u201c${q}\u201d`}</div>
+     <div style={{display:'flex',fontSize:25,lineHeight:1.3,color:MUTED}}>{`A question for ${clip(name,34)}. Open the link and ask it yourself.`}</div>
+    </div>:null}
+    {ask?<div style={{display:'flex',alignItems:'center',gap:14}}>
+     <div style={{display:'flex',padding:'11px 18px',borderRadius:999,backgroundColor:'#c8ff24',color:INK,fontSize:19,letterSpacing:0.2}}>Ask it on rhio.studio</div>
+     <div style={{display:'flex',fontSize:15,letterSpacing:2.6,color:MUTED}}>AN AI CHARACTER · IT CAN BE WRONG</div>
+    </div>:null}
+    {ask?null:<div style={{display:'flex',flexDirection:'column',gap:16,width:600}}>
      <div style={{display:'flex',fontSize:name.length>20?58:name.length>12?72:88,lineHeight:1.02,letterSpacing:-3}}>{clip(name,40)}</div>
      {tagline?<div style={{display:'flex',fontSize:27,lineHeight:1.3,color:MUTED}}>{clip(tagline,92)}</div>:null}
-    </div>
-    <div style={{display:'flex',flexDirection:'column',gap:16}}>
+    </div>}
+    {ask?null:<div style={{display:'flex',flexDirection:'column',gap:16}}>
      <div style={{display:'flex',gap:12}}>
       {stats.map(([l,v])=><div key={l} style={{display:'flex',flexDirection:'column',gap:4,width:150,padding:'12px 16px',borderRadius:14,border:`1px solid ${LINE}`}}>
        <div style={{display:'flex',fontSize:13,letterSpacing:2.4,color:MUTED}}>{l}</div><div style={{display:'flex',fontSize:28,letterSpacing:-0.5}}>{v}</div></div>)}
      </div>
      <div style={{display:'flex',fontSize:15,letterSpacing:2.6,color:MUTED}}>TALK TO IT ON RHIO.STUDIO</div>
-    </div>
+    </div>}
    </div>
    {/* a second card behind it, so the card reads as one of a deck */}
    <div style={{display:'flex',position:'absolute',left:812,top:110,width:312,height:428,borderRadius:26,backgroundColor:bg2,opacity:0.5,transform:'rotate(-7deg)'}}/>
@@ -83,11 +96,11 @@ async function render(request:Request){
 }
 
 /* A card takes a few seconds to draw and a link crawler may not wait, so each one is kept in memory for ten minutes
-   under its address (agent id and ?v=). A card drawn while a picture failed to load is served but not kept. */
+   under its address (agent id, ?ask= and ?v=). A card drawn while a picture failed to load is served but not kept. */
 const KEPT=new Map<string,{until:number;body:ArrayBuffer}>();
 const png=(body:ArrayBuffer)=>new Response(body,{headers:{'Content-Type':'image/png','Cache-Control':'public, max-age=600'}});
 export async function GET(request:Request){
- const u=new URL(request.url);const key=`${u.pathname}?${(u.searchParams.get('v')||'').slice(0,60)}`;
+ const u=new URL(request.url);const key=`${u.pathname}?${(u.searchParams.get(ASK_PARAM)||'').slice(0,2)}|${(u.searchParams.get('v')||'').slice(0,60)}`;
  const hit=KEPT.get(key);if(hit&&hit.until>Date.now())return png(hit.body.slice(0));
  const before=missing;const r=await render(request);
  if(r.status!==200||!(r.headers.get('content-type')||'').startsWith('image/png'))return r;
