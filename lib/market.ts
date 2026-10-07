@@ -3,11 +3,12 @@
 import {publicAgent} from '@/lib/economy';
 import {skillCatalog} from '@/lib/agents';
 import {RATING_COLUMNS} from '@/lib/ratings';
+import {pinsOf,type PinnedAnswer} from '@/lib/share';
 
 /** The guest chat of an agent, for the queries that feed publicAgent(): signed-out visitors can try it on its page. */
 export const GUEST_COLUMN="(SELECT e.id FROM embeds e WHERE e.agent_id=agents.id AND e.owner=agents.owner AND e.origin='rhio:page' AND e.active=1 LIMIT 1) AS guest";
 type Row={guest?:string|null;id:string;owner:string;name:string;config:string;price:number;talk_price:number|null;uses:number;published_at:string|null;handle:string|null;checked_at:string|null;check_mark:string|null;check_passed:number|null;up:number;down:number;kb_rev:number;sources:number};
-export type PublicAgent=ReturnType<typeof publicAgent>&{/** answered runs among its last fifty */health?:{ok:number;total:number}};
+export type PublicAgent=ReturnType<typeof publicAgent>&{/** answered runs among its last fifty */health?:{ok:number;total:number};/** answers its creator pinned to its page (lib/share.ts) */samples?:PinnedAnswer[]};
 export const AGENT_ID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** The agent when it is published and not archived, otherwise null (unknown, private and archived look the same). */
@@ -17,7 +18,7 @@ export async function publishedAgent(db:D1Database,id:string,viewer?:string):Pro
  if(!row)return null;
  // how it has been doing: answered runs among its last fifty (failed ones were refunded)
  const h=await db.prepare("SELECT COALESCE(SUM(CASE WHEN status='complete' THEN 1 ELSE 0 END),0) AS ok,COUNT(*) AS total FROM (SELECT status FROM runs WHERE agent_id=? AND status!='running' ORDER BY created DESC LIMIT 50)").bind(id).first<{ok:number;total:number}>();
- return {...publicAgent(row,viewer),health:{ok:Number(h?.ok||0),total:Number(h?.total||0)}};
+ return {...publicAgent(row,viewer),health:{ok:Number(h?.ok||0),total:Number(h?.total||0)},samples:await pinsOf(db,id).catch(()=>[])};
 }
 
 export const skillLabel=(id:string)=>skillCatalog.find(s=>s.id===id)?.name||id;

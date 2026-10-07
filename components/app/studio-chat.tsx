@@ -16,6 +16,9 @@ import {Button} from '@/components/ui/button';
 import {Textarea} from '@/components/ui/textarea';
 import {Thumb} from '@/components/landing/mocks';
 import {cn} from '@/lib/utils';
+
+/** An answer pinned to the agent's public page (lib/share.ts): the run, and what was asked. */
+type Pin={runId:string;asked:string};
 import type {Agent} from '@/lib/agents';
 import type {CharacterId} from '@/lib/characters';
 
@@ -37,6 +40,17 @@ export function StudioChat({agent,auth,published,onSignIn,ensureSaved,onSpent,on
  /** the agent the conversation on screen belongs to (undefined: a draft that was never saved) */
  const holder=useRef<string|undefined>(undefined);
  useEffect(()=>{let alive=true;api('/api/talk').then(d=>{if(alive)setInfo(d);}).catch(()=>{if(alive)setInfo(null);});return()=>{alive=false;};},[auth]);
+ // the answers pinned to its public page (up to `pinMax`): kept on the server, so they are here after a reload too
+ const [pins,setPins]=useState<Pin[]>([]);const [pinMax,setPinMax]=useState(3);const [pinning,setPinning]=useState('');
+ useEffect(()=>{let alive=true;if(!auth||!agent.id){setPins([]);return;}
+  api(`/api/share?agent=${agent.id}`).then(d=>{if(alive){setPins(d.pinned||[]);setPinMax(d.max||3);}}).catch(()=>{if(alive)setPins([]);});return()=>{alive=false;};},[auth,agent.id]);
+ async function pin(runId:string,asked:string,on:boolean){
+  if(pinning)return;setPinning(runId);
+  try{await api('/api/share',{method:'POST',body:JSON.stringify({runId,pin:on})});
+   setPins(p=>on?(p.some(x=>x.runId===runId)?p:[...p,{runId,asked}]):p.filter(x=>x.runId!==runId));
+   toast.success(on?(published?`Pinned. It now shows on ${agent.name}\u2019s page.`:`Pinned. It shows on ${agent.name}\u2019s page once you publish it.`):'Unpinned');
+  }catch(e:any){toast.error(e.message);}finally{setPinning('');}
+ }
  // back on this tab: the conversation as it was. Another agent opened in the Studio: its own conversation. A draft
  // that got its id from its first save keeps what is on screen.
  useEffect(()=>{
@@ -100,6 +114,9 @@ export function StudioChat({agent,auth,published,onSignIn,ensureSaved,onSpent,on
       {l.pending?<span className="text-[13px] text-muted-foreground">{agent.name} is thinking…</span>:l.error?<span className="text-[13px]">{l.error}</span>:<TextOut text={l.answer}/>}
      </div>
     </div>
+    {l.ok&&!l.pending&&info?.mode==='live'&&(pins.some(p=>p.runId===l.id)
+     ?<div className="ml-9 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground"><span className="rounded-md border border-lime bg-lime/10 px-2 py-0.5 font-medium text-foreground">Pinned to its page</span><button type="button" disabled={!!pinning} onClick={()=>pin(l.id,l.asked,false)} className="underline underline-offset-4 hover:text-foreground disabled:opacity-50">Unpin</button></div>
+     :<button type="button" disabled={!!pinning||pins.length>=pinMax} title={pins.length>=pinMax?`Its page shows up to ${pinMax} pinned answers. Unpin one first.`:'Show this question and answer on the agent\u2019s public page'} onClick={()=>pin(l.id,l.asked,true)} className="ml-9 flex items-center gap-1.5 justify-self-start rounded-md border px-2 py-1 text-[12px] text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground disabled:opacity-50"><I id="plus" className="i size-3"/>{pinning===l.id?'Pinning\u2026':'Pin to its page'}</button>)}
     {l.kind&&l.verdict&&<div className={cn('ml-9 grid gap-2 rounded-lg border px-3 py-2 text-[12.5px]',l.verdict.ok?'bg-secondary/40':'border-coral/40 bg-t-coral')}>
      <span><b className={cn('font-medium',l.verdict.ok?'text-foreground':'text-coral')}>{l.verdict.ok?'Held.':'Did not hold.'}</b> <span className="text-muted-foreground">{l.verdict.note}</span></span>
      {!l.verdict.ok&&(hasLine(agent.personality,FIX_LINES[l.kind])
@@ -109,6 +126,10 @@ export function StudioChat({agent,auth,published,onSignIn,ensureSaved,onSpent,on
    </div>)}
    <div ref={end}/>
   </div>
+  {pins.length>0&&<div className="grid gap-1.5 rounded-lg border px-3 py-2.5">
+   <span className="text-[12.5px] text-muted-foreground"><b className="font-medium text-foreground">On its page: {pins.length} of {pinMax} pinned answers.</b> Visitors see these under \u201cHow it answers\u201d.</span>
+   <ul className="grid gap-1">{pins.map(p=><li key={p.runId} className="flex items-start justify-between gap-2 text-[12.5px]"><span className="min-w-0 break-words">\u201c{p.asked}\u201d</span><button type="button" disabled={!!pinning} onClick={()=>pin(p.runId,p.asked,false)} className="shrink-0 text-muted-foreground underline underline-offset-4 hover:text-foreground disabled:opacity-50">Unpin</button></li>)}</ul>
+  </div>}
   <Textarea value={text} onChange={e=>setText(e.target.value)} maxLength={info?.max??2000} disabled={busy} aria-label={`Message to ${agent.name}`} placeholder={auth?`Message ${agent.name||'your agent'}…`:'Connect a wallet to talk to it'} className="min-h-16"
    onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();send();}}}/>
   <div className="flex flex-wrap items-center gap-3">

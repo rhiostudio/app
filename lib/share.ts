@@ -73,6 +73,47 @@ export async function sharedRun(db:D1Database,id:string):Promise<SharedRun|null>
   earlier:before.map(t=>({asked:clip(t.prompt),answer:clip(splitSearchWidget(t.output).text.trim())})).filter(t=>t.answer)};
 }
 
+
+/* Pinned answers (drizzle/0038 run_shares.pinned): a creator shows, on the public page of their agent, up to PIN_MAX
+   answers the agent really gave them, under "How it answers". A pin is a shared answer with a mark: the same row, so
+   everything that holds for a shared answer holds for it (a completed run, never a Google-grounded one, taken down
+   by its owner at any time). On top of that a pin must be
+     - a message of a conversation (runs.talk): a chat answer is always given under the guard, so it cannot carry the
+       agent's instructions; a task run on one's own agent is not guarded and is not pinnable;
+     - a live answer, not a workflow sample;
+     - a run of the agent's own creator on that agent: nobody pins words onto someone else's agent, and what a
+       visitor asked never gets on the page.
+   The page says who chose them: the agent wrote the answers, its creator picked them. */
+export const PIN_MAX=3;const PIN_ASKED=300,PIN_ANSWER=900;
+export type PinnedAnswer={/** the public id of the shared answer (/s/<id>) */id:string;asked:string;answer:string;/** the answer was cut for the page */more:boolean};
+/** Pins (on) or unpins one of the owner's own chat answers of their own agent. Returns the share's public id. */
+export async function pinRun(db:D1Database,owner:string,runId:string,on:boolean){
+ const run=await db.prepare('SELECT r.id,r.status,r.output,r.talk,r.mode,r.agent_id,a.owner AS agent_owner FROM runs r LEFT JOIN agents a ON a.id=r.agent_id WHERE r.id=? AND r.owner=?').bind(runId,owner)
+  .first<{id:string;status:string;output:string;talk:string|null;mode:string;agent_id:string;agent_owner:string|null}>();
+ if(!run)throw new HttpError(404,'Run not found.');
+ if(!on){await db.prepare('UPDATE run_shares SET pinned=0 WHERE run_id=? AND owner=?').bind(runId,owner).run();return (await db.prepare('SELECT id FROM run_shares WHERE run_id=? AND owner=?').bind(runId,owner).first<{id:string}>())?.id||null;}
+ if(run.agent_owner!==owner)throw new HttpError(403,'Only answers of your own agent can be pinned to its page.');
+ if(!run.talk)throw new HttpError(400,'Only a chat answer can be pinned. Ask it in the Chat tab and pin that answer.');
+ if(run.mode!=='live')throw new HttpError(400,'A workflow sample cannot be pinned: only an answer the AI really gave.');
+ const id=await shareRun(db,owner,runId,true,0);
+ // the count check runs inside the update, so parallel requests cannot pass the limit
+ const r=await db.prepare('UPDATE run_shares SET pinned=1 WHERE id=?1 AND owner=?2 AND (pinned=1 OR (SELECT COUNT(*) FROM run_shares s JOIN runs x ON x.id=s.run_id AND x.owner=s.owner WHERE s.owner=?2 AND s.pinned=1 AND x.agent_id=?3)<?4)').bind(id,owner,run.agent_id,PIN_MAX).run();
+ if(!r.meta.changes)throw new HttpError(409,`An agent shows up to ${PIN_MAX} pinned answers. Unpin one first.`);
+ return id;
+}
+/** The answers pinned on an agent's page, oldest pin first. Only pins of the agent's own creator are read. */
+export async function pinsOf(db:D1Database,agentId:string):Promise<PinnedAnswer[]>{
+ const rows=(await db.prepare("SELECT s.id,r.prompt,r.output FROM run_shares s JOIN runs r ON r.id=s.run_id AND r.owner=s.owner JOIN agents a ON a.id=r.agent_id AND a.owner=s.owner WHERE r.agent_id=? AND s.pinned=1 AND r.status='complete' AND r.talk IS NOT NULL ORDER BY s.created LIMIT ?")
+  .bind(agentId,PIN_MAX).all<{id:string;prompt:string;output:string}>()).results;
+ return rows.map(r=>{const {text,widget}=splitSearchWidget(r.output);const t=text.trim();if(widget||!t)return null;
+  return {id:r.id,asked:r.prompt.length>PIN_ASKED?r.prompt.slice(0,PIN_ASKED).trimEnd()+'…':r.prompt,answer:t.length>PIN_ANSWER?t.slice(0,PIN_ANSWER).trimEnd()+'…':t,more:t.length>PIN_ANSWER};}).filter((x):x is PinnedAnswer=>!!x);
+}
+/** The owner's pinned answers of one agent, for the Studio: the run to unpin and what was asked. */
+export async function pinnedRuns(db:D1Database,owner:string,agentId:string){
+ const rows=await db.prepare('SELECT s.run_id,r.prompt FROM run_shares s JOIN runs r ON r.id=s.run_id AND r.owner=s.owner WHERE s.owner=? AND s.pinned=1 AND r.agent_id=? ORDER BY s.created').bind(owner,agentId).all<{run_id:string;prompt:string}>();
+ return rows.results.map(r=>({runId:r.run_id,asked:r.prompt.length>120?r.prompt.slice(0,120).trimEnd()+'…':r.prompt}));
+}
+
 /** The answer as one plain line for a link preview: markdown marks, tables and links removed. */
 export function excerpt(text:string,max:number){
  const s=text.replace(/```[\s\S]*?```/g,' ').split('\n').filter(l=>!/^\s*\|?\s*:?-{3,}/.test(l)&&!/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/.test(l))

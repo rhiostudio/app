@@ -46,7 +46,8 @@ export type MarketAgent={id:string;name:string;skin:Agent['skin'];look?:Agent['l
  /** the agent's opening line and questions to start from (its creator wrote them) */greeting:string;starters:string[];/** it carries notes or sources from its creator */knows:boolean;/** signed-out visitors can try it on its page: the id of that chat (lib/embed.ts) */guest?:string|null;/** how many sources (lib/knowledge.ts) */sources?:number;
  /** the day it last passed the agent check with the instructions it has now, else null */checked:string|null;
  /** share of helpful marks from other accounts, once there are enough */rating:{percent:number;count:number}|null;
- /** only on the single-agent endpoint: answered runs among its last ones */health?:{ok:number;total:number}};
+ /** only on the single-agent endpoint: answered runs among its last ones */health?:{ok:number;total:number};
+ /** only on the single-agent endpoint: answers its creator pinned to its page (lib/share.ts) */samples?:{id:string;asked:string;answer:string;more:boolean}[]};
 export type LedgerEntry={id:string;delta:number;kind:string;ref:string|null;note:string;created:string};
 export const starter:Agent={name:'My Atlas',skin:'atlas',motion:'Idle',personality:'Be curious, precise, and helpful. Explain your findings clearly. Cite sources when available, and say when something is uncertain.',tone:'Friendly',language:'English',skills:['summarize']};
 export type Run={id:string;agent_id:string;agent_name:string;prompt:string;output:string;mode:string;cost:number;status:string;created:string;skill?:string|null;schedule_id?:string|null;/** a step of a team run: the team run's id and the step's place in it */relay?:string|null;step?:number|null;/** a message of a conversation with the agent: the conversation's id */talk?:string|null};

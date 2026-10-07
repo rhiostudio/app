@@ -9,9 +9,10 @@ import {useEffect,useRef,useState} from 'react';
 import {toast} from 'sonner';
 import {FaXTwitter} from 'react-icons/fa6';
 import Avatar from '@/app/avatar';
-import {api,copyText,I,SKILL_ICON} from '@/app/ui';
+import {api,copyText,I,SKILL_ICON,TextOut} from '@/app/ui';
 import {Button} from '@/components/ui/button';
 import {StatusBadge} from '@/components/app/parts';
+import {cn} from '@/lib/utils';
 import {getCharacter} from '@/lib/characters';
 import {skillCatalog,type MarketAgent} from '@/lib/agents';
 import {agentPath,type View} from '@/lib/routes';
@@ -103,6 +104,17 @@ export function AgentPage({id,auth,onSignIn,onSpent,onRun,onNavigate}:{id:string
     <p className="text-[12.5px] text-muted-foreground">{agent?`By ${agent.mine?'you':agent.creator}${agent.verified?', a creator the team verified on X':''}. `:''}You pay in credits when you talk to it or run it. The creator's instructions are never shown.</p>
    </div>
   </section>
+  {agent&&agent.samples&&agent.samples.length>0&&<section className="mx-auto grid max-w-[1120px] gap-4 px-[clamp(16px,3vw,32px)] pb-8" aria-label={`How ${agent.name} answers`}>
+   <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+    <b className="font-display text-[clamp(24px,2.8vw,34px)] leading-none font-medium tracking-[-.04em]">How it answers</b>
+    <span className="text-[12.5px] text-muted-foreground">{agent.name} wrote these answers. {agent.mine?'You':'Its creator'} picked them.</span>
+   </div>
+   <ul className={cn('grid gap-3',agent.samples.length>1&&'md:grid-cols-2',agent.samples.length>2&&'lg:grid-cols-3')}>{agent.samples.map(s=><li key={s.id} className="grid content-start gap-3 rounded-2xl border bg-card p-4">
+    <p className="justify-self-end rounded-2xl rounded-br-md bg-lime px-3.5 py-2 text-[14px] break-words whitespace-pre-wrap text-ink">{s.asked}</p>
+    <div className="min-w-0 text-[14px]"><TextOut text={s.answer}/></div>
+    <a href={`/s/${s.id}`} className="justify-self-start text-[12.5px] text-muted-foreground underline underline-offset-4 hover:text-foreground">{s.more?'Read the whole answer':'Open this answer'}</a>
+   </li>)}</ul>
+  </section>}
   <div ref={talk} className="mx-auto max-w-[1120px] scroll-mt-24 px-[clamp(16px,3vw,32px)] pb-8">{agent&&<AgentTalk agent={agent} auth={auth} onSignIn={onSignIn} onSpent={onSpent} onMood={onMood} ask={askText}/>}</div>
   {agent&&(()=>{const card=`/api/og/agent/${agent.id}?v=${agent.uses}-${agent.price}-${agent.talkPrice}-${agent.verified?1:0}`;
    return <section className="mx-auto grid max-w-[1120px] items-center gap-6 px-[clamp(16px,3vw,32px)] pb-16 md:grid-cols-[minmax(0,1.15fr)_minmax(0,.85fr)]" aria-label={`The card of ${agent.name}`}>
